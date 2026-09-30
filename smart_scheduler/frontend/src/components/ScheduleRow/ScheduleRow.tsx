@@ -45,7 +45,7 @@ export function ScheduleRow({
         ) : (
           <>
             <span className="schedule-row__time">{rowTimeLabel(primary, timeFormat)}</span>
-            <span className="schedule-row__action">{describeAction(primary.action)}</span>
+            {primary.trigger_type !== "auto_off" && <span className="schedule-row__action">{describeAction(primary.action)}</span>}
           </>
         )}
       </button>

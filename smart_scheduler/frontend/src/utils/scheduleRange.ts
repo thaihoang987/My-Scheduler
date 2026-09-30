@@ -23,8 +23,9 @@ export interface ScheduleDraft {
   end_date: string | null;
   // Kieu hen gio: "time" = gio co dinh (field `time`), "sunrise"/"sunset" =
   // binh minh/hoang hon +/- `offset_minutes`. Che do "Khung gio" chi ap dung
-  // cho moc BAT (moc TAT luon la gio co dinh `end_time`).
-  trigger_type: "time" | "sunrise" | "sunset";
+  // cho moc BAT (moc TAT luon la gio co dinh `end_time`). "auto_off" = tu
+  // tat sau khi bat, `time` la DO DAI "HH:MM:SS" (xem backend auto_off.py).
+  trigger_type: "time" | "sunrise" | "sunset" | "auto_off";
   offset_minutes: number;
   // Chi dung khi action_service === "climate_set".
   climate_hvac_mode: string | null;
@@ -204,8 +205,23 @@ export function describeAction(action: HAAction): string {
 /** Nhan hien thi cho 1 moc gio - "18:30:00" (kieu "time") hoac "Bình minh
  * +15p"/"Hoàng hôn -10p" (kieu sunrise/sunset), dung chung cho ten lich tu
  * dong sinh, ScheduleRow, ScheduleDetailSheet, DeviceDetail hero. */
-export function triggerLabel(triggerType: "time" | "sunrise" | "sunset", offsetMinutes: number, time: string): string {
+/** "30 phút" / "1 giờ 30 phút" / "45 giây" tu chuoi do dai "HH:MM:SS". */
+export function formatDuration(value: string): string {
+  const [h = 0, m = 0, s = 0] = value.split(":").map(Number);
+  const parts: string[] = [];
+  if (h) parts.push(`${h} ${tr("giờ", h > 1 ? "hours" : "hour")}`);
+  if (m) parts.push(`${m} ${tr("phút", "min")}`);
+  if (s) parts.push(`${s} ${tr("giây", "sec")}`);
+  return parts.join(" ") || `0 ${tr("phút", "min")}`;
+}
+
+export function autoOffLabel(duration: string): string {
+  return `⏱ ${tr("Tự tắt sau", "Auto-off after")} ${formatDuration(duration)}`;
+}
+
+export function triggerLabel(triggerType: Schedule["trigger_type"], offsetMinutes: number, time: string): string {
   if (triggerType === "time") return time;
+  if (triggerType === "auto_off") return autoOffLabel(time);
   const base = triggerType === "sunrise" ? tr("Bình minh", "Sunrise") : tr("Hoàng hôn", "Sunset");
   if (!offsetMinutes) return base;
   return `${base} ${offsetMinutes > 0 ? "+" : ""}${offsetMinutes}p`;
@@ -218,13 +234,13 @@ export function triggerLabel(triggerType: "time" | "sunrise" | "sunset", offsetM
  * tinh, khong phai gio chinh xac se chay MOI NGAY (gio mat troi xe di vai
  * phut/ngay theo mua). */
 export function triggerLabelWithClock(
-  triggerType: "time" | "sunrise" | "sunset",
+  triggerType: Schedule["trigger_type"],
   offsetMinutes: number,
   time: string,
   nextRun: string | null,
 ): string {
   const label = triggerLabel(triggerType, offsetMinutes, time);
-  if (triggerType === "time" || !nextRun) return label;
+  if (triggerType === "time" || triggerType === "auto_off" || !nextRun) return label;
   const clock = new Date(nextRun).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" });
   return `${label} (~${clock})`;
 }
@@ -240,6 +256,7 @@ export function draftName(draft: ScheduleDraft, entities: EntitySummary[]): stri
       : draft.target_entities.length === 1
         ? nameOf(draft.target_entities[0])
         : `${draft.target_entities.length} ${tr("thiết bị", "devices")}`;
+  if (draft.trigger_type === "auto_off") return `${deviceLabel} · ${autoOffLabel(draft.time)}`;
   if (draft.end_time) return `${deviceLabel} · ${draft.time}→${draft.end_time}`;
   if (draft.action_service === "climate_set") {
     const modeText = draft.climate_hvac_mode ? hvacModeLabel(draft.climate_hvac_mode) : tr("Đặt chế độ", "Set mode");
@@ -389,11 +406,14 @@ export async function saveScheduleDraft(
 
   if (!draft.end_time) {
     if (sibling) await api.deleteSchedule(sibling.id);
+    const autoOff = draft.trigger_type === "auto_off";
     const payload = {
       ...base,
+      // Tu tat khong dung ngay lap/khoang ngay/dieu kien - luon ap dung.
+      ...(autoOff ? { days: ALL_DAYS, start_date: null, end_date: null, group_id: null } : {}),
       name: draftName(draft, entities),
-      action: draftToAction(draft),
-      conditions: draft.conditions,
+      action: draftToAction(autoOff ? { ...draft, action_service: "turn_off" } : draft),
+      conditions: autoOff ? [] : draft.conditions,
       time: draft.time,
       trigger_type: draft.trigger_type,
       offset_minutes: draft.offset_minutes,
@@ -449,6 +469,9 @@ function toSeconds(t: string): number {
  * nhau; chi cam gio Bat va Tat trung chinh xac den giay trong cung 1 khung. */
 export function validateScheduleDraft(draft: ScheduleDraft): string | null {
   if (draft.target_entities.length === 0) return tr("Hãy chọn ít nhất một thiết bị", "Select at least one device");
+  if (draft.trigger_type === "auto_off") {
+    return toSeconds(draft.time) > 0 ? null : tr("Thời gian tự tắt phải lớn hơn 0", "Auto-off duration must be greater than 0");
+  }
   if (draft.days.length === 0) return tr("Hãy chọn ít nhất một ngày lặp", "Select at least one repeat day");
   if (draft.start_date && draft.end_date && draft.start_date > draft.end_date) {
     return tr("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc", "Start date must be before or equal to end date");

@@ -15,7 +15,7 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:latest
 ARG BUILD_VERSION
 
-FROM node:20-alpine AS frontend-build
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-build
 ARG BUILD_VERSION
 WORKDIR /frontend
 COPY ./frontend/package.json ./frontend/package-lock.json* ./

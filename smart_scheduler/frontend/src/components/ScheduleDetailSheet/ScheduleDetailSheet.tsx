@@ -44,12 +44,15 @@ export function ScheduleDetailSheet({
   onDelete: () => void;
 }) {
   if (!schedule) return null;
+  const autoOff = schedule.trigger_type === "auto_off";
   return (
     <BottomSheet open={open} title={scheduleTimeLabel(schedule, timeFormat)} onClose={onClose}>
       <div className="schedule-detail__summary">
         <div className="schedule-detail__name">{deviceName}</div>
-        <div className="schedule-detail__action">{describeAction(schedule.action)}</div>
-        <div className="schedule-detail__days">{daysLabel(schedule.days)}</div>
+        <div className="schedule-detail__action">
+          {autoOff ? tr("Mỗi lần thiết bị bật, tự tắt sau khoảng thời gian này", "Every time the device turns on, it is turned off after this duration") : describeAction(schedule.action)}
+        </div>
+        {!autoOff && <div className="schedule-detail__days">{daysLabel(schedule.days)}</div>}
         {(schedule.start_date || schedule.end_date) && (
           <div className="schedule-detail__range">
             {schedule.start_date ?? "…"} → {schedule.end_date ?? "…"}
@@ -57,12 +60,16 @@ export function ScheduleDetailSheet({
         )}
       </div>
       <div className="schedule-detail__actions">
-        <button className="btn btn--ghost btn--block" onClick={onSkip}>
-          {schedule.skip_once ? tr("Hủy bỏ qua lần tới", "Cancel next-run skip") : tr("Bỏ qua lần tới", "Skip next run")}
-        </button>
-        <button className="btn btn--ghost btn--block" onClick={onRunNow}>
-          {tr("Chạy ngay", "Run now")}
-        </button>
+        {!autoOff && (
+          <>
+            <button className="btn btn--ghost btn--block" onClick={onSkip}>
+              {schedule.skip_once ? tr("Hủy bỏ qua lần tới", "Cancel next-run skip") : tr("Bỏ qua lần tới", "Skip next run")}
+            </button>
+            <button className="btn btn--ghost btn--block" onClick={onRunNow}>
+              {tr("Chạy ngay", "Run now")}
+            </button>
+          </>
+        )}
         <button className="btn btn--ghost btn--block" onClick={onEdit}>
           {tr("Sửa lịch", "Edit schedule")}
         </button>

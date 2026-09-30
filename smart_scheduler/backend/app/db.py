@@ -99,6 +99,11 @@ CREATE TABLE IF NOT EXISTS manual_timers (
     off_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS auto_off_state (
+    entity_id TEXT PRIMARY KEY,
+    on_since TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_history_schedule ON execution_history(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_history_executed_at ON execution_history(executed_at);
 CREATE INDEX IF NOT EXISTS idx_manual_timers_off_at ON manual_timers(off_at);

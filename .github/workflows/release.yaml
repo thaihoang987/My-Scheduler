@@ -1,14 +1,12 @@
-# Automatic release: runs after every successful "Test channel" run (push to `dev`).
+# Release: push to `dev` -> build the multi-arch image -> only then commit to `main`,
+# tag v<version> and create the GitHub release. `main` is written by this workflow only,
+# so Home Assistant never sees an update whose image is not on GHCR yet.
+# A push without a version bump does nothing (that version is already released).
 # Can also be started by hand: Actions -> Release -> Run workflow.
-# Takes exactly what is on the `test` branch, builds the STABLE image, and only after the
-# image is on GHCR commits it to `main` and creates the GitHub release.
-# If that version was already released (dev push without a version bump) it does nothing.
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["Test channel"]
-    types: [completed]
+  push:
     branches: [dev]
   workflow_dispatch:
 
@@ -22,21 +20,20 @@ concurrency:
 
 jobs:
   release:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: test
+          ref: dev
           fetch-depth: 0
 
-      - name: Stable version
+      - name: Version
         id: v
         run: |
           version=$(python3 .github/scripts/set_channel.py version)
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --tags origin "refs/tags/v${version}" >/dev/null; then
-            echo "::notice::v${version} is already released - nothing to do (bump the version on dev to release)"
+            echo "::notice::v${version} is already released - nothing to do (bump the version to release)"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -55,7 +52,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push stable image
+      # Layer cache (npm ci / pip install) is reused until package-lock.json or
+      # requirements.txt change, so a normal code change only rebuilds the app layers.
+      - name: Build and push image
         if: steps.v.outputs.skip != 'true'
         uses: docker/build-push-action@v6
         with:
@@ -63,6 +62,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: ghcr.io/thaihoang987/smart-scheduler:${{ steps.v.outputs.version }}
           build-args: |
             BUILD_VERSION=${{ steps.v.outputs.version }}
@@ -80,7 +81,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p /tmp/release && cp -a . /tmp/release/ && rm -rf /tmp/release/.git
           git fetch origin main
-          # -f: set_channel.py modified config.yaml on the test tree (full copy is already in /tmp/release)
+          # -f: set_channel.py modified config.yaml on the dev tree (full copy is already in /tmp/release)
           git checkout -f -B main origin/main
           git rm -rq --ignore-unmatch .
           cp -a /tmp/release/. .

@@ -22,7 +22,7 @@ export function ForceOnControl({ entityIds, activeTimers, reloadTimers }: { enti
   const [busy, setBusy] = useState(false);
 
   const idSet = new Set(entityIds);
-  const active = activeTimers.find((t) => t.entity_ids.length === entityIds.length && t.entity_ids.every((id) => idSet.has(id)));
+  const active = activeTimers.find((t) => t.source !== "auto_off" && t.entity_ids.length === entityIds.length && t.entity_ids.every((id) => idSet.has(id)));
 
   async function handleForceOn() {
     setBusy(true);

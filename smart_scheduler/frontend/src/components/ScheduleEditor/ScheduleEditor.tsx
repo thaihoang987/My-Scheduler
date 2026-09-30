@@ -88,6 +88,11 @@ export function ScheduleEditor({
 
   const nameFor = (id: string) => entities.find((e) => e.entity_id === id)?.alias || entities.find((e) => e.entity_id === id)?.ha_friendly_name || id;
   const isRange = draft.end_time !== null;
+  // "Tu tat sau khi bat" (v0.5.44): `time` la do dai, backend dem tu luc
+  // thiet bi thuc su bat (tu bat ky dau) - khong co ngay lap/dieu kien/hanh dong.
+  const isAutoOff = draft.trigger_type === "auto_off";
+  const leaveAutoOff = (d: ScheduleDraft): Partial<ScheduleDraft> =>
+    d.trigger_type === "auto_off" ? { trigger_type: "time", time: EMPTY_DRAFT.time, action_service: "turn_on" } : {};
   const allDomain = (domain: string) =>
     draft.target_entities.length > 0 && draft.target_entities.every((id) => entities.find((e) => e.entity_id === id)?.domain === domain);
   const allClimate = allDomain("climate");
@@ -173,26 +178,41 @@ export function ScheduleEditor({
         )}
 
         <div className="chip-row">
-          <button className={!isRange ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, end_time: null }))}>
+          <button className={!isRange && !isAutoOff ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, end_time: null, ...leaveAutoOff(d) }))}>
             {tr("Mốc thời gian", "Time point")}
           </button>
           <button
             className={isRange ? "chip chip--active" : "chip"}
             onClick={() =>
-              setDraft((d) => ({
-                ...d,
-                end_time: d.end_time ?? defaultEndTime(d.time),
-                action_service: "turn_on",
-              }))
+              setDraft((d) => {
+                const base = { ...d, ...leaveAutoOff(d) };
+                return { ...base, end_time: d.end_time ?? defaultEndTime(base.time), action_service: "turn_on" };
+              })
             }
           >
             {tr("Khung giờ (bật → tắt)", "Time range (on → off)")}
+          </button>
+          <button
+            className={isAutoOff ? "chip chip--active" : "chip"}
+            onClick={() =>
+              setDraft((d) => ({
+                ...d,
+                trigger_type: "auto_off",
+                end_time: null,
+                action_service: "turn_off",
+                time: d.trigger_type === "auto_off" ? d.time : "00:30:00",
+                conditions: [],
+                end_conditions: [],
+              }))
+            }
+          >
+            ⏱ {tr("Tự tắt sau khi bật", "Auto-off after on")}
           </button>
         </div>
 
         {/* Khung gio: chip nay chi ap dung cho moc BAT (moc TAT luon la gio
             co dinh) - vd "bật đèn sân lúc hoàng hôn, tắt lúc 23:00". */}
-        <div className="chip-row">
+        {!isAutoOff && <div className="chip-row">
           <button
             className={draft.trigger_type === "time" ? "chip chip--active" : "chip"}
             onClick={() => setDraft((d) => ({ ...d, trigger_type: "time" }))}
@@ -211,11 +231,22 @@ export function ScheduleEditor({
           >
             🌇 {tr("Hoàng hôn", "Sunset")}{sunHint(sunTimes.sunset)}
           </button>
-        </div>
+        </div>}
 
         {showError && <div className="form-error" role="alert">{validationError}</div>}
 
-        {isRange ? (
+        {isAutoOff ? (
+          <>
+            <div className="field-label field-label--inline">{tr("Tắt sau (giờ : phút : giây)", "Turn off after (h : m : s)")}</div>
+            <TimeWheelPicker value={draft.time} onChange={(time) => setDraft((d) => ({ ...d, time }))} />
+            <p className="settings-hint">
+              {tr(
+                "Mỗi lần thiết bị bật (từ Lovelace, công tắc tay, automation hay lịch khác) sẽ tự tắt sau khoảng này. Mốc bật được lưu lại, Home Assistant/add-on khởi động lại vẫn tính tiếp; quá hạn trong lúc tắt máy thì tắt ngay khi chạy lại.",
+                "Whenever the device turns on (dashboard, wall switch, automation or another schedule) it is turned off after this duration. The on-time is stored, so restarts keep counting; if it expired while offline it turns off as soon as the add-on is back.",
+              )}
+            </p>
+          </>
+        ) : isRange ? (
           <div className="range-wheels">
             <div className="range-wheel">
               {draft.trigger_type === "time" ? (
@@ -248,7 +279,7 @@ export function ScheduleEditor({
           />
         )}
 
-        {!isRange && (
+        {!isRange && !isAutoOff && (
           <>
             <label className="field-label">{tr("Hành động", "Action")}</label>
             <div className="chip-row">
@@ -355,6 +386,7 @@ export function ScheduleEditor({
           </>
         )}
 
+        {!isAutoOff && <>
         <label className="field-label">{tr("Ngày lặp", "Repeat days")}</label>
         <DaySelector value={draft.days} onChange={(days) => setDraft((d) => ({ ...d, days }))} />
 
@@ -431,6 +463,7 @@ export function ScheduleEditor({
             onAdd={() => setConditionPickerFor("on")}
           />
         )}
+        </>}
       </BottomSheet>
 
       <EntityPicker

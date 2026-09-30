@@ -379,6 +379,27 @@ def delete_manual_timer(timer_id: str) -> bool:
     return cur.rowcount > 0
 
 
+# ---- auto-off (moc bat cua thiet bi co lich "Tự tắt sau khi bật", xem auto_off.py) ----
+
+def list_auto_off_state() -> dict[str, str]:
+    rows = get_conn().execute("SELECT entity_id, on_since FROM auto_off_state").fetchall()
+    return {row["entity_id"]: row["on_since"] for row in rows}
+
+
+def save_auto_off_state(entity_id: str, on_since: str) -> None:
+    with tx() as c:
+        c.execute(
+            "INSERT INTO auto_off_state (entity_id, on_since) VALUES (?, ?) "
+            "ON CONFLICT(entity_id) DO UPDATE SET on_since=excluded.on_since",
+            (entity_id, on_since),
+        )
+
+
+def delete_auto_off_state(entity_id: str) -> None:
+    with tx() as c:
+        c.execute("DELETE FROM auto_off_state WHERE entity_id=?", (entity_id,))
+
+
 # ---- history ----
 
 def add_history(schedule_id: Optional[str], schedule_name: Optional[str], scheduled_for: Optional[str],

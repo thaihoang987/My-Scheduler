@@ -57,7 +57,7 @@ export function groupSchedules(schedules: Schedule[], entities: EntitySummary[])
 export interface ActiveOnWindow {
   startAt: string;
   endAt: string;
-  source: "schedule" | "manual";
+  source: "schedule" | "manual" | "auto_off";
 }
 
 /** Tim khoang dang bat de ve thanh dem nguoc. Manual timer duoc uu tien;
@@ -72,7 +72,7 @@ export function activeOnWindow(group: DeviceGroup, timers: ManualTimer[], nowMs 
     const startMs = new Date(manual.started_at).getTime();
     const endMs = new Date(manual.off_at).getTime();
     if (startMs <= nowMs && nowMs < endMs) {
-      candidates.push({ startAt: manual.started_at, endAt: manual.off_at, source: "manual" });
+      candidates.push({ startAt: manual.started_at, endAt: manual.off_at, source: manual.source ?? "manual" });
     }
   }
 
@@ -139,6 +139,12 @@ export function nextRunOf(group: DeviceGroup): { time: string | null; scheduleId
     if (!best || s.next_run! < best.next_run!) best = s;
   }
   return { time: best?.next_run ?? null, scheduleId: best?.id ?? null };
+}
+
+/** Lich "Tu tat sau khi bat" dang co hieu luc cua card (ngan nhat neu nhieu). */
+export function autoOffOf(group: DeviceGroup): Schedule | null {
+  const list = group.schedules.filter((s) => s.trigger_type === "auto_off" && s.enabled && s.card_enabled !== false);
+  return list.sort((a, b) => a.time.localeCompare(b.time))[0] ?? null;
 }
 
 export function anyEnabled(group: DeviceGroup): boolean {

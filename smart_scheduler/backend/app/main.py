@@ -9,7 +9,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app import crud, homeassistant, manual_timer, presence
+from app import auto_off, crud, homeassistant, manual_timer, presence
 from app.api import backup, entities, groups, history, manual, presence as presence_api, schedules, settings as settings_api, sun
 from app.db import init_db
 from app.homeassistant import connection_mode
@@ -21,6 +21,7 @@ log = logging.getLogger("ha_smart_scheduler")
 
 _scheduler_task: asyncio.Task | None = None
 _presence_task: asyncio.Task | None = None
+_auto_off_task: asyncio.Task | None = None
 
 
 async def _reset_devices_on_startup() -> None:
@@ -67,7 +68,7 @@ async def _reset_devices_on_startup() -> None:
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _scheduler_task, _presence_task
+    global _scheduler_task, _presence_task, _auto_off_task
     init_db()
     log.info("Database ready")
     await _reset_devices_on_startup()
@@ -78,8 +79,9 @@ async def lifespan(app: FastAPI):
     log.info("Home Assistant connection mode: %s", connection_mode())
     _scheduler_task = asyncio.create_task(scheduler_loop())
     _presence_task = asyncio.create_task(presence.presence_loop())
+    _auto_off_task = asyncio.create_task(auto_off.auto_off_loop())
     yield
-    for task in (_scheduler_task, _presence_task):
+    for task in (_scheduler_task, _presence_task, _auto_off_task):
         if task:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):

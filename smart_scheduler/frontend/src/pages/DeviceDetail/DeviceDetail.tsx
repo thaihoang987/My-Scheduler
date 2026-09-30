@@ -16,8 +16,8 @@ import { removeStaleFallbackClones } from "../../utils/sortableFallbackCleanup";
 import { visualFor } from "../../utils/deviceVisuals";
 import { useMdiIcons } from "../../utils/mdiIcons";
 import { formatTimeDisplay } from "../../utils/formatTime";
-import { activeOnWindow, cardEnabled, entityNames, isRangeRowRunning, nextRunOf } from "../../utils/groupSchedules";
-import { deleteScheduleWithSibling, describeAction, groupIntoRows, saveScheduleDraft, triggerLabelWithClock, type ScheduleDraft } from "../../utils/scheduleRange";
+import { activeOnWindow, autoOffOf, cardEnabled, entityNames, isRangeRowRunning, nextRunOf } from "../../utils/groupSchedules";
+import { autoOffLabel, deleteScheduleWithSibling, describeAction, groupIntoRows, saveScheduleDraft, triggerLabelWithClock, type ScheduleDraft } from "../../utils/scheduleRange";
 import { tr } from "../../i18n";
 
 export function DeviceDetail({
@@ -180,6 +180,14 @@ export function DeviceDetail({
           <div className="device-detail__hero-action">{describeAction(nextSchedule.action)}</div>
           <Countdown nextRun={nextRun} />
           {onWindow?.source === "schedule" && <OnTimeProgress startAt={onWindow.startAt} endAt={onWindow.endAt} />}
+        </div>
+      ) : autoOffOf(group) && cardEnabled(group) ? (
+        <div className="device-detail__hero">
+          <div className="device-detail__hero-time">{autoOffLabel(autoOffOf(group)!.time)}</div>
+          <div className="device-detail__hero-action">
+            {onWindow?.source === "auto_off" ? tr("Đang bật - sẽ tự tắt khi hết thời gian", "On - will turn off when the time is up") : tr("Tự đếm khi thiết bị bật", "Starts counting when the device turns on")}
+          </div>
+          {onWindow?.source === "auto_off" && <OnTimeProgress startAt={onWindow.startAt} endAt={onWindow.endAt} />}
         </div>
       ) : (
         <div className="device-detail__hero device-detail__hero--empty">
