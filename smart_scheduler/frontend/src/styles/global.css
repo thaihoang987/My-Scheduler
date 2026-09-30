@@ -338,7 +338,7 @@ body {
 
 .empty-state__title { font-size: 18px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
 
-.settings-hint { font-size: 13px; color: var(--text-muted); margin: 0 0 12px; }
+.settings-hint { font-size: 14px; color: var(--text-muted); margin: 0 0 12px; }
 
 .icon-btn {
   background: var(--surface-2);
@@ -786,7 +786,7 @@ body {
 .entity-row--disabled { opacity: 0.4; }
 
 .entity-row__icon {
-  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--accent) 16%, var(--surface));
   color: var(--accent);
@@ -794,27 +794,29 @@ body {
 
 .entity-row__info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-.entity-row__name { font-size: 15px; font-weight: 500; }
+.entity-row__name { font-size: 16px; font-weight: 500; }
 
-.entity-row__domain, .entity-row__state, .entity-row__id { font-size: 12px; color: var(--text-muted); }
+.entity-row__domain, .entity-row__state, .entity-row__id { font-size: 13px; color: var(--text-muted); }
 
 /* Dong thiet bi trong Cai dat -> Thiet bi: chu nho hon 2px, hang nut nho
    gon ben duoi ten, can trai (DevicesSettings.tsx). */
 .device-row { align-items: flex-start; }
-.device-row .entity-row__icon { margin-top: 2px; }
-.device-row .entity-row__name { font-size: 13px; overflow-wrap: anywhere; }
-.device-row .entity-row__id { font-size: 10px; overflow-wrap: anywhere; }
-.device-row__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+/* v0.5.49: bo thu nho chu (13/10px -> 16/13px) - phan hoi "chữ trong settings
+   bé quá không thấy gì" ca dien thoai lan web. */
+.device-row .entity-row__icon { margin-top: 2px; width: 40px; height: 40px; }
+.device-row .entity-row__name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.device-row .entity-row__id { font-size: 13px; overflow-wrap: anywhere; }
+.device-row__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .device-row__btn {
   display: inline-flex; align-items: center; justify-content: center;
-  height: 28px; padding: 0 10px; border: none; border-radius: 999px;
+  height: 34px; padding: 0 14px; border: none; border-radius: 999px;
   background: var(--surface-2); color: var(--text);
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-size: 14px; font-weight: 600; cursor: pointer;
 }
-.device-row__btn--icon { width: 28px; padding: 0; }
+.device-row__btn--icon { width: 34px; padding: 0; }
 
 .readonly-value { padding: 10px 0; font-size: 15px; }
-.readonly-value--muted { color: var(--text-muted); font-size: 13px; }
+.readonly-value--muted { color: var(--text-muted); font-size: 14px; }
 
 /* ---- Bottom sheet ---- */
 
@@ -1022,8 +1024,8 @@ body {
 .history-row__status--success { color: var(--success); }
 .history-row__status--error { color: var(--danger); }
 
-.history-row__name { font-weight: 600; font-size: 14px; }
-.history-row__time { font-size: 12px; color: var(--text-muted); }
+.history-row__name { font-weight: 600; font-size: 15px; }
+.history-row__time { font-size: 13px; color: var(--text-muted); }
 .history-row__label { color: var(--warning); }
 .history-row__message { font-size: 12px; color: var(--danger); margin-top: 2px; }
 
@@ -1052,7 +1054,7 @@ body {
 .settings-row {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px; background: var(--surface); border-radius: var(--radius);
-  margin-bottom: 6px; font-size: 14px;
+  margin-bottom: 6px; font-size: 15px;
 }
 
 .settings-list-row {
@@ -1068,15 +1070,15 @@ body {
 }
 
 .settings-list-row__icon {
-  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
   background: color-mix(in srgb, var(--accent) 16%, var(--surface));
   color: var(--accent);
   display: flex; align-items: center; justify-content: center;
 }
 
 .settings-list-row__text { flex: 1; display: flex; flex-direction: column; }
-.settings-list-row__title { font-size: 15px; font-weight: 500; }
-.settings-list-row__hint { font-size: 12px; color: var(--text-muted); }
+.settings-list-row__title { font-size: 16px; font-weight: 500; }
+.settings-list-row__hint { font-size: 13px; color: var(--text-muted); }
 .settings-list-row__chevron { color: var(--text-muted); flex-shrink: 0; }
 
 .subpage-header {
@@ -1084,10 +1086,10 @@ body {
   padding: 4px 0 10px;
 }
 
-.subpage-header__title { font-size: 17px; font-weight: 700; }
+.subpage-header__title { font-size: 18px; font-weight: 700; }
 .subpage-header__spacer { width: 36px; }
 
-.status-text { font-size: 13px; }
+.status-text { font-size: 14px; }
 .status-text--on { color: var(--success); }
 .status-text--off { color: var(--warning); }
 

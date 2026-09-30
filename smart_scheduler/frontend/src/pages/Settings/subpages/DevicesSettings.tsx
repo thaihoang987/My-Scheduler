@@ -131,7 +131,7 @@ export function DevicesSettings({
     <div className="page">
       <SubpageHeader title={tr("Thiết bị", "Devices")} onBack={onBack} />
       <button className="btn btn--primary btn--block" onClick={() => setAddOpen(true)}>
-        <Icon path={mdiPlus} size={16} /> {tr("Thêm thiết bị", "Add devices")}
+        <Icon path={mdiPlus} size={20} /> {tr("Thêm thiết bị", "Add devices")}
       </button>
       <input className="input search-input" placeholder={`🔍 ${tr("Tìm thiết bị đã thêm...", "Search added devices...")}`} value={search} onChange={(e) => setSearch(e.target.value)} />
       {added.length === 0 ? (
@@ -143,7 +143,7 @@ export function DevicesSettings({
             return (
               <div key={e.entity_id} className="entity-row entity-row--editable device-row">
                 <span className="entity-row__icon" style={{ "--accent": visual.color } as React.CSSProperties}>
-                  <Icon path={visual.icon} size={18} />
+                  <Icon path={visual.icon} size={24} />
                 </span>
                 {/* Ten + entity_id chiem tron chieu ngang, hang nut nho gon
                     nam ben duoi can trai - phan hoi 2026-09-24 (anh chup:
@@ -156,7 +156,7 @@ export function DevicesSettings({
                   </div>
                   <div className="device-row__actions">
                     <button className="device-row__btn device-row__btn--icon" onClick={() => toggleFavorite(e)} aria-label={tr("Yêu thích", "Favorite")}>
-                      <Icon path={e.favorite ? mdiStar : mdiStarOutline} size={16} />
+                      <Icon path={e.favorite ? mdiStar : mdiStarOutline} size={20} />
                     </button>
                     <button className="device-row__btn" onClick={() => setGroupPickerFor(e)}>
                       {groupNameOf(e.category_id) ?? `+ ${tr("Nhóm", "Group")}`}
@@ -173,10 +173,10 @@ export function DevicesSettings({
                         setSaveError("");
                       }}
                     >
-                      <Icon path={mdiPencilOutline} size={16} />
+                      <Icon path={mdiPencilOutline} size={20} />
                     </button>
                     <button className="device-row__btn device-row__btn--icon" onClick={() => removeDevice(e)} aria-label={tr("Bỏ khỏi danh sách", "Remove from list")}>
-                      <Icon path={mdiDeleteOutline} size={16} />
+                      <Icon path={mdiDeleteOutline} size={20} />
                     </button>
                   </div>
                 </div>

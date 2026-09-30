@@ -69,7 +69,7 @@ export function GroupsSettings({
           onChange={(e) => setNewName(e.target.value)}
         />
         <button className="btn btn--primary" onClick={addGroup} disabled={!newName.trim()}>
-          <Icon path={mdiPlus} size={16} /> {tr("Thêm", "Add")}
+          <Icon path={mdiPlus} size={20} /> {tr("Thêm", "Add")}
         </button>
       </div>
 
@@ -83,10 +83,10 @@ export function GroupsSettings({
                 <div className="entity-row__name">{g.name}</div>
               </div>
               <button className="icon-btn icon-btn--plain" onClick={() => move(i, -1)} disabled={i === 0} aria-label={tr("Lên", "Move up")}>
-                <Icon path={mdiArrowUp} size={18} />
+                <Icon path={mdiArrowUp} size={22} />
               </button>
               <button className="icon-btn icon-btn--plain" onClick={() => move(i, 1)} disabled={i === categoryGroups.length - 1} aria-label={tr("Xuống", "Move down")}>
-                <Icon path={mdiArrowDown} size={18} />
+                <Icon path={mdiArrowDown} size={22} />
               </button>
               <button
                 className="icon-btn icon-btn--plain"
@@ -96,10 +96,10 @@ export function GroupsSettings({
                 }}
                 aria-label={tr("Đổi tên", "Rename")}
               >
-                <Icon path={mdiPencilOutline} size={18} />
+                <Icon path={mdiPencilOutline} size={22} />
               </button>
               <button className="icon-btn icon-btn--plain" onClick={() => removeGroup(g)} aria-label={tr("Xóa nhóm", "Delete group")}>
-                <Icon path={mdiDeleteOutline} size={18} />
+                <Icon path={mdiDeleteOutline} size={22} />
               </button>
             </div>
           ))}

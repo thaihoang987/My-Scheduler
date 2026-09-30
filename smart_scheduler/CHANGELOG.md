@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.49
+
+- Larger text in Settings, on both phones and desktop: device names and entity IDs in Settings → Devices
+  (were 13/10 px, now 16/13 px), bigger action buttons and icons, and slightly larger menu, hint, status
+  and log text.
+- Icons in Settings scaled up to match: menu icons (32 → 40 px tiles), back/chevron arrows, device icons,
+  group, backup and device picker icons.
+
 ## 0.5.48
 
 - Maintenance release (no functional changes since 0.5.47).

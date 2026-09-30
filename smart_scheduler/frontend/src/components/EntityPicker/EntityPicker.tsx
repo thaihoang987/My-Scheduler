@@ -40,7 +40,7 @@ const EntityRow = memo(function EntityRow({
   return (
     <label className={`entity-row entity-row--card ${disabled ? "entity-row--disabled" : ""}`}>
       <span className="entity-row__icon" style={{ "--accent": visual.color } as React.CSSProperties}>
-        <Icon path={visual.icon} size={20} />
+        <Icon path={visual.icon} size={22} />
       </span>
       <span className="entity-row__info">
         <span className="entity-row__name">{entity.alias || entity.ha_friendly_name}</span>
@@ -240,7 +240,7 @@ export function EntityPicker({
       {showSuggestions && favorites.length > 0 && (
         <div className="entity-group">
           <div className="entity-group__title">
-            <Icon path={mdiStar} size={12} /> {tr("Yêu thích", "Favorites")}
+            <Icon path={mdiStar} size={14} /> {tr("Yêu thích", "Favorites")}
           </div>
           {favorites.map((e) => (
             <EntityRow
