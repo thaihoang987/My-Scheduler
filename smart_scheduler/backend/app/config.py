@@ -37,3 +37,8 @@ DEFAULT_TIMEZONE = OPTIONS.get("timezone") or os.environ.get("TZ") or "Asia/Ho_C
 # proxy noi bo luon duoc uu tien va khong can nguoi dung cau hinh gi.
 HA_TOKEN = (OPTIONS.get("ha_token") or "").strip()
 HA_BASE_URL_OVERRIDE = (OPTIONS.get("ha_base_url") or "").strip().rstrip("/")
+
+# Mui gio doc truc tiep tu cau hinh Home Assistant (GET /api/config -> time_zone)
+# luc add-on khoi dong (main.py, v0.5.53) - nguon DUY NHAT cho mac dinh; TZ o tren
+# chi con la du phong khi chua doc duoc HA.
+HA_TIMEZONE: str | None = None

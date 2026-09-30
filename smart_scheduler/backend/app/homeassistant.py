@@ -12,6 +12,7 @@ import asyncio
 import itertools
 import json
 import logging
+import ssl
 import time
 
 import httpx
@@ -71,8 +72,21 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
+_ssl_context: ssl.SSLContext | None = None
+
+
+def _client(timeout: float) -> httpx.AsyncClient:
+    """httpx.AsyncClient() moi lan tao lai SSL context (nap bo chung chi, DONG BO)
+    ~0.2s chan ca event loop - 12 lich cung gio thi cai cuoi tre ~2s (do thuc te
+    v0.5.53). Tao SSL context 1 lan, dung lai cho moi client."""
+    global _ssl_context
+    if _ssl_context is None:
+        _ssl_context = ssl.create_default_context()
+    return httpx.AsyncClient(timeout=timeout, verify=_ssl_context)
+
+
 async def get_states() -> list[dict]:
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with _client(10) as client:
         resp = await client.get(f"{_effective_api_base()}/states", headers=_headers())
         resp.raise_for_status()
         return resp.json()
@@ -82,7 +96,7 @@ async def get_core_config() -> dict:
     """GET /config - lay latitude/longitude/elevation cua HA (Settings ->
     System -> General) de tinh gio moc troi/lan (sunrise/sunset trigger,
     muc "Kieu hen gio" moi)."""
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with _client(10) as client:
         resp = await client.get(f"{_effective_api_base()}/config", headers=_headers())
         resp.raise_for_status()
         return resp.json()
@@ -92,7 +106,7 @@ async def call_service(domain: str, service: str, entity_ids: list[str], service
     log.info("HA command service=%s.%s targets=%s", domain, service, entity_ids)
     payload = dict(service_data or {})
     payload["entity_id"] = entity_ids
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with _client(15) as client:
         resp = await client.post(
             f"{_effective_api_base()}/services/{domain}/{service}",
             headers=_headers(),

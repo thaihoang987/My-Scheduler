@@ -1,10 +1,11 @@
 import { api } from "../../services/api";
 import type { EntitySummary, PresenceStatus, Settings } from "../../types";
 import { entityNames } from "../../utils/groupSchedules";
-import { appLocale, tr } from "../../i18n";
+import { tr } from "../../i18n";
+import { fmtDateTime, fmtTime } from "../../utils/appTime";
 
 function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString(appLocale(), { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+  return fmtDateTime(iso, { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
 }
 
 /** Cac bang thong bao dau trang Nha: dang tam dung lich, dang gia lap co
@@ -45,9 +46,9 @@ export function HomeBanners({
           <span className="home-banner__text">
             🏠 {tr("Giả lập có người đang chạy", "Presence simulation is running")}
             {presence.on.length > 0
-              ? ` · ${tr("đang bật", "on")}: ${entityNames(presence.on.map((o) => o.entity_id), entities)} ${tr("đến", "until")} ${formatWhen(presence.on[0].off_at).slice(0, 5)}`
+              ? ` · ${tr("đang bật", "on")}: ${entityNames(presence.on.map((o) => o.entity_id), entities)} ${tr("đến", "until")} ${fmtTime(presence.on[0].off_at)}`
               : presence.next_start_at
-                ? ` · ${tr("bật tiếp lúc", "next activity at")} ~${formatWhen(presence.next_start_at).slice(0, 5)}`
+                ? ` · ${tr("bật tiếp lúc", "next activity at")} ~${fmtTime(presence.next_start_at)}`
                 : ""}
           </span>
         </div>

@@ -3,6 +3,7 @@ dict thuan (khong ORM) de FastAPI/Pydantic serialize truc tiep."""
 import json
 from typing import Any, Optional
 
+from app import config
 from app.config import DEFAULT_TIMEZONE
 from app.db import get_conn, new_id, now_iso, tx
 from app.i18n import tr
@@ -15,7 +16,12 @@ def settings_timezone() -> str:
     dung voi lich. Cot `schedules.timezone` gio chi con de tuong thich."""
     conn = get_conn()
     row = conn.execute("SELECT value FROM settings WHERE key='timezone'").fetchone()
-    return (json.loads(row["value"]) if row else None) or DEFAULT_TIMEZONE
+    return (json.loads(row["value"]) if row else None) or default_timezone()
+
+
+def default_timezone() -> str:
+    """Mui gio cua Home Assistant (doc luc khoi dong), chua doc duoc thi TZ/mac dinh."""
+    return config.HA_TIMEZONE or DEFAULT_TIMEZONE
 
 
 def _row_to_schedule(row, tz: Optional[str] = None) -> dict[str, Any]:
@@ -473,13 +479,14 @@ def get_settings() -> dict:
     conn = get_conn()
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
     stored = {r["key"]: json.loads(r["value"]) for r in rows}
-    return {**DEFAULT_SETTINGS, **stored}
+    # timezone mac dinh = mui gio HA; ha_timezone chi de hien thi/so sanh o Cai dat.
+    return {**DEFAULT_SETTINGS, "timezone": default_timezone(), **stored, "ha_timezone": config.HA_TIMEZONE}
 
 
 def update_settings(data: dict) -> dict:
     with tx() as c:
         for k, v in data.items():
-            if v is None:
+            if v is None or k == "ha_timezone":
                 continue
             c.execute(
                 "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -500,7 +507,9 @@ def export_all() -> dict:
         "entity_aliases": [dict(r) for r in conn.execute("SELECT * FROM entity_aliases").fetchall()],
         # v2: them nhom phan loai (Cai dat -> Nhom) - truoc day mat khi khoi phuc.
         "groups": [dict(r) for r in conn.execute("SELECT * FROM groups").fetchall()],
-        "settings": get_settings(),
+        # Chi cac gia tri nguoi dung DA CHINH (v0.5.53): truoc day xuat ca mac dinh
+        # -> khoi phuc bien mui gio mac dinh thanh gia tri co dinh, het theo HA.
+        "settings": {r["key"]: json.loads(r["value"]) for r in conn.execute("SELECT key, value FROM settings").fetchall()},
     }
 
 
@@ -550,6 +559,8 @@ def import_all(data: dict) -> None:
                 ),
             )
         for k, v in (data.get("settings") or {}).items():
+            if k == "ha_timezone":
+                continue  # chi la thong tin doc tu HA, khong luu
             c.execute(
                 "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, json.dumps(v)),

@@ -184,4 +184,20 @@ async def auto_off_loop() -> None:
             raise
         except Exception:  # noqa: BLE001
             log.exception("Loi khong mong doi trong auto_off_loop")
-        await asyncio.sleep(POLL_SECONDS)
+        await asyncio.sleep(next_sleep())
+
+
+def next_sleep(now: datetime | None = None) -> float:
+    """Ngu toi da POLL_SECONDS, nhung thuc day DUNG luc thiet bi dang dem toi han
+    (test dau cuoi v0.5.53: tu tat 15s thuc te tat sau 20s vi cho het vong 5s)."""
+    now = now or _now()
+    rule_map = rules()
+    wait = float(POLL_SECONDS)
+    for eid, on_since in crud.list_auto_off_state().items():
+        start = _parse(on_since)
+        if start is None or eid not in rule_map:
+            continue
+        left = (start + timedelta(seconds=rule_map[eid][0]) - now).total_seconds()
+        if left > 0:
+            wait = min(wait, left + 0.05)
+    return max(0.2, wait)

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../../services/api";
 import type { HistoryEntry } from "../../types";
-import { appLocale, storedText, tr } from "../../i18n";
+import { storedText, tr } from "../../i18n";
+import { fmtDateTime } from "../../utils/appTime";
 
 /** Cot trai chi co icon (rong 20px); chu mo ta trang thai hien duoi gio chay
  * - truoc day ca cum "⚠ bỏ qua (lỡ giờ)" nhet vao cot 20px nen tran ra ngoai. */
@@ -14,6 +15,7 @@ function statusInfo(status: string): [string, string] {
     skipped_condition: ["⚠", tr("Bỏ qua (điều kiện)", "Skipped (condition)")],
     skipped_expired: ["⚠", tr("Bỏ qua (hết khung)", "Skipped (expired)")],
     verify_failed: ["⚠", tr("Sai trạng thái", "State mismatch")],
+    warning: ["⚠", tr("Cảnh báo", "Warning")],
   } as Record<string, [string, string]>)[status] || ["•", status];
 }
 
@@ -50,7 +52,7 @@ export function History() {
                 {storedText(e.schedule_name) || tr("(đã xóa)", "(deleted)")} {e.manual && <span className="badge">{tr("thủ công", "manual")}</span>}
               </div>
               <div className="history-row__time">
-                {new Date(e.executed_at).toLocaleString(appLocale())}
+                {fmtDateTime(e.executed_at)}
                 {label && <span className="history-row__label"> · {label}</span>}
               </div>
               {e.message && <div className="history-row__message">{storedText(e.message)}</div>}

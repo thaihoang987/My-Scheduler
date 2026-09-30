@@ -66,11 +66,32 @@ async def _reset_devices_on_startup() -> None:
         log.warning("Tat thiet bi luc khoi dong that bai (HA co the chua san sang): %s", exc)
 
 
+async def _load_ha_timezone() -> None:
+    """Lay mui gio tu cau hinh HA (Settings -> System -> General) - moi tinh toan
+    gio cua add-on theo dung mui nay tru khi nguoi dung chu dong chon khac trong
+    Cai dat. Loi (HA chua san sang) -> giu TZ do Supervisor truyen vao."""
+    from zoneinfo import ZoneInfo
+
+    from app import config
+    try:
+        tz = (await homeassistant.get_core_config()).get("time_zone")
+        if tz:
+            ZoneInfo(tz)
+            config.HA_TIMEZONE = tz
+            log.info("Mui gio Home Assistant: %s", tz)
+            chosen = crud.settings_timezone()
+            if chosen != tz:
+                log.warning("Mui gio trong Cai dat (%s) khac Home Assistant (%s) - lich chay theo %s", chosen, tz, chosen)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Chua doc duoc mui gio tu Home Assistant (dung TZ=%s): %s", config.DEFAULT_TIMEZONE, exc)
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     global _scheduler_task, _presence_task, _auto_off_task
     init_db()
     log.info("Database ready")
+    await _load_ha_timezone()
     await _reset_devices_on_startup()
     await manual_timer.restore_active()
     frontend_version_file = Path(os.environ.get("STATIC_DIR", "/app/static")) / "build-version.txt"

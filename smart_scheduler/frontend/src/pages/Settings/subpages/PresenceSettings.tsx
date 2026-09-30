@@ -5,10 +5,11 @@ import { api } from "../../../services/api";
 import type { EntitySummary, PresenceConfig, PresenceStatus } from "../../../types";
 import { entityNames } from "../../../utils/groupSchedules";
 import { SubpageHeader } from "../SubpageHeader";
-import { appLocale, tr } from "../../../i18n";
+import { tr } from "../../../i18n";
+import { fmtTime } from "../../../utils/appTime";
 
 function hhmm(iso: string): string {
-  return new Date(iso).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" });
+  return fmtTime(iso);
 }
 
 /** "Giả lập có người" (v0.5.32) - khi di vang, trong khung gio da chon bat

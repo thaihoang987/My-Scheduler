@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.53
+
+- Time zone now comes straight from Home Assistant (Settings → System → General) unless you pick a
+  different one in the app. A different zone replaces the HA zone (it is never added on top); the
+  mismatch is noted in the Log.
+- Fixed: card times, sunrise/sunset hints, the Log, pause and presence times were shown in the
+  browser/phone time zone. Everything now uses the app time zone, so a phone set to another zone no
+  longer shows shifted times.
+- Faster, on-time runs: many schedules due at the same second no longer queue up (each Home Assistant
+  call used to rebuild its SSL context, ~0.2 s each). Auto-off now turns off exactly on time instead of
+  up to 5 s late, and bursts of updates reload the page data once.
+- Backups no longer freeze the default time zone when restored.
+
 ## 0.5.52
 
 - Fixed: when a time range turned a device on, its card could stay at "Due now" without the countdown
