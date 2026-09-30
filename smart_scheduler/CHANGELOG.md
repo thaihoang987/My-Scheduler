@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.47
+
+- Auto-off rows are laid out as a grid (about a quarter of the width on desktop, full width on phones).
+- Every group on Home can be collapsed/expanded by tapping its title; the state is remembered on each device.
+- In Arrange mode (pencil) groups get ▲/▼ buttons: move the Auto-off block anywhere between the other
+  groups, and reorder your own groups right from Home.
+
 ## 0.5.46
 
 - Auto-off rows on Home can be reordered: tap the pencil (Arrange) and drag the handle.

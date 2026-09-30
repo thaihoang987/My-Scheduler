@@ -9,6 +9,8 @@ import { useMdiIcons } from "../../utils/mdiIcons";
 import { entityNames } from "../../utils/groupSchedules";
 import { formatDuration } from "../../utils/scheduleRange";
 import { Icon } from "../Icon/Icon";
+import type { SectionControls } from "../GroupedDeviceGrid/GroupedDeviceGrid";
+import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { OnTimeProgress } from "../OnTimeProgress/OnTimeProgress";
 import { tr } from "../../i18n";
 
@@ -27,7 +29,9 @@ export function AutoOffList({
   onToggle,
   reload,
   setDragging,
+  controls,
 }: {
+  controls: SectionControls;
   rules: Schedule[];
   allSchedules: Schedule[];
   editMode: boolean;
@@ -76,9 +80,9 @@ export function AutoOffList({
   const entityMap = new Map(entities.map((e) => [e.entity_id, e]));
 
   return (
-    <div className="auto-off">
-      <div className="device-detail__section-title">⏱ {tr("Tự tắt sau khi bật", "Auto-off after on")}</div>
-      <div className="auto-off__list" ref={listRef}>
+    <div className="device-section auto-off">
+      <SectionHeader title={`⏱ ${tr("Tự tắt sau khi bật", "Auto-off after on")}`} count={rules.length} {...controls} />
+      <div className={`auto-off__list ${controls.collapsed ? "is-collapsed" : ""}`} ref={listRef}>
         {rules.map((rule) => {
           const first = entityMap.get(rule.target_entities[0]);
           const name = entityNames(rule.target_entities, entities);

@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS: SettingsType = {
   reset_devices_on_startup: false,
   pause_until: "",
   verify_state: false,
+  auto_off_section_index: 0,
 };
 
 export function App() {

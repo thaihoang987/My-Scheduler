@@ -464,6 +464,8 @@ DEFAULT_SETTINGS = {
     # Xem SettingsIn.pause_until / scheduler_engine.paused_until().
     "pause_until": "",
     "verify_state": False,
+    # Vi tri khoi "Tu tat sau khi bat" tren trang Nha giua cac nhom (0 = tren cung).
+    "auto_off_section_index": 0,
 }
 
 

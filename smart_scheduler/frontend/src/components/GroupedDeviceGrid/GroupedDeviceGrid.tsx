@@ -1,13 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Sortable from "sortablejs";
 import { api } from "../../services/api";
 import type { DeviceGroup, EntitySummary, Group, ManualTimer, Settings } from "../../types";
 import { removeStaleFallbackClones } from "../../utils/sortableFallbackCleanup";
 import { DeviceCard } from "../DeviceCard/DeviceCard";
+import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { tr } from "../../i18n";
 
-const UNGROUPED = "__ungrouped__";
+export const UNGROUPED = "__ungrouped__";
 const SORTABLE_GROUP = "smart-scheduler-devices";
+
+/** Thu/phong + doi vi tri 1 nhom (Home.tsx tinh, xem SectionHeader). */
+export interface SectionControls {
+  collapsed: boolean;
+  onToggle: () => void;
+  onMoveUp?: (() => void) | null;
+  onMoveDown?: (() => void) | null;
+}
 
 interface Section {
   id: string;
@@ -48,7 +57,13 @@ export function GroupedDeviceGrid({
   onReorder,
   setDragging,
   editMode,
+  controls,
+  extra,
 }: {
+  /** Thu/phong + nut len/xuong cho tung nhom (theo section id). */
+  controls: (sectionId: string) => SectionControls;
+  /** Khoi chen them giua cac nhom (danh sach "Tu tat") tai vi tri `index`. */
+  extra?: { index: number; node: ReactNode };
   groups: DeviceGroup[];
   entities: EntitySummary[];
   categoryGroups: Group[];
@@ -122,12 +137,18 @@ export function GroupedDeviceGrid({
   // de co cho tha thiet bi vao; luc xem binh thuong an di cho gon, khong con
   // gi de tuong tac voi 1 nhom rong ca.
   const visibleSections = editMode ? sections : sections.filter((s) => s.groups.length > 0);
+  // Khoi "Tu tat" dat ngay truoc nhom HIEN dau tien co vi tri >= extra.index
+  // (nhom rong bi an luc xem thuong khong lam mat khoi nay).
+  const extraPlacedBefore = (section: Section) =>
+    visibleSections.some((sec) => sec !== section && sections.indexOf(sec) >= (extra?.index ?? 0) && visibleSections.indexOf(sec) < visibleSections.indexOf(section));
 
   return (
     <div ref={containerRef}>
       {visibleSections.map((section) => (
+        <Fragment key={section.id}>
+        {extra && sections.indexOf(section) >= extra.index && !extraPlacedBefore(section) && extra.node}
         <SectionBlock
-          key={section.id}
+          controls={controls(section.id)}
           section={section}
           compact={compact}
           timeFormat={timeFormat}
@@ -141,7 +162,9 @@ export function GroupedDeviceGrid({
           setDragging={setDragging}
           editMode={editMode}
         />
+        </Fragment>
       ))}
+      {extra && !visibleSections.some((sec) => sections.indexOf(sec) >= extra.index) && extra.node}
       {pickerFor && (
         <div className="sheet-backdrop" onClick={() => !saving && setPickerFor(null)}>
           <div className="sheet" onClick={(event) => event.stopPropagation()}>
@@ -194,7 +217,9 @@ function SectionBlock({
   onDragEnd,
   setDragging,
   editMode,
+  controls,
 }: {
+  controls: SectionControls;
   section: Section;
   compact: boolean;
   timeFormat: Settings["time_format"];
@@ -280,10 +305,8 @@ function SectionBlock({
 
   return (
     <div className="device-section">
-      <div className="device-section__title">
-        {section.name} <span className="device-section__count">{section.groups.length}</span>
-      </div>
-      <div ref={listRef} data-section-list data-section-id={section.id} className={`device-grid ${compact ? "device-grid--compact" : ""}`}>
+      <SectionHeader title={section.name} count={section.groups.length} {...controls} />
+      <div ref={listRef} data-section-list data-section-id={section.id} className={`device-grid ${compact ? "device-grid--compact" : ""} ${controls.collapsed ? "is-collapsed" : ""}`}>
         {section.groups.map((g) => (
           <DeviceCard
             key={g.key}
