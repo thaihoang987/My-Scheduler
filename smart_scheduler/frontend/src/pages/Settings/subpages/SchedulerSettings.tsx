@@ -1,7 +1,5 @@
-import { useMemo } from "react";
 import { api } from "../../../services/api";
 import type { Settings as SettingsType } from "../../../types";
-import { timezoneOptions } from "../../../utils/timezones";
 import { SubpageHeader } from "../SubpageHeader";
 import { tr } from "../../../i18n";
 import { fmtDateTime } from "../../../utils/appTime";
@@ -12,7 +10,6 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
     reload();
   }
 
-  const zones = useMemo(() => timezoneOptions(), []);
 
   // Tam dung moi lich (che do di vang, v0.5.32) - backend bo qua moi khe
   // gio truoc moc nay va KHONG chay bu khi het tam dung.
@@ -61,30 +58,15 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
 
       <div className="settings-section">
         <div className="settings-section__title">{tr("Múi giờ", "Time zone")}</div>
-        {/* Chon tu danh sach (sap theo UTC-12 -> UTC+14) thay vi go tay - go
-            tay luu ngay tung phim nen ten do dang go (vd "Asia/Ho") bi gui
-            len backend nhu 1 mui gio khong hop le. */}
-        <select className="input" value={settings.timezone} onChange={(e) => update({ timezone: e.target.value })}>
-          {!zones.some((z) => z.zone === settings.timezone) && <option value={settings.timezone}>{settings.timezone}</option>}
-          {zones.map((z) => (
-            <option key={z.zone} value={z.zone}>
-              {z.label}
-            </option>
-          ))}
-        </select>
-        {/* Mac dinh theo HA (v0.5.53). Chon mui khac = THAY THE mui HA (khong cong
-            them): lich 23:30 chay luc 23:30 theo mui duoc chon. */}
-        {settings.ha_timezone && settings.ha_timezone === settings.timezone && (
-          <p className="settings-hint">✓ {tr(`Đang theo múi giờ của Home Assistant (${settings.ha_timezone}).`, `Following the Home Assistant time zone (${settings.ha_timezone}).`)}</p>
-        )}
-        {settings.ha_timezone && settings.ha_timezone !== settings.timezone && (
-          <p className="settings-hint">
-            {tr(`Múi giờ Home Assistant: ${settings.ha_timezone}.`, `Home Assistant time zone: ${settings.ha_timezone}.`)}{" "}
-            <button className="link-button" onClick={() => update({ timezone: settings.ha_timezone! })}>
-              {tr("Dùng múi giờ này", "Use this time zone")}
-            </button>
-          </p>
-        )}
+        {/* v0.5.54: khong con chon rieng - moi lich/hien thi theo DUNG mui gio HA
+            (Settings -> System -> General), tranh 2 noi chon mui gio gay lech. */}
+        <div className="settings-row">
+          <span>{settings.timezone}</span>
+          <span className="settings-list-row__hint">{tr("theo Home Assistant", "from Home Assistant")}</span>
+        </div>
+        <p className="settings-hint">
+          {tr("Đổi múi giờ trong Home Assistant: Cài đặt → Hệ thống → Chung.", "Change it in Home Assistant: Settings → System → General.")}
+        </p>
       </div>
 
       <div className="settings-section">

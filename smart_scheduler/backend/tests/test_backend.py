@@ -127,25 +127,40 @@ def test_process_schedule_runs_when_not_paused(fake_ha):
 
 # ---- lo gio ----
 
+@pytest.fixture
+def engine_clock(monkeypatch):
+    """Dong ho CO DINH cho engine (khong phu thuoc gio chay test): sat nua dem
+    (00:00-00:30) thi dat ve 00:30 de "10 phut truoc" khong lui sang hom qua.
+    Truoc day cac test nay tu bo qua trong 15 phut dau moi ngay."""
+    real = datetime.now(TZ).replace(microsecond=0)
+    fixed = real if real.hour or real.minute >= 30 else real.replace(minute=30, second=0)
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed.astimezone(tz) if tz else fixed.replace(tzinfo=None)
+
+    monkeypatch.setattr(scheduler_engine, "datetime", Clock)
+    return fixed
+
+
 def _ten_minutes_ago():
-    now = datetime.now(TZ)
-    if now.hour == 0 and now.minute < 15:
-        pytest.skip("khe gio -10 phut roi sang ngay hom qua")
-    return (now - timedelta(minutes=10)).strftime("%H:%M:%S")
+    return (scheduler_engine.datetime.now(TZ) - timedelta(minutes=10)).strftime("%H:%M:%S")
 
 
-def test_slot_before_schedule_created_is_not_missed(fake_ha):
+def test_slot_before_schedule_created_is_not_missed(fake_ha, engine_clock):
     # Tao khung 23:30->02:30 luc 22:12: moc 02:30 hom nay qua truoc khi lich ton tai.
     s = make_schedule(time=_ten_minutes_ago())
+    s["updated_at"] = scheduler_engine.datetime.now(TZ).isoformat()  # vua tao "bay gio"
     run(scheduler_engine._process_schedule(s, "skip", None, None))
     assert fake_ha.calls == []
     assert crud.get_schedule(s["id"])["last_status"] == "skipped_inactive"
     assert crud.list_history(50) == []
 
 
-def test_slot_after_schedule_saved_is_missed(fake_ha):
+def test_slot_after_schedule_saved_is_missed(fake_ha, engine_clock):
     s = make_schedule(time=_ten_minutes_ago())
-    s["updated_at"] = (datetime.now(TZ) - timedelta(days=1)).isoformat()
+    s["updated_at"] = (scheduler_engine.datetime.now(TZ) - timedelta(days=1)).isoformat()
     run(scheduler_engine._process_schedule(s, "skip", None, None))
     assert fake_ha.calls == []
     assert [h["status"] for h in crud.list_history(50)] == ["skipped_missed"]
@@ -289,14 +304,32 @@ def test_turn_off_running_ignores_point_schedules(fake_ha):
 
 # ---- v0.5.35 ----
 
-def test_timezone_follows_settings():
+def test_timezone_always_follows_ha(monkeypatch):
+    """v0.5.54: bo o chon mui gio rieng - gia tri cu/moi gui len deu bi bo qua."""
+    from app import config
+    monkeypatch.setattr(config, "HA_TIMEZONE", "Asia/Tokyo")
     s = make_schedule(time="06:00:00")
-    assert crud.get_schedule(s["id"])["timezone"] == "Asia/Ho_Chi_Minh"
-    crud.update_settings({"timezone": "Asia/Tokyo"})
+    crud.update_settings({"timezone": "Europe/Berlin"})
     got = crud.get_schedule(s["id"])
-    assert got["timezone"] == "Asia/Tokyo"
+    assert got["timezone"] == "Asia/Tokyo" and crud.get_settings()["timezone"] == "Asia/Tokyo"
     now = datetime(2026, 9, 24, 5, 0, tzinfo=ZoneInfo("Asia/Tokyo"))
     assert compute_next_run(got, now, pause=None) == "2026-09-24T06:00:00+09:00"
+
+
+def test_legacy_timezone_cleared_on_startup(fake_ha, monkeypatch):
+    from app import config, main
+    db.get_conn().execute("INSERT INTO settings (key, value) VALUES ('timezone', '\"Europe/Berlin\"')")
+    db.get_conn().commit()
+
+    async def cfg():
+        return {"time_zone": "Asia/Ho_Chi_Minh"}
+    from app import homeassistant
+    monkeypatch.setattr(homeassistant, "get_core_config", cfg)
+    monkeypatch.setattr(config, "HA_TIMEZONE", None)
+    run(main._load_ha_timezone())
+    assert crud.settings_timezone() == "Asia/Ho_Chi_Minh"
+    assert db.get_conn().execute("SELECT 1 FROM settings WHERE key='timezone'").fetchone() is None
+    assert crud.list_history(5)[0]["status"] == "warning"
 
 
 def test_split_conditions_migration_clears_copied_off_conditions(tmp_path, monkeypatch):
@@ -347,14 +380,11 @@ def test_pause_turns_off_running_windows(fake_ha):
     assert len(fake_ha.calls) == 1
 
 
-def test_invalid_timezone_rejected():
-    from fastapi import HTTPException
-
+def test_settings_api_ignores_timezone():
     from app.api import settings as settings_api
     from app.models import SettingsIn
-
-    with pytest.raises(HTTPException):
-        run(settings_api.update_settings(SettingsIn(timezone="Asia/Ho")))
+    out = run(settings_api.update_settings(SettingsIn(timezone="Asia/Ho")))
+    assert out["timezone"] == crud.default_timezone()
 
 
 def test_delete_card_turns_off_devices(fake_ha):
@@ -558,9 +588,7 @@ def test_next_run_skips_slot_just_executed():
 
 def _due_now(**over):
     """Lich den han vua dung luc nay (trong GRACE), tao tu hom qua -> khong bi coi la tao sau moc."""
-    now = datetime.now(TZ)
-    if now.hour == 0 and now.minute < 2:
-        pytest.skip("sat nua dem")
+    now = scheduler_engine.datetime.now(TZ)
     s = make_schedule(time=(now - timedelta(seconds=2)).strftime("%H:%M:%S"), **over)
     s["updated_at"] = (now - timedelta(days=1)).isoformat()
     return s
@@ -570,7 +598,7 @@ def _run(s, policy="skip", expires=None):
     run(scheduler_engine._process_schedule(s, policy, expires, None))
 
 
-def test_point_turn_on_off_toggle_dispatch(fake_ha):
+def test_point_turn_on_off_toggle_dispatch(fake_ha, engine_clock):
     for svc in ("turn_on", "turn_off", "toggle"):
         _run(_due_now(target_entities=[f"switch.{svc}"], action={"domain": "switch", "service": svc, "service_data": {}}))
     # bat/tat tho -> homeassistant.*, toggle giu nguyen domain
@@ -578,14 +606,14 @@ def test_point_turn_on_off_toggle_dispatch(fake_ha):
                              ("switch", "toggle", ["switch.toggle"])]
 
 
-def test_idempotent_same_slot_runs_once(fake_ha):
+def test_idempotent_same_slot_runs_once(fake_ha, engine_clock):
     s = _due_now()
     _run(s)
     _run(crud.get_schedule(s["id"]) | {"updated_at": s["updated_at"]})
     assert len(fake_ha.calls) == 1
 
 
-def test_skip_once_skips_then_clears(fake_ha):
+def test_skip_once_skips_then_clears(fake_ha, engine_clock):
     s = _due_now()
     crud.set_skip(s["id"], True) if hasattr(crud, "set_skip") else db.get_conn().execute("UPDATE schedules SET skip_once=1 WHERE id=?", (s["id"],))
     db.get_conn().commit()
@@ -594,7 +622,7 @@ def test_skip_once_skips_then_clears(fake_ha):
     assert fake_ha.calls == [] and got["last_status"] == "skipped_once" and not got["skip_once"]
 
 
-def test_conditions_block_or_allow(fake_ha):
+def test_conditions_block_or_allow(fake_ha, engine_clock):
     fake_ha.states = [{"entity_id": "sensor.do_am", "state": "55"}]
     ok = _due_now(target_entities=["switch.ok"], conditions=[{"entity_id": "sensor.do_am", "state": "60", "operator": "lt"}])
     no = _due_now(target_entities=["switch.no"], conditions=[{"entity_id": "sensor.do_am", "state": "50", "operator": "lt"}])
@@ -604,7 +632,7 @@ def test_conditions_block_or_allow(fake_ha):
     assert crud.get_schedule(no["id"])["last_status"] == "skipped_condition"
 
 
-def test_disabled_schedule_and_card_do_not_run(fake_ha):
+def test_disabled_schedule_and_card_do_not_run(fake_ha, engine_clock):
     a = _due_now(enabled=False)
     b = _due_now(card_enabled=False)
     _run(a)
@@ -612,33 +640,31 @@ def test_disabled_schedule_and_card_do_not_run(fake_ha):
     assert fake_ha.calls == []
 
 
-def test_days_and_date_range_respected(fake_ha):
-    today = datetime.now(TZ).weekday()
+def test_days_and_date_range_respected(fake_ha, engine_clock):
+    today = engine_clock.weekday()
     _run(_due_now(days=[(today + 1) % 7]))
-    tomorrow = (datetime.now(TZ) + timedelta(days=1)).date().isoformat()
+    tomorrow = (engine_clock + timedelta(days=1)).date().isoformat()
     _run(_due_now(start_date=tomorrow))
     assert fake_ha.calls == []
-    _run(_due_now(days=[today], start_date=datetime.now(TZ).date().isoformat(), end_date=tomorrow))
+    _run(_due_now(days=[today], start_date=engine_clock.date().isoformat(), end_date=tomorrow))
     assert len(fake_ha.calls) == 1
 
 
 def _missed(**over):
-    now = datetime.now(TZ)
-    if now.hour == 0 and now.minute < 15:
-        pytest.skip("sat nua dem")
+    now = scheduler_engine.datetime.now(TZ)
     s = make_schedule(time=(now - timedelta(minutes=10)).strftime("%H:%M:%S"), **over)
     s["updated_at"] = (now - timedelta(days=1)).isoformat()
     return s
 
 
-def test_missed_policy_run_once_catches_up(fake_ha):
+def test_missed_policy_run_once_catches_up(fake_ha, engine_clock):
     _run(_missed(), policy="run_once")
     assert len(fake_ha.calls) == 1
 
 
-def test_on_not_replayed_after_off_deadline(fake_ha):
+def test_on_not_replayed_after_off_deadline(fake_ha, engine_clock):
     s = _missed()
-    _run(s, policy="run_once", expires=datetime.now(TZ) - timedelta(minutes=1))
+    _run(s, policy="run_once", expires=scheduler_engine.datetime.now(TZ) - timedelta(minutes=1))
     assert fake_ha.calls == [] and crud.get_schedule(s["id"])["last_status"] == "skipped_expired"
 
 
@@ -696,17 +722,13 @@ def test_auto_off_wakes_up_at_deadline(fake_ha):
 
 # ---- mui gio theo Home Assistant (v0.5.53) ----
 
-def test_timezone_defaults_to_ha_and_user_override_wins(monkeypatch):
+def test_timezone_defaults_to_ha(monkeypatch):
     from app import config
     monkeypatch.setattr(config, "HA_TIMEZONE", "Europe/Berlin")
-    assert crud.settings_timezone() == "Europe/Berlin"
     st = crud.get_settings()
     assert st["timezone"] == "Europe/Berlin" and st["ha_timezone"] == "Europe/Berlin"
     s = make_schedule(time="23:30:00")
-    assert compute_next_run(crud.get_schedule(s["id"])).endswith(("+02:00", "+01:00"))  # gio Berlin, khong cong them
-    crud.update_settings({"timezone": "Asia/Ho_Chi_Minh"})
-    assert crud.settings_timezone() == "Asia/Ho_Chi_Minh"
-    assert compute_next_run(crud.get_schedule(s["id"])).endswith("23:30:00+07:00")
+    assert compute_next_run(crud.get_schedule(s["id"])).endswith(("23:30:00+02:00", "23:30:00+01:00"))
 
 
 def test_backup_does_not_freeze_default_timezone(monkeypatch):
