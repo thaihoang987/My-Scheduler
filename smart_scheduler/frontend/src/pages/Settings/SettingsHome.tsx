@@ -43,13 +43,13 @@ export function SettingsHome({ onOpen }: { onOpen: (id: SettingsSubpage) => void
           {section.items.map((item) => (
             <button key={item.id} className="settings-list-row" onClick={() => onOpen(item.id)}>
               <span className="settings-list-row__icon">
-                <Icon path={item.icon} size={20} />
+                <Icon path={item.icon} size={24} />
               </span>
               <span className="settings-list-row__text">
                 <span className="settings-list-row__title">{tr(...item.title)}</span>
                 <span className="settings-list-row__hint">{tr(...item.hint)}</span>
               </span>
-              <Icon path={mdiChevronRight} size={18} className="settings-list-row__chevron" />
+              <Icon path={mdiChevronRight} size={22} className="settings-list-row__chevron" />
             </button>
           ))}
         </div>

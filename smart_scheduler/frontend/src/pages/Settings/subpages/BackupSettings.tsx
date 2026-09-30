@@ -39,14 +39,14 @@ export function BackupSettings({ reload, onBack }: { reload: () => void; onBack:
       <div className="settings-section">
         <div className="settings-section__title">{tr("Xuất dữ liệu", "Export data")}</div>
         <button className="btn btn--ghost btn--block" onClick={exportData}>
-          <Icon path={mdiDownload} size={16} /> {tr("Xuất file backup", "Export backup file")}
+          <Icon path={mdiDownload} size={20} /> {tr("Xuất file backup", "Export backup file")}
         </button>
       </div>
 
       <div className="settings-section">
         <div className="settings-section__title">{tr("Khôi phục", "Restore")}</div>
         <button className="btn btn--ghost btn--block" onClick={() => fileRef.current?.click()}>
-          <Icon path={mdiUpload} size={16} /> {tr("Chọn file backup", "Select backup file")}
+          <Icon path={mdiUpload} size={20} /> {tr("Chọn file backup", "Select backup file")}
         </button>
         <input
           ref={fileRef}
