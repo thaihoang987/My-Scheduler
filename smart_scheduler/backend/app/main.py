@@ -13,6 +13,7 @@ from app import auto_off, crud, homeassistant, manual_timer, presence
 from app.api import backup, entities, groups, history, manual, presence as presence_api, schedules, settings as settings_api, sun
 from app.db import init_db
 from app.homeassistant import connection_mode
+from app.i18n import tr
 from app.scheduler_engine import scheduler_loop
 from app.ws import manager
 
@@ -68,8 +69,8 @@ async def _reset_devices_on_startup() -> None:
 
 async def _load_ha_timezone() -> None:
     """Lay mui gio tu cau hinh HA (Settings -> System -> General) - moi tinh toan
-    gio cua add-on theo dung mui nay tru khi nguoi dung chu dong chon khac trong
-    Cai dat. Loi (HA chua san sang) -> giu TZ do Supervisor truyen vao."""
+    gio cua add-on theo DUNG mui nay (v0.5.54 bo o chon mui gio rieng). Loi (HA
+    chua san sang) -> giu TZ do Supervisor truyen vao (cung = mui gio HA)."""
     from zoneinfo import ZoneInfo
 
     from app import config
@@ -79,11 +80,17 @@ async def _load_ha_timezone() -> None:
             ZoneInfo(tz)
             config.HA_TIMEZONE = tz
             log.info("Mui gio Home Assistant: %s", tz)
-            chosen = crud.settings_timezone()
-            if chosen != tz:
-                log.warning("Mui gio trong Cai dat (%s) khac Home Assistant (%s) - lich chay theo %s", chosen, tz, chosen)
     except Exception as exc:  # noqa: BLE001
         log.warning("Chua doc duoc mui gio tu Home Assistant (dung TZ=%s): %s", config.DEFAULT_TIMEZONE, exc)
+    # Ban cu tung chon mui gio rieng trong Cai dat -> bo, tu nay theo HA (v0.5.54).
+    old = crud.clear_legacy_timezone()
+    now_tz = crud.settings_timezone()
+    if old and old != now_tz:
+        log.warning("Bo mui gio rieng cua add-on (%s) - tu nay theo Home Assistant (%s)", old, now_tz)
+        crud.add_history(None, tr("Múi giờ", "Time zone"), None, "warning",
+                         tr(f"Bỏ múi giờ riêng {old}, từ nay theo Home Assistant ({now_tz}).",
+                            f"Dropped the add-on's own time zone {old}; now following Home Assistant ({now_tz})."),
+                         manual=True)
 
 
 @contextlib.asynccontextmanager

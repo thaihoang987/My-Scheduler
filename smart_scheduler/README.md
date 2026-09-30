@@ -17,7 +17,7 @@ created by hand for each device. Pick a device, pick a time, done.
 - Schedules run in the add-on backend — they keep working with the browser closed
 - Interface language (English / Vietnamese): **Settings → Appearance → Language**
 
-Time zone and missed-run handling are set in the app under **Settings → Scheduler**. The add-on
-Configuration tab can normally be left blank.
+All times follow the Home Assistant time zone (Settings → System → General). Missed-run handling is
+set in the app under **Settings → Scheduler**. The add-on Configuration tab can normally be left blank.
 
 > **Personal project.** Feature requests will be considered when reasonable and time allows.

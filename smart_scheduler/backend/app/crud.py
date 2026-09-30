@@ -10,13 +10,21 @@ from app.i18n import tr
 
 
 def settings_timezone() -> str:
-    """Mui gio DUY NHAT cua add-on = o "Múi giờ" trong Cai dat UI (v0.5.35,
-    phan hoi "đồng nhất addon dùng múi giờ trong cài đặt ui"). Truoc day moi
-    lich luu cung mui gio cau hinh add-on luc tao, doi o Cai dat khong co tac
-    dung voi lich. Cot `schedules.timezone` gio chi con de tuong thich."""
-    conn = get_conn()
-    row = conn.execute("SELECT value FROM settings WHERE key='timezone'").fetchone()
-    return (json.loads(row["value"]) if row else None) or default_timezone()
+    """Mui gio DUY NHAT cua add-on = mui gio Home Assistant (v0.5.54, phan hoi
+    2026-10-01 "theo han mui gio hassio"): da bo o chon mui gio trong Cai dat - 2 noi
+    chon mui gio chi gay lech. Moi lich/binh minh/tam dung/gia lap co nguoi tinh theo
+    mui nay. Cot `schedules.timezone` chi con de tuong thich."""
+    return default_timezone()
+
+
+def clear_legacy_timezone() -> str | None:
+    """Ban < 0.5.54 cho chon mui gio rieng -> xoa gia tri cu (tra ve de ghi Nhat ky)."""
+    row = get_conn().execute("SELECT value FROM settings WHERE key='timezone'").fetchone()
+    if not row:
+        return None
+    with tx() as c:
+        c.execute("DELETE FROM settings WHERE key='timezone'")
+    return json.loads(row["value"])
 
 
 def default_timezone() -> str:
@@ -480,14 +488,14 @@ def get_settings() -> dict:
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
     stored = {r["key"]: json.loads(r["value"]) for r in rows}
     # timezone mac dinh = mui gio HA; ha_timezone chi de hien thi/so sanh o Cai dat.
-    return {**DEFAULT_SETTINGS, "timezone": default_timezone(), **stored, "ha_timezone": config.HA_TIMEZONE}
+    return {**DEFAULT_SETTINGS, **stored, "timezone": default_timezone(), "ha_timezone": config.HA_TIMEZONE}
 
 
 def update_settings(data: dict) -> dict:
     with tx() as c:
         for k, v in data.items():
-            if v is None or k == "ha_timezone":
-                continue
+            if v is None or k in ("timezone", "ha_timezone"):
+                continue  # mui gio luon theo Home Assistant
             c.execute(
                 "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, json.dumps(v)),
@@ -559,8 +567,8 @@ def import_all(data: dict) -> None:
                 ),
             )
         for k, v in (data.get("settings") or {}).items():
-            if k == "ha_timezone":
-                continue  # chi la thong tin doc tu HA, khong luu
+            if k in ("timezone", "ha_timezone"):
+                continue  # mui gio luon theo Home Assistant, khong khoi phuc tu ban sao luu
             c.execute(
                 "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, json.dumps(v)),

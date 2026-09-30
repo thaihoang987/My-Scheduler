@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.54
+
+- The time zone always follows Home Assistant (Settings → System → General) for every schedule,
+  sunrise/sunset, pause, presence simulation and every time shown in the app. The separate time zone
+  picker was removed (two places to choose a zone only caused shifted times). A zone chosen in an older
+  version is dropped automatically on startup and noted in the Log.
+- Tests no longer skip time-sensitive cases around midnight.
+
 ## 0.5.53
 
 - Time zone now comes straight from Home Assistant (Settings → System → General) unless you pick a

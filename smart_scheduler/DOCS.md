@@ -36,7 +36,7 @@ The add-on talks to Home Assistant through the Supervisor, so no token or URL is
 Everything is configured inside the app under **Settings**:
 
 - **Appearance → Language**: English (default) or Vietnamese.
-- **Scheduler**: time zone (defaults to the Home Assistant time zone), missed-run policy, pause.
+- **Scheduler**: missed-run policy, pause. The time zone always follows Home Assistant (shown read-only).
 
 ## Add-on configuration
 
