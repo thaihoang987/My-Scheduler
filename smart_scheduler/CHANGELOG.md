@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.48
+
+- Maintenance release (no functional changes since 0.5.47).
+
 ## 0.5.47
 
 - Auto-off rows are laid out as a grid (about a quarter of the width on desktop, full width on phones).
