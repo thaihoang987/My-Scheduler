@@ -4,7 +4,8 @@ import { AutoOffList } from "../../components/AutoOffList/AutoOffList";
 import { Clock } from "../../components/Clock/Clock";
 import { HomeBanners } from "../../components/HomeBanners/HomeBanners";
 import { DeviceGrid } from "../../components/DeviceGrid/DeviceGrid";
-import { GroupedDeviceGrid } from "../../components/GroupedDeviceGrid/GroupedDeviceGrid";
+import { GroupedDeviceGrid, UNGROUPED, type SectionControls } from "../../components/GroupedDeviceGrid/GroupedDeviceGrid";
+import { useCollapsedSections } from "../../hooks/useCollapsedSections";
 import { Icon } from "../../components/Icon/Icon";
 import { ScheduleEditor } from "../../components/ScheduleEditor/ScheduleEditor";
 import { api } from "../../services/api";
@@ -45,6 +46,52 @@ export function Home({
   /** Lich "Tu tat sau khi bat" dang sua (bam 1 dong trong AutoOffList). */
   const [editingRule, setEditingRule] = useState<Schedule | null>(null);
   const autoOffRules = useMemo(() => schedules.filter((s) => s.trigger_type === "auto_off"), [schedules]);
+  const [collapsed, toggleCollapsed] = useCollapsedSections();
+
+  // Thu tu cac khoi tren Nha: nhom phan loai (theo sort_order) + "Chua phan
+  // nhom" (luon cuoi) + khoi "Tu tat" chen o vi tri auto_off_section_index
+  // (luu Cai dat). Che do Sap xep: nut len/xuong doi nhom phan loai
+  // (reorderGroups) hoac doi vi tri khoi Tu tat (updateSettings).
+  const AUTO = "__auto_off__";
+  const baseIds = categoryGroups.length > 0 ? [...categoryGroups.map((g) => g.id), UNGROUPED] : ["__all__"];
+  const autoIndex = Math.max(0, Math.min(settings.auto_off_section_index ?? 0, baseIds.length));
+  const order = [...baseIds.slice(0, autoIndex), AUTO, ...baseIds.slice(autoIndex)];
+  const fixed = (id: string) => id === UNGROUPED || id === "__all__";
+
+  async function moveSection(id: string, dir: -1 | 1) {
+    const arr = [...order];
+    const i = arr.indexOf(id);
+    const j = i + dir;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    const newAuto = arr.indexOf(AUTO);
+    if (newAuto !== autoIndex) await api.updateSettings({ auto_off_section_index: newAuto });
+    const cats = arr.filter((x) => x !== AUTO && !fixed(x));
+    if (cats.join() !== categoryGroups.map((g) => g.id).join()) await api.reorderGroups(cats);
+    reload();
+  }
+
+  function canMove(id: string, dir: -1 | 1): boolean {
+    const j = order.indexOf(id) + dir;
+    if (j < 0 || j >= order.length) return false;
+    // Nhom thuong khong dich qua "Chua phan nhom"/luoi phang (luon co dinh) -
+    // chi khoi Tu tat moi vuot qua duoc.
+    return id === AUTO || !fixed(order[j]);
+  }
+
+  function controls(id: string): SectionControls {
+    const movable = editMode && !fixed(id);
+    return {
+      collapsed: collapsed.has(id),
+      onToggle: () => toggleCollapsed(id),
+      ...(movable
+        ? {
+            onMoveUp: canMove(id, -1) ? () => moveSection(id, -1) : null,
+            onMoveDown: canMove(id, 1) ? () => moveSection(id, 1) : null,
+          }
+        : {}),
+    };
+  }
   /** Che do "Sap xep": an mac dinh de tranh bam nham keo-tha/doi nhom khi chi
    * luot xem binh thuong (phan hoi 2026-09-23) - bam nut but goc tren phai de
    * bat, chi luc do moi hien tay cam keo + nut doi nhom + cac nhom rong (de
@@ -164,53 +211,64 @@ export function Home({
         ))}
       </div>
 
-      <AutoOffList
-        rules={autoOffRules}
-        allSchedules={schedules}
-        editMode={editMode}
-        reload={reload}
-        setDragging={setDragging}
-        entities={entities}
-        activeTimers={activeTimers}
-        onEdit={(rule) => {
-          setEditingRule(rule);
-          setEditorOpen(true);
-        }}
-        onToggle={toggleRule}
-      />
-
-      {groups.length === 0 && autoOffRules.length > 0 ? null : categoryGroups.length > 0 ? (
-        <GroupedDeviceGrid
-          groups={filtered}
-          entities={entities}
-          categoryGroups={categoryGroups}
-          compact={settings.display_mode === "compact"}
-          timeFormat={settings.time_format}
-          activeTimers={activeTimers}
-          onOpen={onOpenDevice}
-          onToggleFavorite={toggleFavorite}
-          onToggleEnabled={toggleEnabled}
-          onDeleteGroup={setDeleteConfirm}
-          onCategoryChanged={reload}
-          onReorder={handleReorder}
-          setDragging={setDragging}
-          editMode={editMode}
-        />
-      ) : (
-        <DeviceGrid
-          groups={filtered}
-          compact={settings.display_mode === "compact"}
-          timeFormat={settings.time_format}
-          activeTimers={activeTimers}
-          onOpen={onOpenDevice}
-          onToggleFavorite={toggleFavorite}
-          onToggleEnabled={toggleEnabled}
-          onDeleteGroup={setDeleteConfirm}
-          onReorder={handleReorder}
-          setDragging={setDragging}
-          editMode={editMode}
-        />
-      )}
+      {(() => {
+        const autoNode = (
+          <AutoOffList
+            rules={autoOffRules}
+            allSchedules={schedules}
+            editMode={editMode}
+            reload={reload}
+            setDragging={setDragging}
+            entities={entities}
+            activeTimers={activeTimers}
+            controls={controls(AUTO)}
+            onEdit={(rule) => {
+              setEditingRule(rule);
+              setEditorOpen(true);
+            }}
+            onToggle={toggleRule}
+          />
+        );
+        if (categoryGroups.length > 0) {
+          return (
+            <GroupedDeviceGrid
+              groups={filtered}
+              entities={entities}
+              categoryGroups={categoryGroups}
+              compact={settings.display_mode === "compact"}
+              timeFormat={settings.time_format}
+              activeTimers={activeTimers}
+              onOpen={onOpenDevice}
+              onToggleFavorite={toggleFavorite}
+              onToggleEnabled={toggleEnabled}
+              onDeleteGroup={setDeleteConfirm}
+              onCategoryChanged={reload}
+              onReorder={handleReorder}
+              setDragging={setDragging}
+              editMode={editMode}
+              controls={controls}
+              extra={{ index: autoIndex, node: autoNode }}
+            />
+          );
+        }
+        const grid =
+          groups.length === 0 && autoOffRules.length > 0 ? null : (
+            <DeviceGrid
+              groups={filtered}
+              compact={settings.display_mode === "compact"}
+              timeFormat={settings.time_format}
+              activeTimers={activeTimers}
+              onOpen={onOpenDevice}
+              onToggleFavorite={toggleFavorite}
+              onToggleEnabled={toggleEnabled}
+              onDeleteGroup={setDeleteConfirm}
+              onReorder={handleReorder}
+              setDragging={setDragging}
+              editMode={editMode}
+            />
+          );
+        return autoIndex === 0 ? <>{autoNode}{grid}</> : <>{grid}{autoNode}</>;
+      })()}
 
       <button className="fab" onClick={() => setEditorOpen(true)} aria-label={tr("Thêm lịch", "Add schedule")}>
         <Icon path={mdiPlus} size={26} />

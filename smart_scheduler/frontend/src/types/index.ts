@@ -158,6 +158,8 @@ export interface Settings {
   pause_until: string;
   /** Tu doc lai trang thai thiet bi 30s sau khi lich Bat/Tat chay, sai thi gui lai lenh. */
   verify_state: boolean;
+  /** Vi tri khoi "Tu tat sau khi bat" giua cac nhom tren Nha (0 = tren cung). */
+  auto_off_section_index: number;
 }
 
 /** "Giả lập có người" - bat lan luot ngau nhien thiet bi da chon trong

@@ -211,6 +211,7 @@ class SettingsIn(BaseModel):
     # Sau khi lich Bat/Tat chay 30s, doc lai trang thai that tu HA; sai thi
     # gui lai lenh 1 lan va canh bao neu van sai (v0.5.35, mac dinh tat).
     verify_state: Optional[bool] = None
+    auto_off_section_index: Optional[int] = None
 
 
 class HistoryEntry(BaseModel):

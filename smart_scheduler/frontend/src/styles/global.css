@@ -1165,3 +1165,35 @@ body {
   white-space: nowrap; flex-shrink: 0;
 }
 .auto-off__row.sortable-fallback { outline: 2px solid var(--accent); background: var(--surface); border-radius: var(--radius-lg); }
+
+/* ---- Thu/phong + doi vi tri nhom tren Nha (v0.5.47) ---- */
+.section-header { align-items: center; justify-content: space-between; }
+.section-header__toggle {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: none; padding: 2px 0; color: inherit;
+  font: inherit; cursor: pointer; text-align: left;
+}
+.section-header__toggle svg { color: var(--text-muted); flex-shrink: 0; }
+.section-header__move { display: flex; gap: 4px; }
+.section-header__move button {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 28px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+}
+.section-header__move button:disabled { opacity: 0.3; cursor: default; }
+.device-grid.is-collapsed, .auto-off__list.is-collapsed { display: none; }
+
+/* Danh sach Tu tat: moi dong 1 o luoi, desktop ~1/4 be ngang trang. */
+.auto-off__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 10px;
+  background: none;
+  border-radius: 0;
+  overflow: visible;
+}
+.auto-off__row {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border-bottom: none;
+}
