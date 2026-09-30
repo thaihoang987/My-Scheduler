@@ -170,6 +170,12 @@ def compute_next_run(schedule: dict, now: datetime | None = None, pause=_UNSET) 
             continue
         candidate = _scheduled_dt_for_date(schedule, date, tz)
         if candidate is not None and candidate >= now.replace(microsecond=0):
+            # Bug v0.5.51 (test "cho card tu bat"): frontend reload ngay khi lich
+            # vua chay, CUNG GIAY voi moc -> `>= now` (da cat micro giay) van tra
+            # lai chinh moc vua chay -> card ket "Due now", khong ve thanh dem
+            # nguoc. Moc da xu ly (last_scheduled_for) thi bo qua.
+            if _slot_key(candidate) == schedule.get("last_scheduled_for"):
+                continue
             return candidate.isoformat()
     return None
 

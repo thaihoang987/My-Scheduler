@@ -15,6 +15,7 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
     let ws: WebSocket | null = null;
     let closedByUs = false;
     let retryDelay = 1000;
+    let everOpened = false;
 
     function connect() {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -28,6 +29,10 @@ export function useWebSocket(onMessage: (msg: WSMessage) => void) {
       };
       ws.onopen = () => {
         retryDelay = 1000;
+        // Noi lai sau khi rot (khoa man hinh, mat mang...) -> co the da lo tin
+        // "lich vua chay" -> bao App doc lai du lieu (khong reload trang).
+        if (everOpened) cbRef.current({ event: "ws_reconnected", data: null });
+        everOpened = true;
       };
       ws.onclose = () => {
         if (closedByUs) return;

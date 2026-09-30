@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.52
+
+- Fixed: when a time range turned a device on, its card could stay at "Due now" without the countdown
+  bar until the page was reloaded (the page refreshed in the same second the run happened and got the
+  run it had just done as the "next run"). The card now switches to on + countdown immediately and hides
+  the bar when the range ends – no page reload.
+- The page re-syncs schedules and countdowns after the connection drops and comes back, and when you
+  return to the tab/app. Auto-off rows update the device on/off state together with the countdown.
+- Add devices: devices already in your list are marked "✓ Added" and can't be picked again.
+
 ## 0.5.51
 
 - Much faster with large Home Assistant setups (tested with 10,000 entities): the area/device registry

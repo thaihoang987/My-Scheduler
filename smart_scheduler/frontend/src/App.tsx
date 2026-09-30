@@ -135,14 +135,16 @@ export function App() {
       if (timer) clearInterval(timer);
       timer = null;
     };
-    const onVisibility = () => (document.visibilityState === "visible" ? (refreshEntityStates(), start()) : stop());
+    // Quay lai tab/app: doc lai ca lich + dem nguoc (co the da lo tin WebSocket
+    // luc an), khong chi trang thai thiet bi - card tu dung, khong reload trang.
+    const onVisibility = () => (document.visibilityState === "visible" ? (reload(), reloadTimers(), start()) : stop());
     document.addEventListener("visibilitychange", onVisibility);
     if (document.visibilityState === "visible") start();
     return () => {
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [refreshEntityStates]);
+  }, [refreshEntityStates, reload, reloadTimers]);
 
   useWebSocket(
     useCallback(
@@ -151,8 +153,15 @@ export function App() {
         if (["schedule_updated", "schedule_deleted", "schedule_executed"].includes(msg.event)) {
           reload();
         }
-        if (msg.event === "auto_off_updated") {
+        if (msg.event === "ws_reconnected") {
+          reload();
           reloadTimers();
+        }
+        if (msg.event === "auto_off_updated") {
+          // Doc lai ca trang thai thiet bi: thanh dem nguoc can "dang bat" +
+          // moc bat, 2 nguon khac nhau - khong doi poll 8s (het lech "● On" khi da tat).
+          reloadTimers();
+          refreshEntityStates();
         }
         if (["manual_timer_started", "manual_timer_finished"].includes(msg.event)) {
           reloadTimers();
@@ -165,7 +174,7 @@ export function App() {
           setPresence(msg.data as PresenceStatus);
         }
       },
-      [reload, reloadTimers, reloadCategoryGroups],
+      [reload, reloadTimers, reloadCategoryGroups, refreshEntityStates],
     ),
   );
 
