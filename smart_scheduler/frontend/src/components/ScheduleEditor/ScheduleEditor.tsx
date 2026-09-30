@@ -43,6 +43,46 @@ function lastAutoOffDuration(schedules: Schedule[]): string {
   return latest?.time ?? "00:30:00";
 }
 
+/** 1 moc gio cua Khung gio: chip Gio/Binh minh/Hoang hon + wheel hoac +/- phut. */
+function PointEditor({
+  trigger,
+  offset,
+  time,
+  sunTimes,
+  onChange,
+}: {
+  trigger: "time" | "sunrise" | "sunset";
+  offset: number;
+  time: string;
+  sunTimes: { sunrise: string | null; sunset: string | null };
+  onChange: (trigger: "time" | "sunrise" | "sunset", offset: number, time: string) => void;
+}) {
+  const chip = (t: "time" | "sunrise" | "sunset", label: string) => (
+    <button type="button" className={trigger === t ? "chip chip--active" : "chip"} onClick={() => onChange(t, t === trigger ? offset : 0, time)}>
+      {label}
+    </button>
+  );
+  return (
+    <>
+      <div className="chip-row chip-row--compact">
+        {chip("time", tr("Giờ", "Time"))}
+        {chip("sunrise", `🌅 ${tr("Bình minh", "Sunrise")}${sunHint(sunTimes.sunrise)}`)}
+        {chip("sunset", `🌇 ${tr("Hoàng hôn", "Sunset")}${sunHint(sunTimes.sunset)}`)}
+      </div>
+      {trigger === "time" ? (
+        <TimeWheelPicker value={time} onChange={(t) => onChange("time", 0, t)} />
+      ) : (
+        <OffsetStepper
+          label={trigger === "sunrise" ? tr("Bình minh", "Sunrise") : tr("Hoàng hôn", "Sunset")}
+          minutes={offset}
+          baseTimeIso={trigger === "sunrise" ? sunTimes.sunrise : sunTimes.sunset}
+          onChange={(m) => onChange(trigger, m, time)}
+        />
+      )}
+    </>
+  );
+}
+
 export function ScheduleEditor({
   open,
   schedule,
@@ -220,9 +260,9 @@ export function ScheduleEditor({
           </button>
         </div>
 
-        {/* Khung gio: chip nay chi ap dung cho moc BAT (moc TAT luon la gio
-            co dinh) - vd "bật đèn sân lúc hoàng hôn, tắt lúc 23:00". */}
-        {!isAutoOff && <div className="chip-row">
+        {/* Lich 1 moc: chon kieu gio o day. Khung gio: moi moc Bat/Tat co hang
+            chip rieng ben duoi (v0.5.51). */}
+        {!isAutoOff && !isRange && <div className="chip-row">
           <button
             className={draft.trigger_type === "time" ? "chip chip--active" : "chip"}
             onClick={() => setDraft((d) => ({ ...d, trigger_type: "time" }))}
@@ -259,23 +299,47 @@ export function ScheduleEditor({
         ) : isRange ? (
           <div className="range-wheels">
             <div className="range-wheel">
-              {draft.trigger_type === "time" ? (
-                <>
-                  <div className="field-label field-label--inline">{tr("Bật lúc", "Turn on at")}</div>
-                  <TimeWheelPicker value={draft.time} onChange={(time) => setDraft((d) => ({ ...d, time }))} />
-                </>
-              ) : (
-                <OffsetStepper
-                  label={draft.trigger_type === "sunrise" ? tr("Bình minh", "Sunrise") : tr("Hoàng hôn", "Sunset")}
-                  minutes={draft.offset_minutes}
-                  baseTimeIso={draft.trigger_type === "sunrise" ? sunTimes.sunrise : sunTimes.sunset}
-                  onChange={(offset_minutes) => setDraft((d) => ({ ...d, offset_minutes }))}
-                />
-              )}
+              <div className="field-label field-label--inline">{tr("Bật lúc", "Turn on at")}</div>
+              <PointEditor
+                trigger={draft.trigger_type === "auto_off" ? "time" : draft.trigger_type}
+                offset={draft.offset_minutes}
+                time={draft.time}
+                sunTimes={sunTimes}
+                onChange={(trigger_type, offset_minutes, time) => setDraft((d) => ({ ...d, trigger_type, offset_minutes, time }))}
+              />
+            </div>
+            <div className="range-swap-row">
+            <button
+              type="button"
+              className="range-swap"
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  trigger_type: d.end_trigger_type,
+                  offset_minutes: d.end_offset_minutes,
+                  time: d.end_time ?? d.time,
+                  end_trigger_type: d.trigger_type === "auto_off" ? "time" : d.trigger_type,
+                  end_offset_minutes: d.offset_minutes,
+                  end_time: d.time,
+                  conditions: d.end_conditions,
+                  end_conditions: d.conditions,
+                }))
+              }
+              aria-label={tr("Đổi chỗ Bật và Tắt", "Swap on and off")}
+              title={tr("Đổi chỗ Bật và Tắt", "Swap on and off")}
+            >
+              ⇅ {tr("Đổi Bật/Tắt", "Swap on/off")}
+            </button>
             </div>
             <div className="range-wheel">
               <div className="field-label field-label--inline">{tr("Tắt lúc", "Turn off at")}</div>
-              <TimeWheelPicker value={draft.end_time!} onChange={(end_time) => setDraft((d) => ({ ...d, end_time }))} />
+              <PointEditor
+                trigger={draft.end_trigger_type}
+                offset={draft.end_offset_minutes}
+                time={draft.end_time!}
+                sunTimes={sunTimes}
+                onChange={(end_trigger_type, end_offset_minutes, end_time) => setDraft((d) => ({ ...d, end_trigger_type, end_offset_minutes, end_time }))}
+              />
             </div>
           </div>
         ) : draft.trigger_type === "time" ? (

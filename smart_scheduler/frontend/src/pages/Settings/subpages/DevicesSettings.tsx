@@ -1,5 +1,5 @@
 import { mdiChevronLeft, mdiChevronRight, mdiDeleteOutline, mdiPencilOutline, mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { EntityPicker } from "../../../components/EntityPicker/EntityPicker";
 import { Icon } from "../../../components/Icon/Icon";
 import { api } from "../../../services/api";
@@ -37,7 +37,8 @@ export function DevicesSettings({
   entities: EntitySummary[];
   schedules: Schedule[];
   categoryGroups: Group[];
-  reload: () => void;
+  /** App.reload (async) - await de chi bo cap nhat lac quan khi du lieu moi da ve. */
+  reload: () => void | Promise<void>;
   onBack: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -65,6 +66,7 @@ export function DevicesSettings({
    * sua 1 thiet bi le (bam nut but trong danh sach). */
   const [editList, setEditList] = useState<EntitySummary[]>([]);
   const [editIdx, setEditIdx] = useState(0);
+  const addingRef = useRef<Promise<void>>(Promise.resolve());
 
   function openEdit(e: EntitySummary) {
     setEditing(e);
@@ -90,7 +92,17 @@ export function DevicesSettings({
     openEdit(list[idx]);
   }
 
-  const added = useMemo(() => entities.filter((e) => e.added), [entities]);
+  // Cap nhat lac quan (v0.5.51 - phan hoi "delete thiet bi lag lag"): an dong /
+  // doi sao NGAY khi bam, goi API + tai lai danh sach chay ngam phia sau.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [favOverride, setFavOverride] = useState<Map<string, boolean>>(new Map());
+  const added = useMemo(
+    () =>
+      entities
+        .filter((e) => e.added && !hidden.has(e.entity_id))
+        .map((e) => (favOverride.has(e.entity_id) ? { ...e, favorite: favOverride.get(e.entity_id)! } : e)),
+    [entities, hidden, favOverride],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -116,6 +128,8 @@ export function DevicesSettings({
   async function persist(): Promise<EntitySummary | null> {
     if (!editing || iconInvalid || saving) return null;
     setSaveError("");
+    // Lenh "them" chua xong ma da bam Luu -> doi, khong thi ten vua sua bi ghi de.
+    await addingRef.current.catch(() => undefined);
     setSaving(true);
     try {
       let targetId = editing.entity_id;
@@ -142,30 +156,52 @@ export function DevicesSettings({
   }
 
   async function toggleFavorite(e: EntitySummary) {
-    await api.setAlias(e.entity_id, { alias: e.alias, area: e.area, icon: e.icon, favorite: !e.favorite, added: true });
-    reload();
+    setFavOverride((m) => new Map(m).set(e.entity_id, !e.favorite));
+    try {
+      await api.setAlias(e.entity_id, { alias: e.alias, area: e.area, icon: e.icon, favorite: !e.favorite, added: true });
+      await reload();
+    } finally {
+      setFavOverride((m) => {
+        const next = new Map(m);
+        next.delete(e.entity_id);
+        return next;
+      });
+    }
   }
 
   async function removeDevice(e: EntitySummary) {
-    await api.setAlias(e.entity_id, { alias: e.alias, area: e.area, icon: e.icon, favorite: e.favorite, added: false });
-    reload();
+    setHidden((h) => new Set(h).add(e.entity_id));
+    try {
+      await api.setAlias(e.entity_id, { alias: e.alias, area: e.area, icon: e.icon, favorite: e.favorite, added: false });
+      await reload();
+    } finally {
+      setHidden((h) => {
+        const next = new Set(h);
+        next.delete(e.entity_id);
+        return next;
+      });
+    }
   }
 
-  async function addDevices(entityIds: string[]) {
-    const byId = new Map(entities.map((e) => [e.entity_id, e]));
-    const fresh: EntitySummary[] = [];
-    for (const id of entityIds) {
-      const e = byId.get(id);
-      await api.setAlias(id, { alias: e?.alias || e?.ha_friendly_name, area: e?.area, icon: e?.icon, favorite: e?.favorite, added: true });
-      if (e && !e.added) fresh.push({ ...e, added: true });
-    }
+  /** `picked` lay tu Entity Picker (danh sach DAY DU cua HA) - `entities` cua
+   * App chi con thiet bi da them (v0.5.51). Luu song song, mo bang Sua ngay. */
+  async function addDevices(entityIds: string[], picked: EntitySummary[]) {
+    const byId = new Map(picked.map((e) => [e.entity_id, e]));
+    const fresh = picked.filter((e) => !e.added).map((e) => ({ ...e, added: true }));
     setAddOpen(false);
-    reload();
     if (fresh.length) {
       setEditList(fresh);
       setEditIdx(0);
       openEdit(fresh[0]);
     }
+    addingRef.current = Promise.all(
+      entityIds.map((id) => {
+        const e = byId.get(id);
+        return api.setAlias(id, { alias: e?.alias || e?.ha_friendly_name, area: e?.area, icon: e?.icon, favorite: e?.favorite, added: true });
+      }),
+    ).then(() => undefined);
+    await addingRef.current;
+    reload();
   }
 
   // category_id gui "" (khong phai bo qua) de XOA khoi nhom hien tai - xem

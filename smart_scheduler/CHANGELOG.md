@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.51
+
+- Much faster with large Home Assistant setups (tested with 10,000 entities): the area/device registry
+  is cached instead of re-downloaded on every refresh, the Home page only polls the devices you added,
+  and the device list is serialized much faster.
+- Device picker: tap a row to select it (it turns yellow with a check mark) instead of a small checkbox.
+  Search stays instant and always searches every entity; the list shows 100 rows and loads 100 more as
+  you scroll.
+- Removing or favoriting a device in Settings → Devices updates instantly.
+- Time ranges: the OFF point can now also be sunrise/sunset ± offset (e.g. on at sunset, off at sunrise),
+  each point has its own Time / Sunrise / Sunset chips, and a ⇅ button swaps the ON and OFF points.
+
 ## 0.5.50
 
 - After adding devices in Settings → Devices, the Edit name/icon sheet opens right away. When several

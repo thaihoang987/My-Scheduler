@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from pydantic import TypeAdapter
 
 from app import crud, homeassistant, manual_timer
 from app.models import (
@@ -55,9 +56,21 @@ def _fan_attrs(attrs: dict) -> FanAttrs:
 
 router = APIRouter(prefix="/api/entities", tags=["entities"])
 
+# Serialize thang bang pydantic-core (v0.5.51): nha nhieu entity -> tra hang
+# nghin EntitySummary, de FastAPI tu kiem tra lai response_model + jsonable_encoder
+# ton ~0.2s moi lan (poll 8s + moi lan tai lai danh sach).
+_ENTITY_LIST = TypeAdapter(list[EntitySummary])
+
 
 @router.get("", response_model=list[EntitySummary])
-async def list_entities():
+async def list_entities(scope: str = "all"):
+    """scope="all" (mac dinh): MOI entity cua HA - Entity Picker "Them thiet bi"
+    can du de tim (nha co the 10.000 entity). scope="added": chi thiet bi da them
+    - trang Nha/Cai dat poll moi 8s chi can nhung cai nay, khoi gui vai MB."""
+    return Response(content=_ENTITY_LIST.dump_json(await build_entities(scope == "added")), media_type="application/json")
+
+
+async def build_entities(added_only: bool = False) -> list[EntitySummary]:
     states = await homeassistant.get_states()
     registries = await homeassistant.get_registries()
     aliases = crud.list_aliases()
@@ -68,6 +81,8 @@ async def list_entities():
     out = []
     for state in states:
         entity_id = state["entity_id"]
+        if added_only and not aliases.get(entity_id, {}).get("added"):
+            continue
         domain = entity_id.split(".", 1)[0]
         reg = entities_reg.get(entity_id, {})
         device = devices_reg.get(reg.get("device_id"), {}) if reg.get("device_id") else {}

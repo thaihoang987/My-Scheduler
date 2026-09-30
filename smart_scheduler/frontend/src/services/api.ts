@@ -49,7 +49,8 @@ export const api = {
   runSchedule: (id: string) =>
     request<{ status: string; message: string | null }>(`/schedules/${id}/run`, { method: "POST" }),
 
-  listEntities: () => request<EntitySummary[]>("/entities"),
+  /** "all" = moi entity cua HA (Entity Picker); "added" = chi thiet bi da them (poll trang Nha). */
+  listEntities: (scope: "all" | "added" = "all") => request<EntitySummary[]>(`/entities${scope === "added" ? "?scope=added" : ""}`),
   setAlias: (entityId: string, data: Partial<EntitySummary>) =>
     request<EntitySummary>(`/entities/${entityId}/alias`, { method: "PUT", body: JSON.stringify(data) }),
   /** Doi thiet bi sang entity khac, backend chuyen luon ten/icon/nhom/lich/

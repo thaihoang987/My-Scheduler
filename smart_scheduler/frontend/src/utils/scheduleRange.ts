@@ -27,6 +27,10 @@ export interface ScheduleDraft {
   // tat sau khi bat, `time` la DO DAI "HH:MM:SS" (xem backend auto_off.py).
   trigger_type: "time" | "sunrise" | "sunset" | "auto_off";
   offset_minutes: number;
+  // Moc TAT cua "Khung gio" (v0.5.51): gio co dinh (`end_time`) hoac binh minh/
+  // hoang hon +/- phut - vd bat luc hoang hon, tat luc binh minh.
+  end_trigger_type: "time" | "sunrise" | "sunset";
+  end_offset_minutes: number;
   // Chi dung khi action_service === "climate_set".
   climate_hvac_mode: string | null;
   climate_temperature: number | null;
@@ -62,6 +66,8 @@ export const EMPTY_DRAFT: ScheduleDraft = {
   end_date: null,
   trigger_type: "time",
   offset_minutes: 0,
+  end_trigger_type: "time",
+  end_offset_minutes: 0,
   climate_hvac_mode: null,
   climate_temperature: null,
   light_brightness_pct: null,
@@ -257,7 +263,11 @@ export function draftName(draft: ScheduleDraft, entities: EntitySummary[]): stri
         ? nameOf(draft.target_entities[0])
         : `${draft.target_entities.length} ${tr("thiết bị", "devices")}`;
   if (draft.trigger_type === "auto_off") return `${deviceLabel} · ${autoOffLabel(draft.time)}`;
-  if (draft.end_time) return `${deviceLabel} · ${draft.time}→${draft.end_time}`;
+  if (draft.end_time) {
+    const on = triggerLabel(draft.trigger_type, draft.offset_minutes, draft.time);
+    const off = triggerLabel(draft.end_trigger_type, draft.end_offset_minutes, draft.end_time);
+    return `${deviceLabel} · ${on}→${off}`;
+  }
   if (draft.action_service === "climate_set") {
     const modeText = draft.climate_hvac_mode ? hvacModeLabel(draft.climate_hvac_mode) : tr("Đặt chế độ", "Set mode");
     const tempText = draft.climate_temperature != null && !hvacModeIsTemperatureless(draft.climate_hvac_mode) ? ` ${draft.climate_temperature}°C` : "";
@@ -330,6 +340,8 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
       // moc TAT luon la gio co dinh.
       trigger_type: onS.trigger_type ?? "time",
       offset_minutes: onS.offset_minutes ?? 0,
+      end_trigger_type: (offS.trigger_type === "sunrise" || offS.trigger_type === "sunset" ? offS.trigger_type : "time"),
+      end_offset_minutes: offS.offset_minutes ?? 0,
       climate_hvac_mode: null,
       climate_temperature: null,
       light_brightness_pct: null,
@@ -366,6 +378,8 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
     end_date: schedule.end_date,
     trigger_type: schedule.trigger_type,
     offset_minutes: schedule.offset_minutes,
+    end_trigger_type: "time",
+    end_offset_minutes: 0,
     climate_hvac_mode: isClimateAction ? ((service_data.hvac_mode as string) ?? null) : null,
     climate_temperature: isClimateAction ? ((service_data.temperature as number) ?? null) : null,
     light_brightness_pct: isLightAction ? ((service_data.brightness_pct as number) ?? null) : null,
@@ -429,8 +443,8 @@ export async function saveScheduleDraft(
   const name = draftName(draft, entities);
   const domain = draftToAction({ ...draft, action_service: "turn_on" }).domain;
 
-  // Moc BAT theo draft (gio co dinh hoac binh minh/hoang hon +/- phut, tu
-  // v0.5.32); moc TAT luon ep ve gio co dinh - gui ro rang ca 2 field vi
+  // Moi moc Bat/Tat deu la gio co dinh hoac binh minh/hoang hon +/- phut (moc
+  // Bat tu v0.5.32, moc Tat tu v0.5.51) - gui ro rang ca 2 field vi
   // update_schedule() merge tu ban cu neu thieu field se giu nham gia tri cu.
   const onPayload = {
     ...base,
@@ -448,8 +462,8 @@ export async function saveScheduleDraft(
     action: { domain, service: "turn_off", service_data: {} },
     time: draft.end_time,
     group_id: groupId,
-    trigger_type: "time" as const,
-    offset_minutes: 0,
+    trigger_type: draft.end_trigger_type,
+    offset_minutes: draft.end_trigger_type === "time" ? 0 : draft.end_offset_minutes,
     conditions: draft.end_conditions,
   };
 
@@ -476,7 +490,8 @@ export function validateScheduleDraft(draft: ScheduleDraft): string | null {
   if (draft.start_date && draft.end_date && draft.start_date > draft.end_date) {
     return tr("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc", "Start date must be before or equal to end date");
   }
-  if (draft.end_time && draft.trigger_type === "time" && toSeconds(draft.time) === toSeconds(draft.end_time)) {
+  if (draft.end_time && draft.trigger_type === draft.end_trigger_type
+      && (draft.trigger_type === "time" ? toSeconds(draft.time) === toSeconds(draft.end_time) : draft.offset_minutes === draft.end_offset_minutes)) {
     return tr("Giờ bật và giờ tắt không được cùng thời điểm", "Turn-on and turn-off times cannot be identical");
   }
   if (draft.action_service === "climate_set" && !draft.climate_hvac_mode) {
