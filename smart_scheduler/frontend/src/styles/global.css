@@ -1164,3 +1164,4 @@ body {
   font-size: 14px; font-weight: 600; color: var(--text-muted);
   white-space: nowrap; flex-shrink: 0;
 }
+.auto-off__row.sortable-fallback { outline: 2px solid var(--accent); background: var(--surface); border-radius: var(--radius-lg); }

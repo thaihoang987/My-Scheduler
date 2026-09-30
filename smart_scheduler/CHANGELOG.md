@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.46
+
+- Auto-off rows on Home can be reordered: tap the pencil (Arrange) and drag the handle.
+
 ## 0.5.45
 
 - Auto-off timers are now shown together as one list on Home (icon, name, countdown bar, duration,

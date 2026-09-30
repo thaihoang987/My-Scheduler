@@ -166,6 +166,10 @@ export function Home({
 
       <AutoOffList
         rules={autoOffRules}
+        allSchedules={schedules}
+        editMode={editMode}
+        reload={reload}
+        setDragging={setDragging}
         entities={entities}
         activeTimers={activeTimers}
         onEdit={(rule) => {
