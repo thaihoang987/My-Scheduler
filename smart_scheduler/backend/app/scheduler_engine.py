@@ -159,6 +159,8 @@ def compute_next_run(schedule: dict, now: datetime | None = None, pause=_UNSET) 
     days = set(schedule.get("days") or [0, 1, 2, 3, 4, 5, 6])
     if not schedule.get("enabled", True) or not schedule.get("card_enabled", True) or not days:
         return None
+    if schedule.get("trigger_type") == "auto_off":
+        return None  # khong chay theo gio - xem auto_off.py
     # Quet toi da 370 ngay de tim ngay hop le tiep theo trong start_date/
     # end_date - du de bao trum ca nam neu khoang ngay dat trong tuong lai.
     horizon = 370 if (schedule.get("start_date") or schedule.get("end_date")) else 8
@@ -236,6 +238,8 @@ async def _process_schedule(schedule: dict, missed_policy: str, expires_at: date
     now = datetime.now(tz)
     if not schedule.get("enabled", True) or not schedule.get("card_enabled", True):
         return
+    if schedule.get("trigger_type") == "auto_off":
+        return  # auto_off.py xu ly theo trang thai that, khong theo gio
     days = set(schedule.get("days") or [])
     if now.weekday() not in days:
         return
@@ -491,7 +495,7 @@ async def scheduler_loop() -> None:
                 settings = crud.get_settings()
                 pause_end = paused_until(settings)
                 schedules = crud.list_schedules()
-                if any((s.get("trigger_type") or "time") != "time" for s in schedules):
+                if any(s.get("trigger_type") in ("sunrise", "sunset") for s in schedules):
                     if observer_task is None or observer_task.done():
                         observer_task = asyncio.create_task(_ensure_observer())
                 for schedule in schedules:

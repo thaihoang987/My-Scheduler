@@ -150,6 +150,9 @@ export function App() {
         if (["schedule_updated", "schedule_deleted", "schedule_executed"].includes(msg.event)) {
           reload();
         }
+        if (msg.event === "auto_off_updated") {
+          reloadTimers();
+        }
         if (["manual_timer_started", "manual_timer_finished"].includes(msg.event)) {
           reloadTimers();
           reload();

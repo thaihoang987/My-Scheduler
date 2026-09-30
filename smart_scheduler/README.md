@@ -12,6 +12,7 @@ created by hand for each device. Pick a device, pick a time, done.
 - On → off time ranges, fixed times or sunrise/sunset ± offset, repeat days
 - Entity-state conditions, device groups, custom names/icons, favorites
 - Forced-on with auto-off, presence simulation while away, pause all schedules
+- Auto-off after on: a device that stays on longer than N (from any source) is turned off, survives restarts
 - Missed-run catch-up, device state verification, history log, backup/restore
 - Schedules run in the add-on backend — they keep working with the browser closed
 - Interface language (English / Vietnamese): **Settings → Appearance → Language**

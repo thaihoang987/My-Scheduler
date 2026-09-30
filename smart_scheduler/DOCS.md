@@ -24,6 +24,7 @@ The add-on talks to Home Assistant through the Supervisor, so no token or URL is
 ## Other features
 
 - **Forced on**: turn a device on now with an automatic off timer; survives add-on restarts.
+- **Auto-off after on**: + → "Auto-off after on", pick a device and a duration. Whenever it turns on (dashboard, wall switch, automation, another schedule) it is turned off after that duration. The on-time is stored, so a Home Assistant restart or backup does not reset the countdown; if it expired while offline, it turns off as soon as the add-on is back.
 - **Presence simulation**: randomly switch selected devices while you are away.
 - **Groups, custom names, icons, favorites** to organize the Home page.
 - **Missed runs**: skip, or run once after the add-on restarts.

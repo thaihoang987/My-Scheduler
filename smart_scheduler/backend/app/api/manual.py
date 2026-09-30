@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app import manual_timer
+from app import auto_off, manual_timer
 
 router = APIRouter(prefix="/api/manual", tags=["manual"])
 
@@ -13,7 +13,9 @@ class ForceOnIn(BaseModel):
 
 @router.get("/active")
 async def active():
-    return manual_timer.list_active()
+    # Kem dem nguoc "Tu tat sau khi bat" (source="auto_off", khong huy duoc
+    # qua /cancel) de card ve chung 1 thanh tien trinh.
+    return manual_timer.list_active() + auto_off.list_active()
 
 
 @router.post("/force_on")

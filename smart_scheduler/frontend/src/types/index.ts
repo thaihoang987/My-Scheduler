@@ -36,7 +36,9 @@ export interface Schedule {
   // Kieu hen gio: "time" = gio co dinh (field `time` phia tren), "sunrise"/
   // "sunset" = tinh theo binh minh/hoang hon thuc te tai vi tri HA, +/-
   // `offset_minutes` phut (giong Google Home/Tuya/SmartThings).
-  trigger_type: "time" | "sunrise" | "sunset";
+  // "auto_off" (v0.5.44) = tu tat sau khi thiet bi BAT duoc `time` (do dai
+  // HH:MM:SS, khong phai gio dong ho) - backend theo doi trang thai that.
+  trigger_type: "time" | "sunrise" | "sunset" | "auto_off";
   offset_minutes: number;
   conditions: ScheduleCondition[];
   /** Cong tac TONG cua card tren trang Nha - doc lap voi `enabled` cua tung
@@ -119,6 +121,8 @@ export interface ManualTimer {
   entity_ids: string[];
   started_at: string | null;
   off_at: string | null;
+  /** "auto_off" = dem nguoc cua lich "Tu tat sau khi bat" (khong huy duoc). */
+  source?: "auto_off";
 }
 
 export interface HistoryEntry {

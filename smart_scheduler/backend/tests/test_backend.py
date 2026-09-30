@@ -415,3 +415,116 @@ def test_replace_entity_dedupes_when_target_already_listed():
     s = make_schedule(target_entities=["switch.a", "switch.new"])
     crud.replace_entity("switch.a", "switch.new", "switch")
     assert crud.get_schedule(s["id"])["target_entities"] == ["switch.new"]
+
+
+# ---- tu tat sau khi bat (auto_off) ----
+
+from app import auto_off  # noqa: E402
+
+UTC = ZoneInfo("UTC")
+
+
+def _utc(h, m=0, day=1):
+    return datetime(2026, 10, day, h, m, tzinfo=UTC)
+
+
+def make_auto_off(duration="03:00:00", entity="light.ngu", **over):
+    auto_off._last_sent.clear()
+    s = make_schedule(
+        target_entities=[entity], time=duration, trigger_type="auto_off",
+        action={"domain": "homeassistant", "service": "turn_off", "service_data": {}}, **over,
+    )
+    # lich tao tu truoc, khong anh huong moc bat
+    db.get_conn().execute("UPDATE schedules SET updated_at=? WHERE id=?", (_utc(0, day=1).isoformat(), s["id"]))
+    db.get_conn().commit()
+    return s
+
+
+def _state(fake_ha, state, last_changed, entity="light.ngu"):
+    fake_ha.states = [{"entity_id": entity, "state": state, "last_changed": last_changed.isoformat()}]
+
+
+def test_auto_off_not_scheduled_by_engine(fake_ha):
+    s = make_auto_off(duration="00:00:05")
+    assert compute_next_run(s) is None
+    run(scheduler_engine._process_schedule(crud.get_schedule(s["id"]), "run_once", None, None))
+    assert fake_ha.calls == []
+
+
+def test_auto_off_turns_off_after_duration(fake_ha):
+    make_auto_off("00:30:00")
+    _state(fake_ha, "on", _utc(10))
+    assert run(auto_off.check_once(_utc(10, 5))) == []
+    assert run(auto_off.check_once(_utc(10, 29))) == []
+    assert run(auto_off.check_once(_utc(10, 30))) == ["light.ngu"]
+    assert fake_ha.calls == [("homeassistant", "turn_off", ["light.ngu"])]
+    assert crud.list_history(10)[0]["status"] == "success"
+
+
+def test_auto_off_survives_backup_restart(fake_ha):
+    """Den ngu bat 23:00, tat sau 3h. 01:00 VM tat de backup, 01:30 bat lai:
+    HA bao last_changed=01:30 nhung moc 23:00 da luu -> van tat luc 02:00."""
+    make_auto_off("03:00:00")
+    _state(fake_ha, "on", _utc(23, 0, day=1))
+    run(auto_off.check_once(_utc(23, 0, day=1)))
+    run(auto_off.check_once(_utc(0, 59, day=2)))
+    assert fake_ha.calls == []
+
+    # VM tat: add-on khong chay. Len lai: HA chua san sang -> get_states loi
+    async def boom():
+        raise RuntimeError("HA starting")
+    fake_ha_get = fake_ha.get_states
+    from app import homeassistant
+    homeassistant.get_states = boom
+    run(auto_off.check_once(_utc(1, 30, day=2)))
+    homeassistant.get_states = fake_ha_get
+    # entity dang khoi dong: unavailable -> giu moc
+    _state(fake_ha, "unavailable", _utc(1, 31, day=2))
+    run(auto_off.check_once(_utc(1, 31, day=2)))
+    # restore lai "on", last_changed moi
+    _state(fake_ha, "on", _utc(1, 32, day=2))
+    run(auto_off.check_once(_utc(1, 35, day=2)))
+    assert fake_ha.calls == []
+    assert run(auto_off.check_once(_utc(2, 0, day=2))) == ["light.ngu"]
+
+
+def test_auto_off_overdue_after_restart_turns_off_immediately(fake_ha):
+    make_auto_off("03:00:00")
+    _state(fake_ha, "on", _utc(23, 0, day=1))
+    run(auto_off.check_once(_utc(23, 0, day=1)))
+    # may tat tu 01:00 toi 02:30 -> qua han 02:00, len lai la tat ngay
+    _state(fake_ha, "on", _utc(2, 29, day=2))
+    assert run(auto_off.check_once(_utc(2, 30, day=2))) == ["light.ngu"]
+
+
+def test_auto_off_off_resets_and_new_rule_counts_from_creation(fake_ha):
+    s = make_auto_off("00:10:00")
+    _state(fake_ha, "on", _utc(8))
+    run(auto_off.check_once(_utc(8, 1)))
+    _state(fake_ha, "off", _utc(8, 2))
+    run(auto_off.check_once(_utc(8, 2)))
+    assert crud.list_auto_off_state() == {}
+    # dat lich luc 9:00 cho thiet bi da bat tu 7:00 -> dem tu 9:00
+    _state(fake_ha, "on", _utc(7))
+    db.get_conn().execute("UPDATE schedules SET updated_at=? WHERE id=?", (_utc(9).isoformat(), s["id"]))
+    db.get_conn().commit()
+    assert run(auto_off.check_once(_utc(9, 1))) == []
+    assert run(auto_off.check_once(_utc(9, 10))) == ["light.ngu"]
+
+
+def test_auto_off_disabled_card_clears_state(fake_ha):
+    s = make_auto_off("00:10:00")
+    _state(fake_ha, "on", _utc(8))
+    run(auto_off.check_once(_utc(8, 1)))
+    crud.set_group_enabled([s["id"]], False)
+    assert run(auto_off.check_once(_utc(9))) == []
+    assert crud.list_auto_off_state() == {}
+    assert fake_ha.calls == []
+
+
+def test_auto_off_active_list(fake_ha):
+    make_auto_off("00:30:00")
+    _state(fake_ha, "on", _utc(10))
+    run(auto_off.check_once(_utc(10, 1)))
+    [a] = auto_off.list_active()
+    assert a["source"] == "auto_off" and a["off_at"] == _utc(10, 30).isoformat()
