@@ -1,5 +1,6 @@
 import { mdiPencilOutline, mdiPlus } from "@mdi/js";
 import { useMemo, useState } from "react";
+import { AutoOffList } from "../../components/AutoOffList/AutoOffList";
 import { Clock } from "../../components/Clock/Clock";
 import { HomeBanners } from "../../components/HomeBanners/HomeBanners";
 import { DeviceGrid } from "../../components/DeviceGrid/DeviceGrid";
@@ -41,6 +42,9 @@ export function Home({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [editorOpen, setEditorOpen] = useState(false);
+  /** Lich "Tu tat sau khi bat" dang sua (bam 1 dong trong AutoOffList). */
+  const [editingRule, setEditingRule] = useState<Schedule | null>(null);
+  const autoOffRules = useMemo(() => schedules.filter((s) => s.trigger_type === "auto_off"), [schedules]);
   /** Che do "Sap xep": an mac dinh de tranh bam nham keo-tha/doi nhom khi chi
    * luot xem binh thuong (phan hoi 2026-09-23) - bam nut but goc tren phai de
    * bat, chi luc do moi hien tay cam keo + nut doi nhom + cac nhom rong (de
@@ -63,8 +67,25 @@ export function Home({
   const activeCount = schedules.filter((s) => s.enabled).length;
 
   async function handleSave(draft: ScheduleDraft) {
-    await saveScheduleDraft(draft, entities, null, schedules);
+    await saveScheduleDraft(draft, entities, editingRule, schedules);
     setEditorOpen(false);
+    setEditingRule(null);
+    reload();
+  }
+
+  function closeEditor() {
+    setEditorOpen(false);
+    setEditingRule(null);
+  }
+
+  async function deleteRule(id: string) {
+    await api.deleteSchedule(id);
+    closeEditor();
+    reload();
+  }
+
+  async function toggleRule(rule: Schedule) {
+    await api.groupToggleSchedules([rule.id], !(rule.enabled && rule.card_enabled !== false));
     reload();
   }
 
@@ -143,7 +164,18 @@ export function Home({
         ))}
       </div>
 
-      {categoryGroups.length > 0 ? (
+      <AutoOffList
+        rules={autoOffRules}
+        entities={entities}
+        activeTimers={activeTimers}
+        onEdit={(rule) => {
+          setEditingRule(rule);
+          setEditorOpen(true);
+        }}
+        onToggle={toggleRule}
+      />
+
+      {groups.length === 0 && autoOffRules.length > 0 ? null : categoryGroups.length > 0 ? (
         <GroupedDeviceGrid
           groups={filtered}
           entities={entities}
@@ -180,7 +212,15 @@ export function Home({
         <Icon path={mdiPlus} size={26} />
       </button>
 
-      <ScheduleEditor open={editorOpen} schedule={null} allSchedules={schedules} entities={entities} onClose={() => setEditorOpen(false)} onSave={handleSave} />
+      <ScheduleEditor
+        open={editorOpen}
+        schedule={editingRule}
+        allSchedules={schedules}
+        entities={entities}
+        onClose={closeEditor}
+        onSave={handleSave}
+        onDelete={editingRule ? deleteRule : undefined}
+      />
 
       {deleteConfirm && (
         <div className="sheet-backdrop" onClick={() => !deleting && setDeleteConfirm(null)}>
