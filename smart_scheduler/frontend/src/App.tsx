@@ -74,7 +74,7 @@ export function App() {
     setSettings(st);
     setHaConnectionMode(health.ha_connection_mode);
     try {
-      const e = await api.listEntities();
+      const e = await api.listEntities("added");
       setEntities(e);
       setHaConnected(true);
     } catch {
@@ -108,7 +108,7 @@ export function App() {
   const refreshEntityStates = useCallback(async () => {
     if (draggingRef.current) return;
     try {
-      const e = await api.listEntities();
+      const e = await api.listEntities("added");
       if (draggingRef.current) return; // co the da bat dau keo trong luc cho fetch
       setEntities(e);
       setHaConnected(true);

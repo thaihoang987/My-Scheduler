@@ -8,9 +8,11 @@ WebSocket (`/core/websocket` hoac `/api/websocket`) dung mot lan/goi
 de lay registry (area/device/entity) - khong giu ket noi thuong truc de don
 gian cho MVP.
 """
+import asyncio
 import itertools
 import json
 import logging
+import time
 
 import httpx
 import websockets
@@ -102,8 +104,29 @@ async def call_service(domain: str, service: str, entity_ids: list[str], service
 
 _id_counter = itertools.count(1)
 
+# Cache registry (v0.5.51): truoc day MOI lan GET /api/entities (tim kiem, xoa
+# thiet bi, poll 8s cua trang Nha) deu mo WS va tai lai toan bo area/device/
+# entity registry - nha nhieu entity mat ca giay, UI lag (phan hoi 2026-09-30).
+# Registry chi dung de lay ten khu vuc/thiet bi, doi rat it -> cache 5 phut.
+REGISTRY_TTL_SECONDS = 300
+_registry_cache: tuple[float, dict] | None = None
+_registry_lock = asyncio.Lock()
+
 
 async def get_registries() -> dict:
+    global _registry_cache
+    async with _registry_lock:
+        now = time.monotonic()
+        if _registry_cache and now - _registry_cache[0] < REGISTRY_TTL_SECONDS:
+            return _registry_cache[1]
+        data = await _fetch_registries()
+        # Loi (khong co area/device/entity nao) -> khong cache, lan sau thu lai.
+        if data["entities"] or data["devices"] or data["areas"]:
+            _registry_cache = (now, data)
+        return data
+
+
+async def _fetch_registries() -> dict:
     """Tra ve {areas: {area_id: name}, devices: {device_id: {name, area_id}},
     entities: {entity_id: {area_id, device_id, name}}} - dung de ghep area/
     device vao Entity Picker (muc 10 SPEC.md)."""

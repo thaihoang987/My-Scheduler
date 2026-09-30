@@ -1,5 +1,5 @@
-import { mdiStar, mdiStarOutline } from "@mdi/js";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { mdiCheckCircle, mdiStar } from "@mdi/js";
+import { Fragment, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../services/api";
 import type { EntitySummary, Schedule } from "../../types";
 import { visualFor } from "../../utils/deviceVisuals";
@@ -10,6 +10,12 @@ import { tr } from "../../i18n";
 
 const DOMAIN_FILTERS = ["Tất cả", "switch", "light", "climate", "fan", "cover", "input_boolean", "script", "scene"];
 const USED_MAX = 8;
+/** Ve dan danh sach (v0.5.51): Them thiet bi tung ve TOAN BO entity cua HA
+ * (co the 10.000 dong co icon) -> go tim/cuon lag. Ve 100 dong truoc, cuon toi
+ * dong thu 60 (con 40 dong nua la het) thi nap san them 100 (160, 260...). Tim
+ * kiem van quet DU moi entity, chi so dong ve ra la gioi han. */
+const PAGE_ROWS = 100;
+const PRELOAD_BEFORE_END = 40;
 
 function normalize(s: string): string {
   return s
@@ -38,7 +44,16 @@ const EntityRow = memo(function EntityRow({
   useMdiIcons();
   const visual = visualFor(entity.domain, entity.alias || entity.ha_friendly_name, entity.icon);
   return (
-    <label className={`entity-row entity-row--card ${disabled ? "entity-row--disabled" : ""}`}>
+    // Bam ca dong de chon, dong dang chon sang vang (v0.5.51 - phan hoi "o tick
+    // chua ro rang, nhan chon thi no vang len"), khong con checkbox.
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      disabled={disabled}
+      className={`entity-row entity-row--card entity-row--pick ${checked ? "entity-row--picked" : ""} ${disabled ? "entity-row--disabled" : ""}`}
+      onClick={() => onToggle(entity.entity_id)}
+    >
       <span className="entity-row__icon" style={{ "--accent": visual.color } as React.CSSProperties}>
         <Icon path={visual.icon} size={22} />
       </span>
@@ -46,8 +61,8 @@ const EntityRow = memo(function EntityRow({
         <span className="entity-row__name">{entity.alias || entity.ha_friendly_name}</span>
         {showId && <span className="entity-row__id">{entity.entity_id}</span>}
       </span>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onToggle(entity.entity_id)} />
-    </label>
+      {checked && <Icon path={mdiCheckCircle} size={22} className="entity-row__check" />}
+    </button>
   );
 });
 
@@ -88,7 +103,9 @@ export function EntityPicker({
    * cung chung loai (phan hoi 2026-09-24, khac loai lam sai timer card). */
   onlyDomain?: string;
   onClose: () => void;
-  onConfirm: (entityIds: string[]) => void;
+  /** `picked`: thong tin day du cua entity da chon (App chi giu thiet bi da them,
+   * nen man hinh Them thiet bi can lay ten/khu vuc tu day). */
+  onConfirm: (entityIds: string[], picked: EntitySummary[]) => void;
 }) {
   const displayTitle = title ?? tr("Chọn thiết bị", "Select devices");
   const [entities, setEntities] = useState<EntitySummary[]>([]);
@@ -134,18 +151,28 @@ export function EntityPicker({
     return firstId ? (byId.get(firstId)?.domain ?? null) : null;
   }, [picked, byId, single, scope]);
 
+  // Chuoi tim kiem (da bo dau) tinh 1 lan khi tai danh sach, khong tinh lai
+  // cho tung entity sau moi phim go. useDeferredValue: o tim cap nhat ngay,
+  // loc/ve lai danh sach chay sau nen go khong bi khung.
+  const haystacks = useMemo(
+    () => new Map(entities.map((e) => [e.entity_id, normalize(`${e.entity_id} ${e.alias ?? ""} ${e.ha_friendly_name} ${e.area ?? ""} ${e.domain}`)])),
+    [entities],
+  );
+  const query = useDeferredValue(search);
+  const [limit, setLimit] = useState(PAGE_ROWS);
+  useEffect(() => setLimit(PAGE_ROWS), [query, domain, open]);
   const filtered = useMemo(() => {
-    const q = normalize(search.trim());
+    const terms = normalize(query.trim()).split(/\s+/).filter(Boolean);
     return entities.filter((e) => {
       if (scope === "added" && !e.added) return false;
       if (domain !== "Tất cả" && e.domain !== domain) return false;
-      if (!q) return true;
-      const haystack = normalize(`${e.entity_id} ${e.alias ?? ""} ${e.ha_friendly_name} ${e.area ?? ""} ${e.domain}`);
-      return q.split(/\s+/).every((term) => haystack.includes(term));
+      if (!terms.length) return true;
+      const haystack = haystacks.get(e.entity_id) ?? "";
+      return terms.every((term) => haystack.includes(term));
     });
-  }, [entities, search, domain, scope]);
+  }, [entities, haystacks, query, domain, scope]);
 
-  const showSuggestions = !search.trim() && domain === "Tất cả";
+  const showSuggestions = !query.trim() && domain === "Tất cả";
   const scoped = useMemo(() => (scope === "added" ? entities.filter((e) => e.added) : entities), [entities, scope]);
   const favorites = useMemo(() => (showSuggestions ? scoped.filter((e) => e.favorite) : []), [showSuggestions, scoped]);
   const used = useMemo(
@@ -159,14 +186,52 @@ export function EntityPicker({
   const grouped = useMemo(() => {
     const shownAbove = new Set([...favorites, ...used].map((e) => e.entity_id));
     const groups = new Map<string, EntitySummary[]>();
+    let count = 0;
     for (const e of filtered) {
       if (shownAbove.has(e.entity_id)) continue;
+      if (count++ >= limit) break;
       const key = e.area || tr("Chưa gán khu vực", "No area assigned");
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(e);
     }
     return groups;
-  }, [filtered, favorites, used]);
+  }, [filtered, favorites, used, limit]);
+
+  const hiddenCount = Math.max(0, filtered.length - limit);
+  // Moc nap them: dong thu (limit - 40) trong danh sach theo khu vuc. IntersectionObserver
+  // (khong nghe scroll) - moc hien tren man hinh la tang limit them 100.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || hiddenCount === 0) return;
+    let done = false;
+    const more = () => {
+      if (done) return;
+      done = true;
+      setLimit((l) => l + PAGE_ROWS);
+    };
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) more();
+    });
+    io.observe(el);
+    // Du phong: 1 so WebView/trang an tam dung IntersectionObserver -> kiem tra
+    // them khi khung danh sach cuon (so vi tri moc voi day khung).
+    const scroller = el.closest(".sheet__body");
+    const onScroll = () => {
+      const box = scroller?.getBoundingClientRect();
+      if (box && el.getBoundingClientRect().top < box.bottom) more();
+    };
+    scroller?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      io.disconnect();
+      scroller?.removeEventListener("scroll", onScroll);
+    };
+  }, [limit, hiddenCount, grouped]);
+  const sentinelAt = Math.max(0, limit - PRELOAD_BEFORE_END);
+  // Ref de `toggle` giu nguyen tham chieu -> EntityRow (memo) khong ve lai ca
+  // danh sach moi lan chon 1 dong.
+  const pickedDomainRef = useRef(pickedDomain);
+  pickedDomainRef.current = pickedDomain;
 
   const toggle = useCallback(
     (entityId: string) => {
@@ -181,16 +246,18 @@ export function EntityPicker({
         // tren) - phong truong hop goi toggle() truc tiep bo qua thuoc tinh
         // `disabled` cua checkbox (vd ban phim/test tu dong).
         const entityDomain = byId.get(entityId)?.domain;
-        if (next.size > 0 && pickedDomain && entityDomain !== pickedDomain) return prev;
+        const lockDomain = pickedDomainRef.current;
+        if (next.size > 0 && lockDomain && entityDomain !== lockDomain) return prev;
         next.add(entityId);
         return next;
       });
     },
-    [byId, pickedDomain, single],
+    [byId, single],
   );
 
   function confirm() {
-    onConfirm([...picked]);
+    const ids = [...picked];
+    onConfirm(ids, ids.map((id) => byId.get(id)).filter((e): e is EntitySummary => Boolean(e)));
   }
 
   return (
@@ -273,10 +340,14 @@ export function EntityPicker({
       )}
 
       <div className="entity-list">
-        {[...grouped.entries()].map(([area, items]) => (
+        {(() => {
+          let index = 0;
+          return [...grouped.entries()].map(([area, items]) => (
           <div key={area} className="entity-group">
             <div className="entity-group__title">{area}</div>
             {items.map((e) => (
+              <Fragment key={e.entity_id}>
+              {index++ === sentinelAt && hiddenCount > 0 && <div ref={sentinelRef} aria-hidden="true" />}
               <EntityRow
                 key={e.entity_id}
                 entity={e}
@@ -285,9 +356,14 @@ export function EntityPicker({
                 disabled={Boolean(pickedDomain) && e.domain !== pickedDomain && !picked.has(e.entity_id)}
                 onToggle={toggle}
               />
+              </Fragment>
             ))}
           </div>
-        ))}
+          ));
+        })()}
+        {hiddenCount > 0 && (
+          <div className="empty-hint">{tr(`Cuộn xuống để xem thêm (còn ${hiddenCount} thiết bị) hoặc gõ tên để tìm.`, `Scroll for more (${hiddenCount} left) or type to search.`)}</div>
+        )}
       </div>
     </BottomSheet>
   );

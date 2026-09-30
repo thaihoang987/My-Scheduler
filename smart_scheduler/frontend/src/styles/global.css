@@ -1208,3 +1208,25 @@ body {
   background: var(--surface-2); color: var(--text); cursor: pointer; flex-shrink: 0;
 }
 .edit-nav__btn:disabled { opacity: 0.3; cursor: default; }
+
+/* Chon thiet bi bang cach bam ca dong (v0.5.51): bo checkbox, dong chon sang vang. */
+.entity-row--pick {
+  width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
+  border: 2px solid transparent;
+}
+.entity-row--pick:disabled { cursor: not-allowed; }
+.entity-row--picked {
+  background: color-mix(in srgb, var(--star) 20%, var(--surface));
+  border-color: var(--star);
+}
+.entity-row--picked .entity-row__name { font-weight: 700; }
+.entity-row__check { color: var(--star); margin-left: auto; flex-shrink: 0; }
+
+/* Khung gio: moi moc Bat/Tat co chip Gio/Binh minh/Hoang hon rieng + nut doi cho (v0.5.51). */
+.range-wheel .chip-row--compact { justify-content: center; margin: 4px 0 2px; }
+.chip-row--compact .chip { padding: 5px 10px; font-size: 13px; }
+.range-swap {
+  align-self: center; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.range-swap-row { flex: 0 0 100%; display: flex; justify-content: center; }

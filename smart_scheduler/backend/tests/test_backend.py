@@ -528,3 +528,17 @@ def test_auto_off_active_list(fake_ha):
     run(auto_off.check_once(_utc(10, 1)))
     [a] = auto_off.list_active()
     assert a["source"] == "auto_off" and a["off_at"] == _utc(10, 30).isoformat()
+
+
+# ---- khung gio binh minh/hoang hon ca 2 moc (v0.5.51) ----
+
+def test_range_sunset_to_sunrise_ends_next_morning(monkeypatch):
+    from astral import Observer
+    monkeypatch.setattr(scheduler_engine, "_observer", Observer(latitude=10.8, longitude=106.6))
+    on = make_schedule(time="18:00:00", trigger_type="sunset", group_id="g1")
+    off = make_schedule(time="06:00:00", trigger_type="sunrise", group_id="g1",
+                        action={"domain": "switch", "service": "turn_off", "service_data": {}})
+    start = scheduler_engine._scheduled_dt_for_date(on, datetime(2026, 10, 1).date(), TZ)
+    end = scheduler_engine._window_end(on, start, [on, off])
+    assert start.hour in (17, 18) and end.date() == datetime(2026, 10, 2).date() and end.hour in (5, 6)
+    assert compute_next_run(off) is not None
