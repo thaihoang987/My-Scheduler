@@ -141,12 +141,6 @@ export function nextRunOf(group: DeviceGroup): { time: string | null; scheduleId
   return { time: best?.next_run ?? null, scheduleId: best?.id ?? null };
 }
 
-/** Lich "Tu tat sau khi bat" dang co hieu luc cua card (ngan nhat neu nhieu). */
-export function autoOffOf(group: DeviceGroup): Schedule | null {
-  const list = group.schedules.filter((s) => s.trigger_type === "auto_off" && s.enabled && s.card_enabled !== false);
-  return list.sort((a, b) => a.time.localeCompare(b.time))[0] ?? null;
-}
-
 export function anyEnabled(group: DeviceGroup): boolean {
   return group.schedules.some((s) => s.enabled);
 }

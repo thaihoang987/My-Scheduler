@@ -33,6 +33,16 @@ function sunHint(iso: string | null): string {
   return ` (${new Date(iso).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" })})`;
 }
 
+/** Thoi luong cua lich "Tu tat" duoc tao/sua GAN NHAT (updated_at) - dung lam
+ * mac dinh cho lich tu tat moi, nguoi dung do phai chon lai (phan hoi
+ * 2026-09-30). Lay tu du lieu server nen dung chung moi thiet bi mo app. */
+function lastAutoOffDuration(schedules: Schedule[]): string {
+  const latest = schedules
+    .filter((s) => s.trigger_type === "auto_off")
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
+  return latest?.time ?? "00:30:00";
+}
+
 export function ScheduleEditor({
   open,
   schedule,
@@ -200,7 +210,7 @@ export function ScheduleEditor({
                 trigger_type: "auto_off",
                 end_time: null,
                 action_service: "turn_off",
-                time: d.trigger_type === "auto_off" ? d.time : "00:30:00",
+                time: d.trigger_type === "auto_off" ? d.time : lastAutoOffDuration(allSchedules),
                 conditions: [],
                 end_conditions: [],
               }))

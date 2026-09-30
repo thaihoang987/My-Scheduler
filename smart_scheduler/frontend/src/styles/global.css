@@ -1136,3 +1136,31 @@ body {
 .presence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 .presence-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .presence-field__label { font-size: 12px; color: var(--text-muted); }
+
+/* ---- Danh sach "Tu tat sau khi bat" tren trang Nha (v0.5.45) ---- */
+.auto-off { margin: 4px 0 14px; }
+.auto-off__list {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.auto-off__row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.auto-off__row:last-child { border-bottom: none; }
+.auto-off__row--dim { opacity: 0.55; }
+.auto-off__icon { width: 38px; height: 38px; margin-bottom: 0; flex-shrink: 0; }
+.auto-off__main { flex: 1; min-width: 0; }
+.auto-off__main .on-time { margin-top: 4px; }
+.auto-off__name {
+  font-size: 15px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.auto-off__state { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.auto-off__duration {
+  font-size: 14px; font-weight: 600; color: var(--text-muted);
+  white-space: nowrap; flex-shrink: 0;
+}

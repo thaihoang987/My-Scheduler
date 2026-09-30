@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.45
+
+- Auto-off timers are now shown together as one list on Home (icon, name, countdown bar, duration,
+  on/off switch) instead of one card per device. Tap a row to edit or delete it.
+- A new auto-off timer starts with the duration of the one you created or edited most recently.
+
 ## 0.5.44
 
 - New "Auto-off after on" timer type: pick a device and a duration (e.g. 30 min for garden watering).

@@ -174,7 +174,8 @@ export function App() {
     else root.setAttribute("data-theme", settings.theme);
   }, [settings.theme]);
 
-  const groups = useMemo(() => groupSchedules(schedules, entities), [schedules, entities]);
+  // Lich "Tu tat sau khi bat" hien rieng thanh 1 danh sach tren Nha (AutoOffList), khong thanh card.
+  const groups = useMemo(() => groupSchedules(schedules.filter((s) => s.trigger_type !== "auto_off"), entities), [schedules, entities]);
   const openDevice = useMemo(() => groups.find((g) => g.key === openDeviceKey) ?? null, [groups, openDeviceKey]);
   setAppLanguage(settings.language);
 

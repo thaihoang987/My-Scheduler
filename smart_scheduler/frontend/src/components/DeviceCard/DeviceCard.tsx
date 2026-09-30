@@ -1,10 +1,10 @@
 import { mdiClose, mdiDragVertical, mdiFolderMoveOutline, mdiStar, mdiStarOutline } from "@mdi/js";
 import type { DeviceGroup, ManualTimer, Settings } from "../../types";
-import { activeOnWindow, anyEnabled, autoOffOf, cardEnabled, nextRunOf } from "../../utils/groupSchedules";
+import { activeOnWindow, anyEnabled, cardEnabled, nextRunOf } from "../../utils/groupSchedules";
 import { visualFor } from "../../utils/deviceVisuals";
 import { useMdiIcons } from "../../utils/mdiIcons";
 import { formatTimeDisplay } from "../../utils/formatTime";
-import { autoOffLabel, describeAction } from "../../utils/scheduleRange";
+import { describeAction } from "../../utils/scheduleRange";
 import { Countdown } from "../Countdown/Countdown";
 import { Icon } from "../Icon/Icon";
 import { OnTimeProgress } from "../OnTimeProgress/OnTimeProgress";
@@ -63,7 +63,6 @@ export function DeviceCard({
   const hasSchedules = group.schedules.length > 0;
   const multiEntity = group.entityIds.length > 1;
   const onWindow = activeOnWindow(group, activeTimers);
-  const autoOff = enabled ? autoOffOf(group) : null;
 
   return (
     <div
@@ -146,10 +145,6 @@ export function DeviceCard({
               <div className="device-card__time">{formatTimeDisplay(new Date(nextRun).toTimeString().slice(0, 8), timeFormat)}</div>
               <div className="device-card__action">{actionWord(group, scheduleId)}</div>
               {!onWindow && <Countdown nextRun={nextRun} />}
-            </div>
-          ) : autoOff ? (
-            <div className="device-card__next">
-              <div className="device-card__action">{autoOffLabel(autoOff.time)}</div>
             </div>
           ) : (
             <div className="device-card__next device-card__next--off">{!enabled ? tr("Tạm tắt", "Paused") : hasEnabledSchedule ? tr("Không có lần chạy tới", "No upcoming run") : tr("Chưa bật lịch nào", "No enabled schedules")}</div>
