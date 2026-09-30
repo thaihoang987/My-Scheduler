@@ -1,6 +1,6 @@
 name: "Smart Scheduler"
 description: "Support: buymeacoffee.com/leon_bell · ko-fi.com/leonbell · paypal.me/leonbell95 | An iOS-style device timer and scheduler for Home Assistant. No YAML or manually created Helpers required."
-version: "0.5.47"
+version: "0.5.48"
 image: "ghcr.io/thaihoang987/smart-scheduler"
 url: "https://github.com/thaihoang987/Smart-Schedule"
 slug: "smart_scheduler"
