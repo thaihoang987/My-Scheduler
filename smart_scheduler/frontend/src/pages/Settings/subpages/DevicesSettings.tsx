@@ -1,4 +1,4 @@
-import { mdiDeleteOutline, mdiPencilOutline, mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
+import { mdiChevronLeft, mdiChevronRight, mdiDeleteOutline, mdiPencilOutline, mdiPlus, mdiStar, mdiStarOutline } from "@mdi/js";
 import { useMemo, useState } from "react";
 import { EntityPicker } from "../../../components/EntityPicker/EntityPicker";
 import { Icon } from "../../../components/Icon/Icon";
@@ -8,6 +8,7 @@ import { defaultVisualFor, ICON_CHOICES, iconChoiceLabel, iconPathFor, visualFor
 import { isMdiLoaded, loadAllMdi, normalizeIconKey, useMdiIcons } from "../../../utils/mdiIcons";
 import { SubpageHeader } from "../SubpageHeader";
 import { tr } from "../../../i18n";
+import { backdropProps } from "../../../utils/backdrop";
 
 /** "API /x loi 409: {"detail":"..."}" -> chi lay phan detail de hien cho nguoi dung. */
 function apiErrorDetail(err: unknown): string {
@@ -59,6 +60,35 @@ export function DevicesSettings({
   const [saving, setSaving] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [groupPickerFor, setGroupPickerFor] = useState<EntitySummary | null>(null);
+  /** Cac thiet bi vua them (phan hoi 2026-09-30): them xong tu mo bang Sua
+   * ten/icon, them nhieu cai thi co mui ten ◀ ▶ chuyen qua lai. Rong = dang
+   * sua 1 thiet bi le (bam nut but trong danh sach). */
+  const [editList, setEditList] = useState<EntitySummary[]>([]);
+  const [editIdx, setEditIdx] = useState(0);
+
+  function openEdit(e: EntitySummary) {
+    setEditing(e);
+    setAliasDraft(e.alias || e.ha_friendly_name);
+    setIconDraft(e.icon ?? "");
+    setReplaceWith(null);
+    setSaveError("");
+  }
+
+  function closeEdit() {
+    setEditing(null);
+    setEditList([]);
+  }
+
+  /** ◀ ▶: luu thay doi cua thiet bi dang sua roi chuyen sang cai ke ben. */
+  async function goTo(idx: number) {
+    if (idx < 0 || idx >= editList.length) return;
+    const saved = await persist();
+    if (!saved) return;
+    const list = editList.map((e, i) => (i === editIdx ? saved : e));
+    setEditList(list);
+    setEditIdx(idx);
+    openEdit(list[idx]);
+  }
 
   const added = useMemo(() => entities.filter((e) => e.added), [entities]);
 
@@ -70,8 +100,21 @@ export function DevicesSettings({
     );
   }, [added, search]);
 
+  /** Bam Luu: luu va sang thiet bi ke tiep trong danh sach vua them, het thi dong. */
   async function saveAlias() {
-    if (!editing || iconInvalid || saving) return;
+    if (!(await persist())) return;
+    if (editIdx < editList.length - 1) {
+      const next = editIdx + 1;
+      setEditIdx(next);
+      openEdit(editList[next]);
+    } else {
+      closeEdit();
+    }
+  }
+
+  /** Ghi ten/icon (+ doi entity) cua thiet bi dang sua. Tra ve ban da luu, null neu loi. */
+  async function persist(): Promise<EntitySummary | null> {
+    if (!editing || iconInvalid || saving) return null;
     setSaveError("");
     setSaving(true);
     try {
@@ -88,10 +131,11 @@ export function DevicesSettings({
         favorite: editing.favorite,
         added: true,
       });
-      setEditing(null);
       reload();
+      return { ...editing, entity_id: targetId, alias: aliasDraft, icon: iconKey };
     } catch (err) {
       setSaveError(apiErrorDetail(err));
+      return null;
     } finally {
       setSaving(false);
     }
@@ -109,12 +153,19 @@ export function DevicesSettings({
 
   async function addDevices(entityIds: string[]) {
     const byId = new Map(entities.map((e) => [e.entity_id, e]));
+    const fresh: EntitySummary[] = [];
     for (const id of entityIds) {
       const e = byId.get(id);
       await api.setAlias(id, { alias: e?.alias || e?.ha_friendly_name, area: e?.area, icon: e?.icon, favorite: e?.favorite, added: true });
+      if (e && !e.added) fresh.push({ ...e, added: true });
     }
     setAddOpen(false);
     reload();
+    if (fresh.length) {
+      setEditList(fresh);
+      setEditIdx(0);
+      openEdit(fresh[0]);
+    }
   }
 
   // category_id gui "" (khong phai bo qua) de XOA khoi nhom hien tai - xem
@@ -166,11 +217,8 @@ export function DevicesSettings({
                       aria-label={tr("Sửa tên và icon", "Edit name and icon")}
                       title={tr("Sửa tên và icon", "Edit name and icon")}
                       onClick={() => {
-                        setEditing(e);
-                        setAliasDraft(e.alias || e.ha_friendly_name);
-                        setIconDraft(e.icon ?? "");
-                        setReplaceWith(null);
-                        setSaveError("");
+                        setEditList([]);
+                        openEdit(e);
                       }}
                     >
                       <Icon path={mdiPencilOutline} size={20} />
@@ -187,9 +235,23 @@ export function DevicesSettings({
       )}
 
       {editing && (
-        <div className="sheet-backdrop" onClick={() => setEditing(null)}>
+        <div className="sheet-backdrop" {...backdropProps(closeEdit)}>
           <div className="sheet" onClick={(ev) => ev.stopPropagation()}>
-            <div className="sheet__title">{tr("Sửa thiết bị", "Edit device")}</div>
+            {editList.length > 1 ? (
+              <div className="sheet__title edit-nav">
+                <button className="edit-nav__btn" onClick={() => goTo(editIdx - 1)} disabled={editIdx === 0 || saving} aria-label={tr("Thiết bị trước", "Previous device")}>
+                  <Icon path={mdiChevronLeft} size={26} />
+                </button>
+                <span>
+                  {tr("Sửa thiết bị", "Edit device")} <span className="device-section__count">{editIdx + 1}/{editList.length}</span>
+                </span>
+                <button className="edit-nav__btn" onClick={() => goTo(editIdx + 1)} disabled={editIdx === editList.length - 1 || saving} aria-label={tr("Thiết bị sau", "Next device")}>
+                  <Icon path={mdiChevronRight} size={26} />
+                </button>
+              </div>
+            ) : (
+              <div className="sheet__title">{tr("Sửa thiết bị", "Edit device")}</div>
+            )}
             <div className="sheet__body">
               <label className="field-label">{tr("Tên Home Assistant", "Home Assistant name")}</label>
               <div className="readonly-value">
@@ -289,11 +351,11 @@ export function DevicesSettings({
             </div>
             <div className="sheet__footer">
               <div className="sheet__actions">
-                <button className="btn btn--ghost" onClick={() => setEditing(null)}>
+                <button className="btn btn--ghost" onClick={closeEdit}>
                   {tr("Hủy", "Cancel")}
                 </button>
                 <button className="btn btn--primary" onClick={saveAlias} disabled={iconInvalid || saving}>
-                  {saving ? tr("Đang lưu...", "Saving...") : tr("Lưu", "Save")}
+                  {saving ? tr("Đang lưu...", "Saving...") : editIdx < editList.length - 1 ? tr("Lưu & tiếp →", "Save & next →") : tr("Lưu", "Save")}
                 </button>
               </div>
             </div>
@@ -320,7 +382,7 @@ export function DevicesSettings({
       <EntityPicker open={addOpen} selected={[]} scope="all" schedules={schedules} onClose={() => setAddOpen(false)} onConfirm={addDevices} />
 
       {groupPickerFor && (
-        <div className="sheet-backdrop" onClick={() => setGroupPickerFor(null)}>
+        <div className="sheet-backdrop" {...backdropProps(() => setGroupPickerFor(null))}>
           <div className="sheet" onClick={(ev) => ev.stopPropagation()}>
             <div className="sheet__title">{tr(`Chọn nhóm cho "${groupPickerFor.alias || groupPickerFor.ha_friendly_name}"`, `Select a group for "${groupPickerFor.alias || groupPickerFor.ha_friendly_name}"`)}</div>
             <div className="sheet__body">

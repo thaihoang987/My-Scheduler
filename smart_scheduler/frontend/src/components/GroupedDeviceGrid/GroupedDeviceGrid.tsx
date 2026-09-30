@@ -6,6 +6,7 @@ import { removeStaleFallbackClones } from "../../utils/sortableFallbackCleanup";
 import { DeviceCard } from "../DeviceCard/DeviceCard";
 import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { tr } from "../../i18n";
+import { backdropProps } from "../../utils/backdrop";
 
 export const UNGROUPED = "__ungrouped__";
 const SORTABLE_GROUP = "smart-scheduler-devices";
@@ -166,7 +167,7 @@ export function GroupedDeviceGrid({
       ))}
       {extra && !visibleSections.some((sec) => sections.indexOf(sec) >= extra.index) && extra.node}
       {pickerFor && (
-        <div className="sheet-backdrop" onClick={() => !saving && setPickerFor(null)}>
+        <div className="sheet-backdrop" {...backdropProps(() => !saving && setPickerFor(null))}>
           <div className="sheet" onClick={(event) => event.stopPropagation()}>
             <div className="sheet__title">{tr(`Chọn nhóm cho "${pickerFor.title}"`, `Select a group for "${pickerFor.title}"`)}</div>
             <div className="sheet__body">

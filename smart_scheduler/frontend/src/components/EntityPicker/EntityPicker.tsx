@@ -127,10 +127,12 @@ export function EntityPicker({
   // se lam sai hoac im lang rot ve hanh dong chung khong dung y. Domain khoa
   // theo thiet bi DAU TIEN da chon (thu tu Set giu dung thu tu them vao).
   const pickedDomain = useMemo(() => {
-    if (single) return null;
+    // scope "all" = Cai dat -> Them thiet bi: chi them vao danh sach, khong
+    // tao lich, nen them cung luc nhieu loai thiet bi thoai mai (v0.5.50).
+    if (single || scope === "all") return null;
     const firstId = [...picked][0];
     return firstId ? (byId.get(firstId)?.domain ?? null) : null;
-  }, [picked, byId, single]);
+  }, [picked, byId, single, scope]);
 
   const filtered = useMemo(() => {
     const q = normalize(search.trim());
