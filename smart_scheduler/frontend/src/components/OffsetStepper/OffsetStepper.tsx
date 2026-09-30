@@ -1,4 +1,5 @@
-import { appLocale, tr } from "../../i18n";
+import { tr } from "../../i18n";
+import { fmtTime } from "../../utils/appTime";
 
 /** Chinh so phut lech +/- so voi 1 moc troi (Binh minh/Hoang hon) - thay the
  * TimeWheelPicker khi trigger_type khac "time" (xem ScheduleEditor.tsx).
@@ -27,7 +28,7 @@ export function OffsetStepper({
 }) {
   const clamp = (v: number) => Math.max(MIN, Math.min(MAX, v));
   const previewTime = baseTimeIso ? new Date(new Date(baseTimeIso).getTime() + minutes * 60000) : null;
-  const previewText = previewTime ? previewTime.toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" }) : null;
+  const previewText = previewTime ? fmtTime(previewTime) : null;
   return (
     <div className="offset-stepper">
       <button type="button" className="offset-stepper__btn" onClick={() => onChange(clamp(minutes - STEP))} aria-label={tr("Giảm", "Decrease")}>

@@ -552,3 +552,168 @@ def test_next_run_skips_slot_just_executed():
     s["last_scheduled_for"] = now.isoformat()
     nxt = datetime.fromisoformat(compute_next_run(s, now=now))
     assert nxt > now and nxt.date() > now.date()
+
+
+# ---- kiem tra tong the tung che do (v0.5.52) ----
+
+def _due_now(**over):
+    """Lich den han vua dung luc nay (trong GRACE), tao tu hom qua -> khong bi coi la tao sau moc."""
+    now = datetime.now(TZ)
+    if now.hour == 0 and now.minute < 2:
+        pytest.skip("sat nua dem")
+    s = make_schedule(time=(now - timedelta(seconds=2)).strftime("%H:%M:%S"), **over)
+    s["updated_at"] = (now - timedelta(days=1)).isoformat()
+    return s
+
+
+def _run(s, policy="skip", expires=None):
+    run(scheduler_engine._process_schedule(s, policy, expires, None))
+
+
+def test_point_turn_on_off_toggle_dispatch(fake_ha):
+    for svc in ("turn_on", "turn_off", "toggle"):
+        _run(_due_now(target_entities=[f"switch.{svc}"], action={"domain": "switch", "service": svc, "service_data": {}}))
+    # bat/tat tho -> homeassistant.*, toggle giu nguyen domain
+    assert fake_ha.calls == [("homeassistant", "turn_on", ["switch.turn_on"]), ("homeassistant", "turn_off", ["switch.turn_off"]),
+                             ("switch", "toggle", ["switch.toggle"])]
+
+
+def test_idempotent_same_slot_runs_once(fake_ha):
+    s = _due_now()
+    _run(s)
+    _run(crud.get_schedule(s["id"]) | {"updated_at": s["updated_at"]})
+    assert len(fake_ha.calls) == 1
+
+
+def test_skip_once_skips_then_clears(fake_ha):
+    s = _due_now()
+    crud.set_skip(s["id"], True) if hasattr(crud, "set_skip") else db.get_conn().execute("UPDATE schedules SET skip_once=1 WHERE id=?", (s["id"],))
+    db.get_conn().commit()
+    _run(crud.get_schedule(s["id"]) | {"updated_at": s["updated_at"]})
+    got = crud.get_schedule(s["id"])
+    assert fake_ha.calls == [] and got["last_status"] == "skipped_once" and not got["skip_once"]
+
+
+def test_conditions_block_or_allow(fake_ha):
+    fake_ha.states = [{"entity_id": "sensor.do_am", "state": "55"}]
+    ok = _due_now(target_entities=["switch.ok"], conditions=[{"entity_id": "sensor.do_am", "state": "60", "operator": "lt"}])
+    no = _due_now(target_entities=["switch.no"], conditions=[{"entity_id": "sensor.do_am", "state": "50", "operator": "lt"}])
+    _run(ok)
+    _run(no)
+    assert fake_ha.calls == [("homeassistant", "turn_on", ["switch.ok"])]
+    assert crud.get_schedule(no["id"])["last_status"] == "skipped_condition"
+
+
+def test_disabled_schedule_and_card_do_not_run(fake_ha):
+    a = _due_now(enabled=False)
+    b = _due_now(card_enabled=False)
+    _run(a)
+    _run(b)
+    assert fake_ha.calls == []
+
+
+def test_days_and_date_range_respected(fake_ha):
+    today = datetime.now(TZ).weekday()
+    _run(_due_now(days=[(today + 1) % 7]))
+    tomorrow = (datetime.now(TZ) + timedelta(days=1)).date().isoformat()
+    _run(_due_now(start_date=tomorrow))
+    assert fake_ha.calls == []
+    _run(_due_now(days=[today], start_date=datetime.now(TZ).date().isoformat(), end_date=tomorrow))
+    assert len(fake_ha.calls) == 1
+
+
+def _missed(**over):
+    now = datetime.now(TZ)
+    if now.hour == 0 and now.minute < 15:
+        pytest.skip("sat nua dem")
+    s = make_schedule(time=(now - timedelta(minutes=10)).strftime("%H:%M:%S"), **over)
+    s["updated_at"] = (now - timedelta(days=1)).isoformat()
+    return s
+
+
+def test_missed_policy_run_once_catches_up(fake_ha):
+    _run(_missed(), policy="run_once")
+    assert len(fake_ha.calls) == 1
+
+
+def test_on_not_replayed_after_off_deadline(fake_ha):
+    s = _missed()
+    _run(s, policy="run_once", expires=datetime.now(TZ) - timedelta(minutes=1))
+    assert fake_ha.calls == [] and crud.get_schedule(s["id"])["last_status"] == "skipped_expired"
+
+
+def test_force_on_timer_cancel_and_restore(fake_ha, monkeypatch):
+    from app import manual_timer
+
+    async def scenario():
+        rec = await manual_timer.start(["switch.f"], 0.02)  # ~1.2s
+        assert fake_ha.calls[-1] == ("homeassistant", "turn_on", ["switch.f"])
+        assert crud.list_manual_timers()
+        await asyncio.sleep(1.6)
+        assert fake_ha.calls[-1] == ("homeassistant", "turn_off", ["switch.f"]) and not crud.list_manual_timers()
+        rec2 = await manual_timer.start(["switch.g"], 10)
+        assert await manual_timer.cancel(rec2["id"])
+        assert fake_ha.calls[-1] == ("homeassistant", "turn_off", ["switch.g"]) and not crud.list_manual_timers()
+        # restore sau restart: hen da qua han -> tat ngay
+        crud.save_manual_timer({"id": "x", "entity_ids": ["switch.h"], "started_at": "2026-01-01T00:00:00+00:00",
+                                "off_at": "2026-01-01T00:01:00+00:00"})
+        manual_timer._active.clear()
+        await manual_timer.restore_active()
+        await asyncio.sleep(0.2)
+        assert fake_ha.calls[-1] == ("homeassistant", "turn_off", ["switch.h"])
+    run(scenario())
+
+
+def test_force_on_with_timer_overrides_auto_off(fake_ha):
+    from app import manual_timer
+    make_auto_off("00:00:10", entity="switch.m")
+    _state(fake_ha, "on", _utc(8), entity="switch.m")
+    manual_timer._active["t"] = {"id": "t", "entity_ids": ["switch.m"], "started_at": _utc(8).isoformat(), "off_at": _utc(9).isoformat(), "task": None}
+    try:
+        assert run(auto_off.check_once(_utc(8, 5))) == []
+    finally:
+        manual_timer._active.pop("t", None)
+    assert run(auto_off.check_once(_utc(8, 6))) == ["switch.m"]
+
+
+def test_reset_devices_on_startup_only_turns_off_on_devices(fake_ha):
+    from app import main
+    crud.update_settings({"reset_devices_on_startup": True})
+    make_schedule(target_entities=["switch.on1"])
+    make_schedule(target_entities=["switch.off1"])
+    fake_ha.states = [{"entity_id": "switch.on1", "state": "on"}, {"entity_id": "switch.off1", "state": "off"}]
+    run(main._reset_devices_on_startup())
+    assert fake_ha.calls == [("homeassistant", "turn_off", ["switch.on1"])]
+
+
+def test_auto_off_wakes_up_at_deadline(fake_ha):
+    make_auto_off("00:00:15")
+    _state(fake_ha, "on", _utc(10))
+    run(auto_off.check_once(_utc(10, 0)))
+    assert auto_off.next_sleep(_utc(10, 0) + timedelta(seconds=12)) == pytest.approx(3.05)
+    assert auto_off.next_sleep(_utc(10, 0) + timedelta(seconds=1)) == auto_off.POLL_SECONDS
+
+
+# ---- mui gio theo Home Assistant (v0.5.53) ----
+
+def test_timezone_defaults_to_ha_and_user_override_wins(monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "HA_TIMEZONE", "Europe/Berlin")
+    assert crud.settings_timezone() == "Europe/Berlin"
+    st = crud.get_settings()
+    assert st["timezone"] == "Europe/Berlin" and st["ha_timezone"] == "Europe/Berlin"
+    s = make_schedule(time="23:30:00")
+    assert compute_next_run(crud.get_schedule(s["id"])).endswith(("+02:00", "+01:00"))  # gio Berlin, khong cong them
+    crud.update_settings({"timezone": "Asia/Ho_Chi_Minh"})
+    assert crud.settings_timezone() == "Asia/Ho_Chi_Minh"
+    assert compute_next_run(crud.get_schedule(s["id"])).endswith("23:30:00+07:00")
+
+
+def test_backup_does_not_freeze_default_timezone(monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "HA_TIMEZONE", "Europe/Berlin")
+    data = crud.export_all()
+    assert "timezone" not in data["settings"] and "ha_timezone" not in data["settings"]
+    crud.import_all(data)
+    monkeypatch.setattr(config, "HA_TIMEZONE", "Asia/Tokyo")
+    assert crud.settings_timezone() == "Asia/Tokyo"

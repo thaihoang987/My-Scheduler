@@ -9,6 +9,7 @@ import { Countdown } from "../Countdown/Countdown";
 import { Icon } from "../Icon/Icon";
 import { OnTimeProgress } from "../OnTimeProgress/OnTimeProgress";
 import { tr } from "../../i18n";
+import { hmsInZone } from "../../utils/appTime";
 
 function actionWord(group: DeviceGroup, scheduleId: string | null): string {
   const s = group.schedules.find((x) => x.id === scheduleId);
@@ -142,7 +143,7 @@ export function DeviceCard({
         <>
           {nextRun ? (
             <div className="device-card__next">
-              <div className="device-card__time">{formatTimeDisplay(new Date(nextRun).toTimeString().slice(0, 8), timeFormat)}</div>
+              <div className="device-card__time">{formatTimeDisplay(hmsInZone(nextRun), timeFormat)}</div>
               <div className="device-card__action">{actionWord(group, scheduleId)}</div>
               {!onWindow && <Countdown nextRun={nextRun} />}
             </div>

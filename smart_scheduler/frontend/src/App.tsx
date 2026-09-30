@@ -10,6 +10,7 @@ import { api } from "./services/api";
 import type { DeviceGroup, EntitySummary, Group, HealthStatus, ManualTimer, PresenceStatus, Schedule, Settings as SettingsType } from "./types";
 import { groupSchedules } from "./utils/groupSchedules";
 import { setAppLanguage, tr } from "./i18n";
+import { setAppTimeZone } from "./utils/appTime";
 
 type Tab = "home" | "settings";
 
@@ -146,12 +147,24 @@ export function App() {
     };
   }, [refreshEntityStates, reload, reloadTimers]);
 
+  // Gop nhieu tin WS lien tiep (vd 12 lich cung gio -> 12 schedule_executed)
+  // thanh 1 lan tai lai du lieu sau 300ms - do thuc te v0.5.53: truoc day 12 lan
+  // reload song song (schedules + entities) moi lan.
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadSoon = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      reloadTimerRef.current = null;
+      reload();
+    }, 300);
+  }, [reload]);
+
   useWebSocket(
     useCallback(
       (msg) => {
         if (draggingRef.current) return; // xem ghi chu o draggingRef phia tren
         if (["schedule_updated", "schedule_deleted", "schedule_executed"].includes(msg.event)) {
-          reload();
+          reloadSoon();
         }
         if (msg.event === "ws_reconnected") {
           reload();
@@ -174,7 +187,7 @@ export function App() {
           setPresence(msg.data as PresenceStatus);
         }
       },
-      [reload, reloadTimers, reloadCategoryGroups, refreshEntityStates],
+      [reload, reloadSoon, reloadTimers, reloadCategoryGroups, refreshEntityStates],
     ),
   );
 
@@ -185,6 +198,8 @@ export function App() {
   }, [settings.theme]);
 
   // Lich "Tu tat sau khi bat" hien rieng thanh 1 danh sach tren Nha (AutoOffList), khong thanh card.
+  // Dat mui gio hien thi NGAY trong render (khong doi useEffect) de lan ve dau da dung.
+  setAppTimeZone(settings.timezone);
   const groups = useMemo(() => groupSchedules(schedules.filter((s) => s.trigger_type !== "auto_off"), entities), [schedules, entities]);
   const openDevice = useMemo(() => groups.find((g) => g.key === openDeviceKey) ?? null, [groups, openDeviceKey]);
   setAppLanguage(settings.language);

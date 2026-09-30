@@ -1,5 +1,6 @@
 import { serverNow } from "./serverTime";
 import type { DeviceGroup, EntitySummary, ManualTimer, Schedule } from "../types";
+import { secondsOfDayInZone } from "./appTime";
 
 /** Quy tac gom nhom (muc 6/71 SPEC_UI.md):
  * - Schedule chi co dung 1 target entity -> gom theo entity_id do (nhieu
@@ -87,10 +88,7 @@ export function activeOnWindow(group: DeviceGroup, timers: ManualTimer[], nowMs 
   return candidates.sort((a, b) => new Date(a.endAt).getTime() - new Date(b.endAt).getTime())[0] ?? null;
 }
 
-function secondsOfDay(iso: string): number {
-  const d = new Date(iso);
-  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-}
+const secondsOfDay = secondsOfDayInZone;
 
 /** Khoang Bat -> Tat cua 1 "Khung gio" neu DANG dien ra luc nowMs, null neu
  * khong. Suy tu next_run cua backend (khong tu tinh lai gio) nen dung ca khi

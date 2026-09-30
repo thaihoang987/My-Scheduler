@@ -22,7 +22,8 @@ import { TimeWheelPicker } from "../TimeWheelPicker/TimeWheelPicker";
 import { api } from "../../services/api";
 import { defaultConditionState } from "../../utils/conditionStates";
 import { ConditionList } from "../ConditionList/ConditionList";
-import { appLocale, tr } from "../../i18n";
+import { tr } from "../../i18n";
+import { fmtTime, todayInZone } from "../../utils/appTime";
 
 const DOMAIN_ACTION_SERVICE = { climate: "climate_set", light: "light_set", cover: "cover_set", fan: "fan_set" } as const;
 
@@ -30,7 +31,7 @@ const DOMAIN_ACTION_SERVICE = { climate: "climate_set", light: "light_set", cove
  * chua co (dang tai hoac chua lay duoc vi tri HA). */
 function sunHint(iso: string | null): string {
   if (!iso) return "";
-  return ` (${new Date(iso).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" })})`;
+  return ` (${fmtTime(iso)})`;
 }
 
 /** Thoi luong cua lich "Tu tat" duoc tao/sua GAN NHAT (updated_at) - dung lam
@@ -477,8 +478,8 @@ export function ScheduleEditor({
             onClick={() =>
               setDraft((d) => ({
                 ...d,
-                start_date: d.start_date ?? new Date().toISOString().slice(0, 10),
-                end_date: d.end_date ?? new Date().toISOString().slice(0, 10),
+                start_date: d.start_date ?? todayInZone(),
+                end_date: d.end_date ?? todayInZone(),
               }))
             }
           >

@@ -3,7 +3,8 @@ import { api } from "../../../services/api";
 import type { Settings as SettingsType } from "../../../types";
 import { timezoneOptions } from "../../../utils/timezones";
 import { SubpageHeader } from "../SubpageHeader";
-import { appLocale, tr } from "../../../i18n";
+import { tr } from "../../../i18n";
+import { fmtDateTime } from "../../../utils/appTime";
 
 export function SchedulerSettings({ settings, reload, onBack }: { settings: SettingsType; reload: () => void; onBack: () => void }) {
   async function update(patch: Partial<SettingsType>) {
@@ -35,7 +36,7 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
         {paused ? (
           <div className="home-banner home-banner--pause">
             <span className="home-banner__text">
-              ⏸ {tr("Đang tạm dừng đến", "Paused until")} {pauseEnd!.toLocaleString(appLocale(), { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" })}
+              ⏸ {tr("Đang tạm dừng đến", "Paused until")} {fmtDateTime(pauseEnd!, { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" })}
             </span>
             <button className="home-banner__btn" onClick={() => update({ pause_until: "" })}>
               {tr("Tiếp tục ngay", "Resume now")}
@@ -71,6 +72,19 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
             </option>
           ))}
         </select>
+        {/* Mac dinh theo HA (v0.5.53). Chon mui khac = THAY THE mui HA (khong cong
+            them): lich 23:30 chay luc 23:30 theo mui duoc chon. */}
+        {settings.ha_timezone && settings.ha_timezone === settings.timezone && (
+          <p className="settings-hint">✓ {tr(`Đang theo múi giờ của Home Assistant (${settings.ha_timezone}).`, `Following the Home Assistant time zone (${settings.ha_timezone}).`)}</p>
+        )}
+        {settings.ha_timezone && settings.ha_timezone !== settings.timezone && (
+          <p className="settings-hint">
+            {tr(`Múi giờ Home Assistant: ${settings.ha_timezone}.`, `Home Assistant time zone: ${settings.ha_timezone}.`)}{" "}
+            <button className="link-button" onClick={() => update({ timezone: settings.ha_timezone! })}>
+              {tr("Dùng múi giờ này", "Use this time zone")}
+            </button>
+          </p>
+        )}
       </div>
 
       <div className="settings-section">
@@ -106,7 +120,7 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
           <input type="checkbox" checked={settings.verify_state} onChange={(e) => update({ verify_state: e.target.checked })} />
         </label>
         <p className="settings-hint">
-          {tr("30 giây sau khi lịch bật/tắt, đọc trạng thái THẬT từ Home Assistant. Thiết bị nào chưa đúng (mất lệnh Zigbee/WiFi, thiết bị chập chờn) sẽ được gửi lại lệnh 1 lần; 30 giây sau vẫn sai thì hiện cảnh báo trên trang Nhà và ghi Nhật ký.", "Thirty seconds after an on/off schedule, read the actual state from Home Assistant. A device with the wrong state receives one retry; if it is still wrong 30 seconds later, a warning appears on Home and is written to the log.")}
+          {tr("30 giây sau khi lịch bật/tắt, đọc trạng thái THẬT từ Home Assistant. Thiết bị nào chưa đúng (mất lệnh Zigbee/WiFi, thiết bị chập chờn) sẽ được gửi lại lệnh 1 lần; 30 giây sau vẫn sai thì ghi cảnh báo vào Nhật ký.", "Thirty seconds after an on/off schedule, read the actual state from Home Assistant. A device with the wrong state receives one retry; if it is still wrong 30 seconds later, a warning is written to the log.")}
         </p>
       </div>
 

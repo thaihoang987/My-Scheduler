@@ -1,7 +1,8 @@
 import { api } from "../services/api";
 import type { ClimateAttrs, CoverAttrs, EntitySummary, FanAttrs, HAAction, LightAttrs, Schedule, ScheduleCondition } from "../types";
 import { ALL_DAYS } from "../types";
-import { appLocale, tr } from "../i18n";
+import { tr } from "../i18n";
+import { fmtTime } from "./appTime";
 
 /** Lich dang "khung gio" (bat luc X -> tat luc Y, 1 don vi trong UI) duoc
  * luu thanh 2 dong Schedule (turn_on + turn_off) dung chung `group_id` (cot
@@ -247,7 +248,7 @@ export function triggerLabelWithClock(
 ): string {
   const label = triggerLabel(triggerType, offsetMinutes, time);
   if (triggerType === "time" || triggerType === "auto_off" || !nextRun) return label;
-  const clock = new Date(nextRun).toLocaleTimeString(appLocale(), { hour: "2-digit", minute: "2-digit" });
+  const clock = fmtTime(nextRun);
   return `${label} (~${clock})`;
 }
 
