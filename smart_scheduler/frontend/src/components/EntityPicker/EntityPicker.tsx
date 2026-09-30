@@ -33,12 +33,15 @@ const EntityRow = memo(function EntityRow({
   checked,
   showId,
   disabled,
+  alreadyAdded = false,
   onToggle,
 }: {
   entity: EntitySummary;
   checked: boolean;
   showId: boolean;
   disabled: boolean;
+  /** Them thiet bi (scope "all"): da co trong danh sach -> nhan "Da them", khong chon lai. */
+  alreadyAdded?: boolean;
   onToggle: (entityId: string) => void;
 }) {
   useMdiIcons();
@@ -50,8 +53,8 @@ const EntityRow = memo(function EntityRow({
       type="button"
       role="checkbox"
       aria-checked={checked}
-      disabled={disabled}
-      className={`entity-row entity-row--card entity-row--pick ${checked ? "entity-row--picked" : ""} ${disabled ? "entity-row--disabled" : ""}`}
+      disabled={disabled || alreadyAdded}
+      className={`entity-row entity-row--card entity-row--pick ${checked ? "entity-row--picked" : ""} ${disabled ? "entity-row--disabled" : ""} ${alreadyAdded ? "entity-row--added" : ""}`}
       onClick={() => onToggle(entity.entity_id)}
     >
       <span className="entity-row__icon" style={{ "--accent": visual.color } as React.CSSProperties}>
@@ -61,7 +64,11 @@ const EntityRow = memo(function EntityRow({
         <span className="entity-row__name">{entity.alias || entity.ha_friendly_name}</span>
         {showId && <span className="entity-row__id">{entity.entity_id}</span>}
       </span>
-      {checked && <Icon path={mdiCheckCircle} size={22} className="entity-row__check" />}
+      {alreadyAdded ? (
+        <span className="entity-row__added-badge">✓ {tr("Đã thêm", "Added")}</span>
+      ) : (
+        checked && <Icon path={mdiCheckCircle} size={22} className="entity-row__check" />
+      )}
     </button>
   );
 });
@@ -318,7 +325,8 @@ export function EntityPicker({
               checked={picked.has(e.entity_id)}
               showId={scope === "all"}
               disabled={Boolean(pickedDomain) && e.domain !== pickedDomain && !picked.has(e.entity_id)}
-              onToggle={toggle}
+              alreadyAdded={scope === "all" && e.added && !single}
+                onToggle={toggle}
             />
           ))}
         </div>
@@ -333,7 +341,8 @@ export function EntityPicker({
               checked={picked.has(e.entity_id)}
               showId={scope === "all"}
               disabled={Boolean(pickedDomain) && e.domain !== pickedDomain && !picked.has(e.entity_id)}
-              onToggle={toggle}
+              alreadyAdded={scope === "all" && e.added && !single}
+                onToggle={toggle}
             />
           ))}
         </div>
@@ -354,6 +363,7 @@ export function EntityPicker({
                 checked={picked.has(e.entity_id)}
                 showId={scope === "all"}
                 disabled={Boolean(pickedDomain) && e.domain !== pickedDomain && !picked.has(e.entity_id)}
+                alreadyAdded={scope === "all" && e.added && !single}
                 onToggle={toggle}
               />
               </Fragment>

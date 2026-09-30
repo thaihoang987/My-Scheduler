@@ -542,3 +542,13 @@ def test_range_sunset_to_sunrise_ends_next_morning(monkeypatch):
     end = scheduler_engine._window_end(on, start, [on, off])
     assert start.hour in (17, 18) and end.date() == datetime(2026, 10, 2).date() and end.hour in (5, 6)
     assert compute_next_run(off) is not None
+
+
+def test_next_run_skips_slot_just_executed():
+    """Frontend reload cung giay voi moc vua chay khong duoc thay lai chinh moc do."""
+    now = datetime.now(TZ).replace(microsecond=0)
+    s = make_schedule(time=now.strftime("%H:%M:%S"))
+    assert compute_next_run(s, now=now) == now.isoformat()  # chua chay: dung hen
+    s["last_scheduled_for"] = now.isoformat()
+    nxt = datetime.fromisoformat(compute_next_run(s, now=now))
+    assert nxt > now and nxt.date() > now.date()

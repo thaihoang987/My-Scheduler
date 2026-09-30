@@ -1230,3 +1230,10 @@ body {
   color: var(--text); border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600; cursor: pointer;
 }
 .range-swap-row { flex: 0 0 100%; display: flex; justify-content: center; }
+/* Them thiet bi: thiet bi da co trong danh sach (v0.5.52). */
+.entity-row--added { opacity: 0.6; cursor: default; }
+.entity-row__added-badge {
+  margin-left: auto; flex-shrink: 0; font-size: 13px; font-weight: 700;
+  color: var(--success); background: color-mix(in srgb, var(--success) 15%, transparent);
+  padding: 3px 10px; border-radius: 999px;
+}
