@@ -13,6 +13,7 @@ import type { DeviceGroup, EntitySummary, Group, ManualTimer, PresenceStatus, Sc
 import { cardEnabled } from "../../utils/groupSchedules";
 import { saveScheduleDraft, type ScheduleDraft } from "../../utils/scheduleRange";
 import { tr } from "../../i18n";
+import { backdropProps } from "../../utils/backdrop";
 
 type Filter = "all" | "on" | "off" | "favorite";
 
@@ -285,7 +286,7 @@ export function Home({
       />
 
       {deleteConfirm && (
-        <div className="sheet-backdrop" onClick={() => !deleting && setDeleteConfirm(null)}>
+        <div className="sheet-backdrop" {...backdropProps(() => !deleting && setDeleteConfirm(null))}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet__title">{tr(`Xoá "${deleteConfirm.title}"?`, `Delete "${deleteConfirm.title}"?`)}</div>
             <div className="sheet__body">

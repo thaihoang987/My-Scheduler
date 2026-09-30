@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.50
+
+- After adding devices in Settings → Devices, the Edit name/icon sheet opens right away. When several
+  devices were added at once, ◀ ▶ arrows switch between them (changes are saved when you switch) and
+  the Save button becomes "Save & next".
+- Devices of different types can be added together in Settings → Devices (the same-type limit only
+  applies when building a schedule).
+- Popups no longer close by accident when you press inside them and release outside (e.g. dragging a
+  wheel picker or selecting text); they close only when both press and release happen outside.
+
 ## 0.5.49
 
 - Larger text in Settings, on both phones and desktop: device names and entity IDs in Settings → Devices

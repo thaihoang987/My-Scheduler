@@ -5,6 +5,7 @@ import { api } from "../../../services/api";
 import type { Group } from "../../../types";
 import { SubpageHeader } from "../SubpageHeader";
 import { tr } from "../../../i18n";
+import { backdropProps } from "../../../utils/backdrop";
 
 /** Quan ly "Nhom" PHAN LOAI thiet bi tren trang Nha (muc "phan nhom" phan
  * hoi 2026-09-23) - tao/doi ten/xoa/doi thu tu. Thu tu doi bang nut len/
@@ -107,7 +108,7 @@ export function GroupsSettings({
       )}
 
       {editing && (
-        <div className="sheet-backdrop" onClick={() => setEditing(null)}>
+        <div className="sheet-backdrop" {...backdropProps(() => setEditing(null))}>
           <div className="sheet" onClick={(ev) => ev.stopPropagation()}>
             <div className="sheet__title">{tr("Đổi tên nhóm", "Rename group")}</div>
             <div className="sheet__body">

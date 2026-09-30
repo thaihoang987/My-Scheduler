@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { backdropProps } from "../../utils/backdrop";
 
 const DISMISS_THRESHOLD_PX = 80;
 // Cham bat dau tren cac vung nay van giu nguyen hanh vi rieng cua no (keo
@@ -103,7 +104,7 @@ export function BottomSheet({
 
   if (!open) return null;
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    <div className="sheet-backdrop" {...backdropProps(onClose)}>
       <div className="sheet" ref={sheetRef} onClick={(e) => e.stopPropagation()}>
         <div className="sheet__handle" />
         <div className="sheet__title">{title}</div>
