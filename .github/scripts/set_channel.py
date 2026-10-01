@@ -18,19 +18,19 @@ OWNER = "thaihoang987"
 
 CHANNELS = {
     "stable": {
-        "name": "Smart Scheduler",
+        "name": "My Scheduler",
         "slug": "smart_scheduler",
-        "panel_title": "Smart Scheduler",
+        "panel_title": "My Scheduler",
         "image": f"ghcr.io/{OWNER}/smart-scheduler",
-        "repo_name": "Smart Scheduler - Home Assistant (Hass.io) Add-on",
+        "repo_name": "My Scheduler - Home Assistant (Hass.io) Add-on",
         "desc_prefix": "",
     },
     "test": {
-        "name": "Smart Scheduler (Test)",
+        "name": "My Scheduler (Test)",
         "slug": "smart_scheduler_test",
-        "panel_title": "Smart Scheduler Test",
+        "panel_title": "My Scheduler Test",
         "image": f"ghcr.io/{OWNER}/smart-scheduler-test",
-        "repo_name": "Smart Scheduler - TEST channel",
+        "repo_name": "My Scheduler - TEST channel",
         "desc_prefix": "[TEST build - may be unstable] ",
     },
 }

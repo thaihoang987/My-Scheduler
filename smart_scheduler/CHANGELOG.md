@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.58
+
+- The add-on and the repository now show the new name **My Scheduler** in Home Assistant as well
+  (0.5.57 still showed the old name in the add-on store).
+
 ## 0.5.57
 
 - Smart Scheduler is now called **My Scheduler**. The repository moved to
