@@ -16,7 +16,7 @@ export function BackupSettings({ reload, onBack }: { reload: () => void; onBack:
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `smart-scheduler-backup-${todayInZone()}.json`;
+    a.download = `my-scheduler-backup-${todayInZone()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }

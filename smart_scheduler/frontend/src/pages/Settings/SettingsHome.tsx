@@ -31,7 +31,7 @@ const SECTIONS: { group: [string, string]; items: { id: SettingsSubpage; icon: s
       { id: "log", icon: mdiTextBoxOutline, title: ["Nhật ký", "Log"], hint: ["Lịch sử thực thi", "Execution history"] },
     ],
   },
-  { group: ["Về ứng dụng", "About"], items: [{ id: "about", icon: mdiInformationOutline, title: ["Về ứng dụng", "About"], hint: ["Smart Scheduler", "Smart Scheduler"] }] },
+  { group: ["Về ứng dụng", "About"], items: [{ id: "about", icon: mdiInformationOutline, title: ["Về ứng dụng", "About"], hint: ["My Scheduler", "My Scheduler"] }] },
 ];
 
 export function SettingsHome({ onOpen }: { onOpen: (id: SettingsSubpage) => void }) {

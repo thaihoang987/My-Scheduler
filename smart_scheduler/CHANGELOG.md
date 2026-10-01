@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.57
+
+- Smart Scheduler is now called **My Scheduler**. The repository moved to
+  https://github.com/thaihoang987/My-addon-Scheduler – the old link keeps working, nothing to
+  reinstall: your schedules, devices and settings stay as they are.
+
 ## 0.5.56
 
 - Backup/restore now matches the current app: the file contains schedules (ranges, sunrise/sunset,

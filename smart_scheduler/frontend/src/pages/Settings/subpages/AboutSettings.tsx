@@ -13,7 +13,7 @@ export function AboutSettings({ onBack }: { onBack: () => void }) {
     <div className="page about-page">
       <SubpageHeader title={tr("Về ứng dụng", "About")} onBack={onBack} />
       <div className="about-page__body">
-        <div className="about-page__name">Smart Scheduler</div>
+        <div className="about-page__name">My Scheduler</div>
         <div className="about-page__version">{tr("Phiên bản", "Version")} {__APP_VERSION__}</div>
         <div className="about-page__donate-list">
           {DONATE_LINKS.map((link) => (
