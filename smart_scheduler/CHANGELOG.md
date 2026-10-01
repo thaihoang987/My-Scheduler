@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.56
+
+- Backup/restore now matches the current app: the file contains schedules (ranges, sunrise/sunset,
+  auto-off, conditions), added devices with names/icons/groups, groups, presence simulation and all
+  settings. Running state (presence devices currently on, pause, time zone) is no longer saved.
+- Restoring replaces settings exactly as exported (missing ones go back to default).
+- Restore asks for confirmation first, shows what was restored, and refuses files that are not a
+  Smart Scheduler backup instead of wiping your schedules.
+- History card: tapping a segment now shows a Home Assistant-style detail popup – device name, state,
+  exact start and end time (with seconds) and the duration (HH:MM:SS).
+
 ## 0.5.55
 
 - New on/off history card on the device page, between "Next run" and "Manual control": one bar per

@@ -775,3 +775,32 @@ def test_state_history_parses_minimal_response(monkeypatch):
     assert out == {"switch.a": [{"s": "on", "t": "2026-10-01T00:00:00+00:00"}, {"s": "off", "t": "2026-10-01T01:00:00+00:00"}], "switch.b": []}
     assert seen["url"].endswith("/history/period/2026-10-01T07%3A00%3A00%2B07%3A00")  # "+" phai duoc encode
     assert seen["params"]["filter_entity_id"] == "switch.a,switch.b"
+
+
+# ---- sao luu v3 (v0.5.56) ----
+
+def test_backup_v3_skips_runtime_settings_and_replaces_settings():
+    crud.update_settings({"theme": "dark", "presence": {"enabled": True}, "presence_runtime": {"switch.a": "x"}, "pause_until": "2099-01-01T00:00:00+07:00"})
+    dump = crud.export_all()
+    assert dump["version"] == crud.BACKUP_VERSION
+    assert dump["settings"]["theme"] == "dark" and dump["settings"]["presence"] == {"enabled": True}
+    for k in ("presence_runtime", "pause_until", "timezone", "migrated_split_conditions"):
+        assert k not in dump["settings"]
+    crud.update_settings({"theme": "light", "time_format": "12h"})
+    restored = crud.import_all(dump)
+    st = crud.get_settings()
+    assert st["theme"] == "dark"
+    assert st["time_format"] == "24h"  # khoa khong co trong file v3 -> ve mac dinh
+    assert st["presence_runtime"] == {"switch.a": "x"}  # trang thai chay khong bi dong toi
+    assert restored["settings"] == len(dump["settings"])
+
+
+def test_backup_import_rejects_non_backup_before_wiping():
+    from fastapi import HTTPException
+    from app.api.backup import _validate
+    make_schedule()
+    for bad in ({}, {"schedules": "x"}, {"schedules": [{"id": "1"}]}, {"schedules": [], "version": 99}):
+        with pytest.raises(HTTPException):
+            _validate(bad)
+    assert crud.list_schedules()  # khong bi xoa
+    _validate(crud.export_all())

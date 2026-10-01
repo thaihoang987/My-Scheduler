@@ -807,13 +807,17 @@ body {
 .state-timeline__axis { position: relative; height: 18px; margin-left: 104px; margin-top: 2px; }
 .state-timeline__tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .state-timeline__tick--day { color: var(--text); font-weight: 700; }
+/* Tooltip kieu history graph cua HA: noi phia TREN hang vua cham. */
 .state-timeline__tip {
-  position: absolute; z-index: 5; transform: translateX(-50%); margin-top: 4px;
+  position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 6px));
   background: var(--surface-elevated); color: var(--text); border: 1px solid var(--border);
-  border-radius: 10px; padding: 6px 10px; font-size: 12px; white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); pointer-events: none;
+  border-radius: 8px; padding: 8px 12px; font-size: 13px; line-height: 1.45; white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); pointer-events: none;
 }
-.state-timeline__tip-dur { color: var(--text-muted); }
+.state-timeline__tip-title { text-align: center; font-weight: 700; margin-bottom: 2px; }
+.state-timeline__tip-state { display: flex; align-items: center; gap: 6px; }
+.state-timeline__tip-dot { position: static; width: 10px; height: 10px; border-radius: 50%; padding: 0; flex: none; }
+.state-timeline__tip-dot.state-timeline__seg--na { border: 1px dashed var(--text-muted); }
 .state-timeline__error, .state-timeline__empty { margin-top: 8px; font-size: 12px; color: var(--text-muted); text-align: center; }
 .state-timeline__error { color: var(--danger); }
 @media (max-width: 420px) {
