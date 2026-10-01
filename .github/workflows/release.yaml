@@ -69,7 +69,7 @@ jobs:
             BUILD_VERSION=${{ steps.v.outputs.version }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=Smart Scheduler Home Assistant add-on
+            org.opencontainers.image.description=My Scheduler Home Assistant add-on
 
       - name: Commit to main, tag and create the release (image is ready)
         if: steps.v.outputs.skip != 'true'
@@ -95,4 +95,4 @@ jobs:
           m = re.search(rf"^## {re.escape(os.environ['VERSION'])}\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
           print(m.group(1).strip() if m else "See CHANGELOG.md")
           PY
-          gh release create "v${VERSION}" --title "Smart Scheduler ${VERSION}" --notes-file /tmp/notes.md
+          gh release create "v${VERSION}" --title "My Scheduler ${VERSION}" --notes-file /tmp/notes.md

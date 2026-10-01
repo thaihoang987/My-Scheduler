@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
                 await task
 
 
-app = FastAPI(title="HA Smart Scheduler", lifespan=lifespan)
+app = FastAPI(title="My Scheduler", lifespan=lifespan)
 # Nen gzip - chunk thu vien icon MDI day du (~3MB, v0.5.26) chi con ~vai tram KB.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 

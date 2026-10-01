@@ -205,7 +205,7 @@ export function App() {
   setAppLanguage(settings.language);
 
   if (!loaded) {
-    return <div className="app-loading">{tr("Đang tải Smart Scheduler...", "Loading Smart Scheduler...")}</div>;
+    return <div className="app-loading">{tr("Đang tải My Scheduler...", "Loading My Scheduler...")}</div>;
   }
 
   return (
@@ -225,7 +225,7 @@ export function App() {
       ) : (
         <main className="app-main">
           <div className="app-header">
-            Smart Scheduler <span className="app-header__version">v{__APP_VERSION__}</span>
+            My Scheduler <span className="app-header__version">v{__APP_VERSION__}</span>
           </div>
           {tab === "home" && (
             <Home

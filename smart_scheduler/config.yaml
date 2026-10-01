@@ -1,7 +1,7 @@
-name: "Smart Scheduler"
+name: "My Scheduler"
 description: "Support: buymeacoffee.com/leon_bell · ko-fi.com/leonbell · paypal.me/leonbell95 | An iOS-style device timer and scheduler for Home Assistant. No YAML or manually created Helpers required."
-version: "0.5.56"
-url: "https://github.com/thaihoang987/Smart-Schedule"
+version: "0.5.57"
+url: "https://github.com/thaihoang987/My-addon-Scheduler"
 slug: "smart_scheduler"
 init: false
 arch:
@@ -11,7 +11,7 @@ startup: application
 ingress: true
 ingress_port: 8123
 panel_icon: mdi:clock-time-eight-outline
-panel_title: "Smart Scheduler"
+panel_title: "My Scheduler"
 panel_admin: false
 hassio_api: true
 homeassistant_api: true

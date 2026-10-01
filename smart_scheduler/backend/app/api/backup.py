@@ -19,7 +19,7 @@ def _validate(payload: dict) -> None:
         raise HTTPException(status_code=400, detail=tr(vi, en))
 
     if not isinstance(payload.get("schedules"), list) or not isinstance(payload.get("entity_aliases", []), list):
-        bad("File không phải bản sao lưu Smart Scheduler (thiếu danh sách lịch).", "Not a Smart Scheduler backup file (no schedule list).")
+        bad("File không phải bản sao lưu My Scheduler (thiếu danh sách lịch).", "Not a My Scheduler backup file (no schedule list).")
     version = payload.get("version") or 1
     if not isinstance(version, int) or version > crud.BACKUP_VERSION:
         bad(f"Bản sao lưu từ phiên bản mới hơn (định dạng {version}) - hãy cập nhật add-on trước.",

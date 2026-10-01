@@ -1,11 +1,11 @@
-# Smart Scheduler — Documentation
+# My Scheduler — Documentation
 
 Enjoying it? 🍺 [Buy me a beer](https://buymeacoffee.com/leon_bell) · ☕ [Ko-fi](https://ko-fi.com/leonbell) · 💙 [PayPal](https://paypal.me/leonbell95)
 
 ## Getting started
 
 1. Start the add-on and enable **Show in sidebar**.
-2. Open **Smart Scheduler** from the sidebar.
+2. Open **My Scheduler** from the sidebar.
 3. Tap **+** on the Home page and add the devices you want to schedule.
 4. Open a device and create a schedule: a single time, or an on → off time range.
 
@@ -48,5 +48,5 @@ Normally leave both options empty.
 ## Support
 
 This is a personal project. Issues and requests:
-https://github.com/thaihoang987/Smart-Schedule/issues — they will be considered when reasonable
+https://github.com/thaihoang987/My-addon-Scheduler/issues — they will be considered when reasonable
 and time allows.
