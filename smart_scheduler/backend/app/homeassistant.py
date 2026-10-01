@@ -14,6 +14,7 @@ import json
 import logging
 import ssl
 import time
+from urllib.parse import quote
 
 import httpx
 import websockets
@@ -100,6 +101,33 @@ async def get_core_config() -> dict:
         resp = await client.get(f"{_effective_api_base()}/config", headers=_headers())
         resp.raise_for_status()
         return resp.json()
+
+
+async def get_state_history(entity_ids: list[str], start: str, end: str) -> dict[str, list[dict]]:
+    """GET /history/period - lich su trang thai tu recorder cua HA (card timeline
+    keo qua lai o Device Detail, v0.5.55). minimal_response + no_attributes cho
+    nhe; thoi diem trong path phai URL-encode (dau "+" cua "+07:00" bi doc thanh
+    dau cach neu de tho). Tra ve {entity_id: [{"s": state, "t": last_changed}]}."""
+    params = {
+        "filter_entity_id": ",".join(entity_ids),
+        "end_time": end,
+        "minimal_response": "1",
+        "no_attributes": "1",
+    }
+    async with _client(20) as client:
+        resp = await client.get(f"{_effective_api_base()}/history/period/{quote(start, safe='')}", headers=_headers(), params=params)
+        resp.raise_for_status()
+        data = resp.json()
+    out: dict[str, list[dict]] = {eid: [] for eid in entity_ids}
+    for series in data:
+        if not series:
+            continue
+        # minimal_response: chi phan tu dau co entity_id, cac phan tu sau chi co state/last_changed
+        eid = series[0].get("entity_id")
+        if eid not in out:
+            continue
+        out[eid] = [{"s": item.get("state"), "t": item.get("last_changed")} for item in series if item.get("last_changed")]
+    return out
 
 
 async def call_service(domain: str, service: str, entity_ids: list[str], service_data: dict) -> None:

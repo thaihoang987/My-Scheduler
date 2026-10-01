@@ -731,6 +731,7 @@ body {
     grid-template-areas:
       "topbar topbar"
       "header hero"
+      "header timeline"
       "header manual"
       "header schedule-title"
       "header schedule-list"
@@ -749,9 +750,75 @@ body {
   }
   .device-detail__hero { grid-area: hero; margin-top: 0; }
   .device-detail__manual { grid-area: manual; }
+  .state-timeline { grid-area: timeline; }
   .device-detail__schedule-title { grid-area: schedule-title; }
   .schedule-row-list { grid-area: schedule-list; width: 100%; }
   .add-time-btn { grid-area: add-time; }
+}
+
+/* ---- Lich su bat/tat keo qua lai (StateTimeline.tsx) ---- */
+.state-timeline { margin-bottom: 18px; min-width: 0; }
+.state-timeline__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.state-timeline__title { margin: 4px 0 6px; }
+.state-timeline__spans { display: flex; gap: 4px; }
+.state-timeline__chip {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+}
+.state-timeline__chip--active { background: var(--accent); border-color: var(--accent); color: var(--accent-on); }
+.state-timeline__card { background: var(--surface); border-radius: var(--radius-lg); padding: 10px 14px 12px; }
+.state-timeline__nav { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.state-timeline__range { flex: 1; text-align: center; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.state-timeline__loading { opacity: 0.8; }
+.state-timeline__arrow {
+  width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--surface-2); color: var(--text); display: flex; align-items: center; justify-content: center;
+}
+.state-timeline__arrow:disabled { opacity: 0.35; cursor: default; }
+.state-timeline__now {
+  border: none; background: none; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.state-timeline__body { display: flex; gap: 8px; }
+.state-timeline__labels { width: 96px; flex: none; }
+.state-timeline__label {
+  height: 26px; margin-bottom: 4px; line-height: 26px; font-size: 12px; text-align: right;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text);
+}
+.state-timeline__track {
+  position: relative; flex: 1; min-width: 0;
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab;
+}
+.state-timeline__track:active { cursor: grabbing; }
+.state-timeline__row {
+  position: relative; height: 26px; margin-bottom: 4px; border-radius: 4px; overflow: hidden;
+  background: repeating-linear-gradient(45deg, transparent 0 4px, color-mix(in srgb, var(--text-muted) 14%, transparent) 4px 8px);
+}
+.state-timeline__seg {
+  position: absolute; top: 0; bottom: 0; display: flex; align-items: center;
+  padding-left: 5px; font-size: 12px; font-weight: 600; overflow: hidden; white-space: nowrap;
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.state-timeline__seg--on { background: var(--star); color: #1c1c1e; }
+.state-timeline__seg--off { background: color-mix(in srgb, var(--text-muted) 55%, var(--surface)); color: var(--text); }
+.state-timeline__seg--na { background: transparent; color: var(--text-muted); }
+.state-timeline__seg--selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+.state-timeline__grid { position: absolute; top: 0; bottom: 4px; width: 1px; background: color-mix(in srgb, var(--text-muted) 25%, transparent); pointer-events: none; }
+.state-timeline__nowline { position: absolute; top: -3px; bottom: 1px; width: 2px; margin-left: -1px; background: var(--danger); border-radius: 1px; pointer-events: none; }
+.state-timeline__axis { position: relative; height: 18px; margin-left: 104px; margin-top: 2px; }
+.state-timeline__tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.state-timeline__tick--day { color: var(--text); font-weight: 700; }
+.state-timeline__tip {
+  position: absolute; z-index: 5; transform: translateX(-50%); margin-top: 4px;
+  background: var(--surface-elevated); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; padding: 6px 10px; font-size: 12px; white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); pointer-events: none;
+}
+.state-timeline__tip-dur { color: var(--text-muted); }
+.state-timeline__error, .state-timeline__empty { margin-top: 8px; font-size: 12px; color: var(--text-muted); text-align: center; }
+.state-timeline__error { color: var(--danger); }
+@media (max-width: 420px) {
+  .state-timeline__labels { width: 72px; }
+  .state-timeline__axis { margin-left: 80px; }
 }
 
 /* ================= Schedule detail sheet ================= */

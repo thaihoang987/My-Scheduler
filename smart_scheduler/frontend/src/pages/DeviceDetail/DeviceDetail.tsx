@@ -9,6 +9,7 @@ import { OnTimeProgress } from "../../components/OnTimeProgress/OnTimeProgress";
 import { ScheduleDetailSheet } from "../../components/ScheduleDetailSheet/ScheduleDetailSheet";
 import { ScheduleEditor } from "../../components/ScheduleEditor/ScheduleEditor";
 import { ScheduleRow } from "../../components/ScheduleRow/ScheduleRow";
+import { StateTimeline } from "../../components/StateTimeline/StateTimeline";
 import { api } from "../../services/api";
 import type { DeviceGroup, EntitySummary, ManualTimer, Schedule, Settings } from "../../types";
 import { serverNow } from "../../utils/serverTime";
@@ -66,6 +67,8 @@ export function DeviceDetail({
   const nextSchedule = group.schedules.find((s) => s.id === scheduleId);
   const rows = groupIntoRows(group.schedules);
   const onWindow = activeOnWindow(group, activeTimers);
+  const stateMap = new Map(entities.map((e) => [e.entity_id, e.state]));
+  const liveKey = group.entityIds.map((id) => stateMap.get(id) ?? "").join("|");
 
   async function handleSave(draft: ScheduleDraft, id?: string) {
     await saveScheduleDraft(draft, entities, editing, allSchedules, cardEnabled(group));
@@ -186,6 +189,8 @@ export function DeviceDetail({
           {cardEnabled(group) ? tr("Chưa có lịch nào đang bật", "No enabled schedules") : tr("Hẹn giờ của thiết bị này đang tắt (bật lại bằng công tắc trên card ở trang Nhà)", "Scheduling for this device is paused (enable it using the switch on its Home card)")}
         </div>
       )}
+
+      <StateTimeline entityIds={group.entityIds} entities={entities} liveKey={liveKey} />
 
       <div className="device-detail__section-title device-detail__schedule-title">{tr("Lịch", "Schedules")}</div>
       <div className="schedule-row-list" ref={rowListRef}>

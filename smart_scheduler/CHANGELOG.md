@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.55
+
+- New on/off history card on the device page, between "Next run" and "Manual control": one bar per
+  device (using your custom names), drag left/right to browse the past, pick 6h/24h/3d/7d, tap a
+  segment to see when it turned on/off and for how long. Data comes from Home Assistant's Recorder
+  and loads piece by piece while you drag.
+
 ## 0.5.54
 
 - The time zone always follows Home Assistant (Settings → System → General) for every schedule,
