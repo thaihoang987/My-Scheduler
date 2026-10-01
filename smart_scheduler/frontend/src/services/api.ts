@@ -64,6 +64,12 @@ export const api = {
   listHistory: (limit = 200, scheduleId?: string) =>
     request<HistoryEntry[]>(`/history?limit=${limit}${scheduleId ? `&schedule_id=${scheduleId}` : ""}`),
 
+  /** Lich su trang thai that tu recorder HA (card timeline o Device Detail). */
+  stateHistory: (entityIds: string[], start: Date, end: Date) =>
+    request<Record<string, { s: string; t: string }[]>>(
+      `/history/states?entity_ids=${encodeURIComponent(entityIds.join(","))}&start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`,
+    ),
+
   getSettings: () => request<Settings>("/settings"),
   updateSettings: (data: Partial<Settings>) =>
     request<Settings>("/settings", { method: "PUT", body: JSON.stringify(data) }),

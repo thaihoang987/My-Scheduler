@@ -739,3 +739,39 @@ def test_backup_does_not_freeze_default_timezone(monkeypatch):
     crud.import_all(data)
     monkeypatch.setattr(config, "HA_TIMEZONE", "Asia/Tokyo")
     assert crud.settings_timezone() == "Asia/Tokyo"
+
+
+# ---- lich su trang thai cho card timeline (v0.5.55) ----
+
+def test_state_history_parses_minimal_response(monkeypatch):
+    from app import homeassistant
+
+    seen = {}
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return [[
+                {"entity_id": "switch.a", "state": "on", "last_changed": "2026-10-01T00:00:00+00:00"},
+                {"state": "off", "last_changed": "2026-10-01T01:00:00+00:00"},
+            ]]
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            pass
+
+        async def get(self, url, headers=None, params=None):
+            seen["url"], seen["params"] = url, params
+            return Resp()
+
+    monkeypatch.setattr(homeassistant, "_client", lambda timeout: Client())
+    monkeypatch.setattr(homeassistant, "_effective_token", lambda: "t")
+    out = run(homeassistant.get_state_history(["switch.a", "switch.b"], "2026-10-01T07:00:00+07:00", "2026-10-01T09:00:00+07:00"))
+    assert out == {"switch.a": [{"s": "on", "t": "2026-10-01T00:00:00+00:00"}, {"s": "off", "t": "2026-10-01T01:00:00+00:00"}], "switch.b": []}
+    assert seen["url"].endswith("/history/period/2026-10-01T07%3A00%3A00%2B07%3A00")  # "+" phai duoc encode
+    assert seen["params"]["filter_entity_id"] == "switch.a,switch.b"
