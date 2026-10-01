@@ -42,17 +42,17 @@ function stateLabel(s: string): string {
   return s;
 }
 
+/** "23:56:30" - giong tooltip history cua HA; qua 1 ngay thi "2 ngày 03:04:05". */
 function formatDuration(ms: number): string {
-  const totalMin = Math.round(ms / 60_000);
-  if (totalMin < 1) return tr(`${Math.max(1, Math.round(ms / 1000))} giây`, `${Math.max(1, Math.round(ms / 1000))} sec`);
-  const d = Math.floor(totalMin / 1440);
-  const h = Math.floor((totalMin % 1440) / 60);
-  const m = totalMin % 60;
-  const parts: string[] = [];
-  if (d) parts.push(tr(`${d} ngày`, `${d}d`));
-  if (h) parts.push(tr(`${h} giờ`, `${h}h`));
-  if (m && !d) parts.push(tr(`${m} phút`, `${m}m`));
-  return parts.join(" ");
+  const total = Math.max(0, Math.round(ms / 1000));
+  const d = Math.floor(total / 86400);
+  const hms = [Math.floor((total % 86400) / 3600), Math.floor((total % 3600) / 60), total % 60].map((n) => String(n).padStart(2, "0")).join(":");
+  return d ? tr(`${d} ngày ${hms}`, `${d}d ${hms}`) : hms;
+}
+
+/** "10:53:15 30 tháng 9, 2026" theo mui gio app. */
+function fmtFull(t: number): string {
+  return fmtDateTime(new Date(t), { hour: "2-digit", minute: "2-digit", second: "2-digit", day: "numeric", month: "long", year: "numeric" });
 }
 
 /** Gop 2 day diem da sap xep, bo diem lien tiep trung trang thai (diem dau moi
@@ -319,14 +319,18 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
             {tip && (
               <div
                 className="state-timeline__tip"
-                style={{ left: Math.min(Math.max(tip.x, 90), Math.max(90, width - 90)), top: (tip.row + 1) * ROW_PX }}
+                style={{ left: Math.min(Math.max(tip.x, 120), Math.max(120, width - 120)), top: tip.row * ROW_PX }}
               >
-                <b>{stateLabel(tip.seg.s)}</b>
-                <div>
-                  {fmtDateTime(new Date(tip.seg.from), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} →{" "}
-                  {tip.seg.to >= serverNow() - 1000 ? tr("bây giờ", "now") : fmtTime(new Date(tip.seg.to))}
+                <div className="state-timeline__tip-title">{names.get(tip.entityId) || tip.entityId}</div>
+                <div className="state-timeline__tip-state">
+                  <span className={`state-timeline__tip-dot state-timeline__seg--${stateKind(tip.seg.s)}`} />
+                  {stateLabel(tip.seg.s)}
                 </div>
-                <div className="state-timeline__tip-dur">{formatDuration(tip.seg.to - tip.seg.from)}</div>
+                <div>{tr("lúc", "from")} {fmtFull(tip.seg.from)}</div>
+                <div>
+                  {tip.seg.to >= serverNow() - 1000 ? tr("đến bây giờ", "until now") : `${tr("lúc", "to")} ${fmtFull(tip.seg.to)}`}
+                </div>
+                <div>{tr("Thời lượng", "Duration")}: {formatDuration(tip.seg.to - tip.seg.from)}</div>
               </div>
             )}
           </div>

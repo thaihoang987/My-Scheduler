@@ -76,7 +76,7 @@ export const api = {
 
   exportBackup: () => request<Record<string, unknown>>("/backup/export"),
   importBackup: (data: Record<string, unknown>) =>
-    request<{ ok: boolean }>("/backup/import", { method: "POST", body: JSON.stringify(data) }),
+    request<{ ok: boolean; restored: { schedules: number; entity_aliases: number; groups: number | null; settings: number } }>("/backup/import", { method: "POST", body: JSON.stringify(data) }),
 
   listActiveManualTimers: () => request<ManualTimer[]>("/manual/active"),
   forceOn: (entityIds: string[], autoOffMinutes: number | null) =>

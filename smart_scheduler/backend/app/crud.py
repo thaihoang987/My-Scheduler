@@ -505,11 +505,25 @@ def update_settings(data: dict) -> dict:
 
 # ---- backup / restore (muc 50 SPEC.md) ----
 
+BACKUP_VERSION = 3
+
+# Khoa settings KHONG dua vao ban sao luu (v0.5.56): trang thai dang chay hoac
+# co noi bo, khong phai lua chon cua nguoi dung. Khoi phuc chung sang may khac/
+# luc khac se sai: presence_runtime = thiet bi gia lap dang bat (cua phien cu),
+# pause_until = dang tam dung (het han/khong mong muon), migrated_* = co da
+# chuyen du lieu (khoi phuc len DB moi thi bo qua migration), mui gio theo HA.
+_BACKUP_SKIP_SETTINGS = {"timezone", "ha_timezone", "presence_runtime", "pause_until"}
+
+
+def _is_backup_setting(key: str) -> bool:
+    return key not in _BACKUP_SKIP_SETTINGS and not key.startswith("migrated_")
+
+
 def export_all() -> dict:
     conn = get_conn()
     schedules_raw = conn.execute("SELECT * FROM schedules").fetchall()
     return {
-        "version": 2,
+        "version": BACKUP_VERSION,
         "exported_at": now_iso(),
         "schedules": [dict(r) for r in schedules_raw],
         "entity_aliases": [dict(r) for r in conn.execute("SELECT * FROM entity_aliases").fetchall()],
@@ -517,17 +531,34 @@ def export_all() -> dict:
         "groups": [dict(r) for r in conn.execute("SELECT * FROM groups").fetchall()],
         # Chi cac gia tri nguoi dung DA CHINH (v0.5.53): truoc day xuat ca mac dinh
         # -> khoi phuc bien mui gio mac dinh thanh gia tri co dinh, het theo HA.
-        "settings": {r["key"]: json.loads(r["value"]) for r in conn.execute("SELECT key, value FROM settings").fetchall()},
+        # v3: bo trang thai chay/co noi bo (xem _BACKUP_SKIP_SETTINGS). Gom ca
+        # cau hinh Gia lap co nguoi ("presence") va moi lua chon hien thi.
+        "settings": {
+            r["key"]: json.loads(r["value"])
+            for r in conn.execute("SELECT key, value FROM settings").fetchall()
+            if _is_backup_setting(r["key"])
+        },
     }
 
 
-def import_all(data: dict) -> None:
+def import_all(data: dict) -> dict:
     """Thay the TOAN BO schedules/aliases/settings hien co bang du lieu import
     (muc 51 "Reset" cung dung chung co che nay voi payload rong). Giu nguyen
-    id goc de execution_history cu (neu con) van tham chieu dung."""
+    id goc de execution_history cu (neu con) van tham chieu dung. Tra ve so
+    luong da khoi phuc de UI bao lai."""
     with tx() as c:
         c.execute("DELETE FROM schedules")
         c.execute("DELETE FROM entity_aliases")
+        # Moc "dang bat tu luc" cua Tu tat thuoc ve lich CU - bo, auto_off tu
+        # ghi lai theo lich moi o vong kiem tra tiep theo.
+        c.execute("DELETE FROM auto_off_state")
+        # Ban v3+ chua DAY DU cai dat nguoi dung -> xoa cai dat cu truoc de
+        # khoi phuc dung nhu luc xuat (khoa nao khong co = ve mac dinh). Ban cu
+        # (v1/v2) giu cach cu: chi ghi de cac khoa co trong file.
+        if (data.get("version") or 0) >= 3:
+            for (key,) in c.execute("SELECT key FROM settings").fetchall():
+                if _is_backup_setting(key):
+                    c.execute("DELETE FROM settings WHERE key=?", (key,))
         # Ban sao luu cu (v1) khong co "groups" -> giu nguyen nhom hien co thay
         # vi xoa trang, tranh thiet bi mat nhom sau khi khoi phuc.
         if "groups" in data:
@@ -567,9 +598,15 @@ def import_all(data: dict) -> None:
                 ),
             )
         for k, v in (data.get("settings") or {}).items():
-            if k in ("timezone", "ha_timezone"):
-                continue  # mui gio luon theo Home Assistant, khong khoi phuc tu ban sao luu
+            if not _is_backup_setting(k):
+                continue  # mui gio theo HA, trang thai chay khong khoi phuc
             c.execute(
                 "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, json.dumps(v)),
             )
+    return {
+        "schedules": len(data.get("schedules") or []),
+        "entity_aliases": len(data.get("entity_aliases") or []),
+        "groups": len(data["groups"] or []) if "groups" in data else None,
+        "settings": sum(1 for k in (data.get("settings") or {}) if _is_backup_setting(k)),
+    }
