@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.59
+
+- History card: the detail popup now closes when you tap anywhere outside it, tap the same segment
+  again, press Esc or scroll the page.
+
 ## 0.5.58
 
 - The add-on and the repository now show the new name **My Scheduler** in Home Assistant as well

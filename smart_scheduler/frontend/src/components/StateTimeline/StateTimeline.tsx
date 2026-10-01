@@ -212,8 +212,30 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
     const entityId = entityIds[row];
     const t = startMs + (x / rect.width) * spanMs;
     const seg = segmentsIn(data[entityId] || [], startMs, endMs, serverNow()).find((s) => s.from <= t && t < s.to);
-    setTip(seg ? { entityId, seg, x, row } : null);
+    // cham lai dung doan dang mo = dong popup
+    setTip((prev) => (!seg || (prev && prev.entityId === entityId && prev.seg.from === seg.from) ? null : { entityId, seg, x, row }));
   }
+
+  // Popup dang mo: cham/bam BAT KY dau ngoai timeline (ca ngoai card) la an
+  // (phan hoi 2026-10-01 "nhấn xung quanh sẽ tự hide... nó cứ hiện quài").
+  // Cham trong timeline da co onPointerUp lo (doan khac -> doi popup, cho trong
+  // -> an). Esc/cuon trang cung an.
+  useEffect(() => {
+    if (!tip) return;
+    const onDown = (e: PointerEvent) => {
+      if (!trackRef.current?.contains(e.target as Node)) setTip(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setTip(null);
+    const onScroll = () => setTip(null);
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [tip]);
 
   function onWheel(e: React.WheelEvent) {
     // chi cuon ngang (touchpad/shift+lan chuot) moi keo timeline, cuon doc de trang cuon binh thuong
