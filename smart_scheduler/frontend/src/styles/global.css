@@ -1417,7 +1417,7 @@ body {
 .agenda__row:active { background: var(--surface-2); }
 .agenda__row--past { opacity: 0.5; }
 .agenda__row--skipped .agenda__time { text-decoration: line-through; }
-.agenda__time { width: 46px; flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
+.agenda__time { width: 66px; flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
 .agenda__icon {
   width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
