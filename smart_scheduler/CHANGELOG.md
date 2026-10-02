@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.68
+
+- 24h chart: long device names now wrap onto two lines in the name column instead of being cut off.
+
 ## 0.5.67
 
 - Auto-off list: long device names now wrap onto a second line instead of being cut off after one line.
