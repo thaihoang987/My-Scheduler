@@ -111,9 +111,18 @@ async def build_entities(added_only: bool = False) -> list[EntitySummary]:
     # Thiet bi DA THEM ma entity khong con trong HA (thay cong tac, xoa tich
     # hop...) - van tra ve (missing=True) de Cai dat -> Thiet bi con hien va
     # bam "Đổi entity" sang entity moi duoc (v0.5.27); truoc day bien mat han.
-    seen = {e.entity_id for e in out}
-    for entity_id, alias_row in aliases.items():
-        if entity_id in seen or not alias_row.get("added"):
+    # v0.5.62: ca entity ma lich dang dung (du chua "them") cung bao missing -
+    # trang Nha hien dau nhac nhe de nguoi dung doi entity. So voi TOAN BO
+    # states (khong phai `out`): scope="added" bo qua entity chua them nhung
+    # van con trong HA, khong duoc tinh nham la mat. Offline tam thoi van co
+    # trong states (state "unavailable") nen khong bi danh dau.
+    ha_ids = {s["entity_id"] for s in states}
+    wanted = {eid: aliases.get(eid, {}) for eid, row in aliases.items() if row.get("added")}
+    for s in crud.list_schedules():
+        for eid in s.get("target_entities") or []:
+            wanted.setdefault(eid, aliases.get(eid, {}))
+    for entity_id, alias_row in wanted.items():
+        if entity_id in ha_ids:
             continue
         out.append(
             EntitySummary(
@@ -126,7 +135,7 @@ async def build_entities(added_only: bool = False) -> list[EntitySummary]:
                 device_name=alias_row.get("device_name"),
                 icon=alias_row.get("icon"),
                 favorite=bool(alias_row.get("favorite")),
-                added=True,
+                added=bool(alias_row.get("added")),
                 category_id=alias_row.get("category_id"),
                 missing=True,
             )

@@ -199,7 +199,7 @@ class SettingsIn(BaseModel):
     show_device: Optional[bool] = None
     show_last_run: Optional[bool] = None
     show_next_run: Optional[bool] = None
-    display_mode: Optional[str] = None  # compact | normal
+    display_mode: Optional[str] = None  # normal | compact | list (v0.5.62)
     theme: Optional[str] = None  # light | dark | auto
     time_format: Optional[str] = None  # "24h" | "12h"
     sort_mode: Optional[str] = None  # auto | manual

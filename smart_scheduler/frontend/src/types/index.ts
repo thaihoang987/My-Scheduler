@@ -148,7 +148,7 @@ export interface Settings {
   show_device: boolean;
   show_last_run: boolean;
   show_next_run: boolean;
-  display_mode: "compact" | "normal";
+  display_mode: DisplayMode;
   theme: "light" | "dark" | "auto";
   time_format: "24h" | "12h";
   sort_mode: "auto" | "manual";
@@ -194,6 +194,9 @@ export interface HealthStatus {
  * "card" tren Home - day la don vi hien thi chinh cua UI moi (muc 6/102
  * SPEC_UI.md), khac han Schedule (don vi luu tru o backend). Tinh hoan
  * toan phia client tu danh sach schedules, khong doi schema backend. */
+/** Kieu xem trang Nha (v0.5.62 them "list" - hang gon 1 dong/thiet bi). */
+export type DisplayMode = "normal" | "compact" | "list";
+
 export interface DeviceGroup {
   key: string;
   title: string;
@@ -204,6 +207,9 @@ export interface DeviceGroup {
   schedules: Schedule[];
   favorite: boolean;
   isOn: boolean;
+  /** Entity cua card khong con trong HA (backend missing=True) - hien dau
+   * nhac nhe, KHONG tinh "unavailable" (offline tam thoi). */
+  missingIds: string[];
   minSortOrder: number;
 }
 

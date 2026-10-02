@@ -9,6 +9,7 @@ import { useMdiIcons } from "../../utils/mdiIcons";
 import { entityNames } from "../../utils/groupSchedules";
 import { formatDuration } from "../../utils/scheduleRange";
 import { Icon } from "../Icon/Icon";
+import { MissingMark } from "../DeviceCard/DeviceCard";
 import type { SectionControls } from "../GroupedDeviceGrid/GroupedDeviceGrid";
 import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { OnTimeProgress } from "../OnTimeProgress/OnTimeProgress";
@@ -92,6 +93,8 @@ export function AutoOffList({
             return st !== undefined && st !== "off" && st !== "closed" && st !== "unavailable" && st !== "unknown";
           });
           const enabled = rule.enabled && rule.card_enabled !== false;
+          const missingIds = rule.target_entities.filter((id) => entityMap.get(id)?.missing);
+          const allMissing = missingIds.length > 0 && missingIds.length === rule.target_entities.length;
           const timer = enabled
             ? activeTimers.find((t) => t.source === "auto_off" && t.started_at && t.off_at && rule.target_entities.includes(t.entity_ids[0]))
             : undefined;
@@ -112,11 +115,14 @@ export function AutoOffList({
                 <Icon path={visual.icon} size={22} />
               </div>
               <div className="auto-off__main">
-                <div className="auto-off__name">{name}</div>
+                <div className="auto-off__name">
+                  {name}
+                  <MissingMark missingIds={missingIds} total={rule.target_entities.length} />
+                </div>
                 {timer && on ? (
                   <OnTimeProgress startAt={timer.started_at!} endAt={timer.off_at!} />
                 ) : (
-                  <div className="auto-off__state">{on ? tr("● Đang bật", "● On") : tr("Đang tắt", "Off")}</div>
+                  <div className="auto-off__state">{on ? tr("● Đang bật", "● On") : allMissing ? tr("Không tìm thấy trong HA", "Not found in HA") : tr("Đang tắt", "Off")}</div>
                 )}
               </div>
               <div className="auto-off__duration">{formatDuration(rule.time)}</div>

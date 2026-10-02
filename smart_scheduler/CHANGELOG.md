@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.62
+
+- Home: new view button beside the theme button cycles Grid → Compact → List. List view shows one
+  compact row per device with its next run and switch. Also selectable in Appearance settings.
+- Devices whose entity no longer exists in Home Assistant now show a small, muted icon and
+  "Not found in HA", with a hint on the device page to pick a new entity. Devices that are only
+  offline are not marked.
+
 ## 0.5.61
 
 - Home: tap the moon or sun icon beside the arrange button to switch between light and dark themes.
