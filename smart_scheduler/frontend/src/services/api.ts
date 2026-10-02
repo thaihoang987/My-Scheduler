@@ -1,4 +1,4 @@
-import type { EntitySummary, Group, HealthStatus, HistoryEntry, ManualTimer, PresenceConfig, PresenceStatus, Schedule, Settings } from "../types";
+import type { EntitySummary, Group, HealthStatus, HistoryEntry, ManualTimer, PresenceConfig, PresencePreview, PresenceStatus, Schedule, Settings } from "../types";
 
 // Duong dan tuong doi - qua HA Ingress base path duoc proxy tu dong, khong
 // duoc hard-code "/api" tuyet doi tu goc domain (xem vite base: "./" o
@@ -91,6 +91,9 @@ export const api = {
   getPresence: () => request<{ config: PresenceConfig; status: PresenceStatus }>("/presence"),
   updatePresence: (data: Partial<PresenceConfig>) =>
     request<{ config: PresenceConfig; status: PresenceStatus }>("/presence", { method: "PUT", body: JSON.stringify(data) }),
+  previewPresence: (data: Partial<PresenceConfig>) =>
+    request<PresencePreview>("/presence/preview", { method: "POST", body: JSON.stringify(data) }),
+  stopPresence: () => request<{ config: PresenceConfig; status: PresenceStatus }>("/presence/stop", { method: "POST" }),
 
   listGroups: () => request<Group[]>("/groups"),
   createGroup: (name: string) => request<Group>("/groups", { method: "POST", body: JSON.stringify({ name }) }),

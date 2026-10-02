@@ -130,7 +130,7 @@ async def get_state_history(entity_ids: list[str], start: str, end: str) -> dict
     return out
 
 
-async def call_service(domain: str, service: str, entity_ids: list[str], service_data: dict) -> None:
+async def call_service(domain: str, service: str, entity_ids: list[str], service_data: dict) -> list[dict]:
     log.info("HA command service=%s.%s targets=%s", domain, service, entity_ids)
     payload = dict(service_data or {})
     payload["entity_id"] = entity_ids
@@ -142,6 +142,8 @@ async def call_service(domain: str, service: str, entity_ids: list[str], service
         )
         if resp.status_code >= 400:
             raise HAError(f"HA service call failed ({resp.status_code}): {resp.text}")
+        data = resp.json()
+        return data if isinstance(data, list) else []
 
 
 _id_counter = itertools.count(1)

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.74
+
+- Presence: shorter activations, longer rests, same-device cooldown, room alternation,
+  dimmable-light brightness and a total device-on minute limit (not measured energy).
+- Respect manually controlled devices and skip devices with enabled schedules or manual timers.
+- At window end, trip expiry or explicit stop, send OFF to every selected device, including
+  manually activated devices. Persist unconfirmed shutdowns and retry with backoff after outages.
+- Add sunset start, optional last away date, per-device live status, an independent operation
+  toggle, a Home stop button and a read-only sample-plan preview.
+- Presence recorder chart shows actual on/off history in the same style as device detail,
+  plus a faint upcoming activation. Recorded ON states are yellow; planned activations may be skipped.
+- History tooltips now wrap and stay inside narrow phone layouts.
+
 ## 0.5.73
 
 - List: long device names now wrap onto two lines. Arrange controls use a separate row so names

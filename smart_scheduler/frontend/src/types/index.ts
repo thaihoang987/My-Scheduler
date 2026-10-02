@@ -177,12 +177,31 @@ export interface PresenceConfig {
   gap_min: number;
   gap_max: number;
   max_concurrent: number;
+  start_mode: "time" | "sunset";
+  until: string;
+  cooldown_minutes: number;
+  max_total_minutes: number;
+  brightness_pct: number;
 }
 
 export interface PresenceStatus {
+  planned?: { entity_id: string; on_at: string; off_at: string }[];
   on: { entity_id: string; off_at: string }[];
   next_start_at: string | null;
   active: boolean;
+  enabled?: boolean;
+  phase?: "disabled" | "expired" | "waiting_window" | "waiting_next" | "running" | "budget_exhausted" | "error" | "stopping";
+  used_minutes?: number;
+  max_total_minutes?: number;
+  pending_off?: string[];
+  warnings?: { entity_id: string; message: string }[];
+}
+
+export interface PresencePreview {
+  events: { entity_id: string; on_at: string; off_at: string }[];
+  total_minutes: number;
+  window_start: string | null;
+  window_end: string | null;
 }
 
 export interface HealthStatus {

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { goBack, useBackNavigation } from "../../hooks/useBackNavigation";
-import type { DeviceGroup, EntitySummary, Group, HealthStatus, Schedule, Settings as SettingsType } from "../../types";
+import type { DeviceGroup, EntitySummary, Group, HealthStatus, PresenceStatus, Schedule, Settings as SettingsType } from "../../types";
 import { SettingsHome, type SettingsSubpage } from "./SettingsHome";
 import { AboutSettings } from "./subpages/AboutSettings";
 import { AppearanceSettings } from "./subpages/AppearanceSettings";
@@ -23,6 +23,7 @@ export function SettingsPage({
   haConnectionMode,
   reload,
   reloadPresence,
+  presence,
 }: {
   entities: EntitySummary[];
   settings: SettingsType;
@@ -34,6 +35,7 @@ export function SettingsPage({
   haConnectionMode: HealthStatus["ha_connection_mode"];
   reload: () => void;
   reloadPresence: () => void;
+  presence: PresenceStatus | null;
 }) {
   const [subpage, setSubpage] = useState<SettingsSubpage | null>(null);
   useBackNavigation(subpage !== null, () => setSubpage(null));
@@ -56,7 +58,7 @@ export function SettingsPage({
       content = <SchedulerSettings settings={settings} reload={reload} onBack={back} />;
       break;
     case "presence":
-      content = <PresenceSettings entities={entities} reloadPresence={reloadPresence} onBack={back} />;
+      content = <PresenceSettings entities={entities} liveStatus={presence} reloadPresence={reloadPresence} onBack={back} />;
       break;
     case "backup":
       content = <BackupSettings reload={reload} onBack={back} />;

@@ -193,17 +193,6 @@ def test_import_v1_backup_keeps_existing_groups():
 
 # ---- gia lap co nguoi ----
 
-@pytest.fixture
-def presence_reset(monkeypatch):
-    presence._on.clear()
-    presence._next_start_at = None
-    presence._last_entity = None
-    monkeypatch.setattr(presence.random, "uniform", lambda a, b: a)  # luon lay can duoi
-    yield
-    presence._on.clear()
-    presence._next_start_at = None
-
-
 def test_presence_window_overnight():
     cfg = {**presence.DEFAULT_CONFIG, "start": "20:00", "end": "01:00", "days": [3]}  # Thu 5
     thu_2130 = datetime(2026, 9, 24, 21, 30, tzinfo=TZ)
@@ -233,7 +222,7 @@ def test_presence_turns_devices_on_one_at_a_time(fake_ha, presence_reset):
 
 def test_presence_turns_off_at_window_end_and_when_disabled(fake_ha, presence_reset):
     presence.save_config({"enabled": True, "entity_ids": ["light.a"], "start": "18:00", "end": "18:10",
-                          "on_min": 30, "on_max": 30, "gap_min": 0, "gap_max": 0})
+                          "on_min": 30, "on_max": 30, "gap_min": 0, "gap_max": 0, "cooldown_minutes": 0})
     t = datetime(2026, 9, 24, 18, 0, tzinfo=TZ)
     run(presence.tick(t))
     assert fake_ha.calls[-1][1] == "turn_on"

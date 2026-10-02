@@ -28,6 +28,7 @@ export function Home({
   categoryGroups,
   activeTimers,
   presence,
+  reloadPresence,
   reload,
   onOpenDevice,
   setDragging,
@@ -39,6 +40,7 @@ export function Home({
   categoryGroups: Group[];
   activeTimers: ManualTimer[];
   presence: PresenceStatus | null;
+  reloadPresence: () => void;
   reload: () => void;
   onOpenDevice: (group: DeviceGroup) => void;
   /** Bao App.tsx tam dung moi setState nen tu poll/WebSocket trong luc
@@ -229,7 +231,7 @@ export function Home({
   return (
     <div className="page home-page">
       <Clock timeFormat={settings.time_format} timezone={settings.timezone} />
-      <HomeBanners settings={settings} entities={entities} presence={presence} reload={reload} />
+      <HomeBanners settings={settings} entities={entities} presence={presence} reloadPresence={reloadPresence} reload={reload} />
       <div className="home-page__header-row">
         <div className="home-page__summary">
           {groups.length} {tr("thiết bị", "devices")} · {schedules.length} {tr("lịch", "schedules")}{activeCount ? ` · ${activeCount} ${tr("đang bật", "enabled")}` : ""}
