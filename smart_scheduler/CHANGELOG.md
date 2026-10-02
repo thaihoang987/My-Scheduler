@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.77
+
+- Schedule list on the device page shows a short condition chip on schedules that use conditions
+  (e.g. `Cool` for an AC schedule that only runs while cooling; another device's condition adds its
+  name; several conditions show the first one + `+N`). Works for every device type.
+
 ## 0.5.76
 
 - Home 24h view: an overnight time range is drawn as one 24h loop — while it runs, both halves

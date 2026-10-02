@@ -1,7 +1,8 @@
-import { mdiDragVertical } from "@mdi/js";
-import type { Schedule, Settings } from "../../types";
+import { mdiDragVertical, mdiFilterOutline } from "@mdi/js";
+import type { EntitySummary, Schedule, Settings } from "../../types";
 import { formatTimeDisplay } from "../../utils/formatTime";
 import { describeAction, triggerLabelWithClock, type ScheduleRowItem } from "../../utils/scheduleRange";
+import { conditionSummary } from "../../utils/conditionStates";
 import { Icon } from "../Icon/Icon";
 import { tr } from "../../i18n";
 
@@ -19,12 +20,14 @@ function rowTimeLabel(s: Schedule, timeFormat: Settings["time_format"]): string 
  * tranh nham voi bam-de-mo). */
 export function ScheduleRow({
   item,
+  entities,
   timeFormat,
   running = false,
   onOpen,
   onToggle,
 }: {
   item: ScheduleRowItem;
+  entities: EntitySummary[];
   timeFormat: Settings["time_format"];
   /** Dang trong khung gio bat -> to vang (xem isRangeRowRunning). */
   running?: boolean;
@@ -32,6 +35,13 @@ export function ScheduleRow({
   onToggle: () => void;
 }) {
   const { primary, secondary, isRange } = item;
+  const cond = conditionSummary(primary.conditions, primary.target_entities, entities);
+  const condChip = cond && (
+    <span className="schedule-row__cond" title={tr("Chỉ chạy khi", "Only runs if") + " " + cond}>
+      <Icon path={mdiFilterOutline} size={12} />
+      {cond}
+    </span>
+  );
   return (
     <div className={`schedule-row ${running ? "schedule-row--running" : ""}`} data-key={item.key}>
       <span className="drag-handle" onClick={(e) => e.stopPropagation()} aria-label={tr("Kéo để đổi vị trí", "Drag to reorder")} title={tr("Kéo để đổi vị trí", "Drag to reorder")}>
@@ -39,13 +49,17 @@ export function ScheduleRow({
       </span>
       <button className="schedule-row__main" onClick={onOpen}>
         {isRange && secondary ? (
-          <span className="schedule-row__time">
-            {rowTimeLabel(primary, timeFormat)} → {rowTimeLabel(secondary, timeFormat)}
-          </span>
+          <>
+            <span className="schedule-row__time">
+              {rowTimeLabel(primary, timeFormat)} → {rowTimeLabel(secondary, timeFormat)}
+            </span>
+            {condChip}
+          </>
         ) : (
           <>
             <span className="schedule-row__time">{rowTimeLabel(primary, timeFormat)}</span>
             {primary.trigger_type !== "auto_off" && <span className="schedule-row__action">{describeAction(primary.action)}</span>}
+            {condChip}
           </>
         )}
       </button>

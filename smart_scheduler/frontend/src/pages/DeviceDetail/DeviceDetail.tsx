@@ -233,6 +233,7 @@ export function DeviceDetail({
           <ScheduleRow
             key={item.key}
             item={item}
+            entities={entities}
             timeFormat={settings.time_format}
             running={isRangeRowRunning(item, group.isOn, nowMs)}
             onOpen={() => {
