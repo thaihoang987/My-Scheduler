@@ -1,4 +1,4 @@
-import { mdiCog, mdiHome } from "@mdi/js";
+import { mdiCog, mdiHome, mdiInformationOutline } from "@mdi/js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./components/Icon/Icon";
 import { goBack, useBackNavigation } from "./hooks/useBackNavigation";
@@ -11,6 +11,7 @@ import type { DeviceGroup, EntitySummary, Group, HealthStatus, ManualTimer, Pres
 import { groupSchedules } from "./utils/groupSchedules";
 import { setAppLanguage, tr } from "./i18n";
 import { setAppTimeZone } from "./utils/appTime";
+import { AboutSheet } from "./components/AboutSheet/AboutSheet";
 
 type Tab = "home" | "settings";
 
@@ -43,6 +44,7 @@ export function App() {
   useBackNavigation(openDeviceKey !== null, () => setOpenDeviceKey(null));
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [entities, setEntities] = useState<EntitySummary[]>([]);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [settings, setSettings] = useState<SettingsType>(DEFAULT_SETTINGS);
   const [haConnected, setHaConnected] = useState(true);
   const [haConnectionMode, setHaConnectionMode] = useState<HealthStatus["ha_connection_mode"]>("unavailable");
@@ -226,6 +228,15 @@ export function App() {
         <main className="app-main">
           <div className="app-header">
             My Scheduler <span className="app-header__version">v{__APP_VERSION__}</span>
+            <button
+              type="button"
+              className="app-header__info"
+              onClick={() => setAboutOpen(true)}
+              aria-label={tr("Giới thiệu, GitHub và ủng hộ", "About, GitHub and donate")}
+              title={tr("Giới thiệu, GitHub và ủng hộ", "About, GitHub and donate")}
+            >
+              <Icon path={mdiInformationOutline} size={16} />
+            </button>
           </div>
           {tab === "home" && (
             <Home
@@ -257,6 +268,8 @@ export function App() {
           )}
         </main>
       )}
+
+      <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       {!openDevice && (
         <nav className="app-tabbar" aria-label={tr("Điều hướng chính", "Main navigation")}>

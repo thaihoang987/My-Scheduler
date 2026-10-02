@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.66
+
+- New info button next to the version number: short introduction, GitHub link and donate buttons.
+  The About page in Settings also links to GitHub.
+- Device page: new Scheduling switch to turn all schedules of the device on or off. It is the same
+  switch as the one on the device's Home card, so both always match.
+
 ## 0.5.65
 
 - Fixed By time and 24h chart staying on an old time after leaving and reopening the app on a phone;

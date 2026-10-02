@@ -1469,3 +1469,31 @@ body {
 .timeline__bar--live { background: var(--star); opacity: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--star) 50%, transparent); }
 .timeline__mark { position: absolute; top: 1px; bottom: 1px; width: 3px; margin-left: -1px; border-radius: 2px; background: var(--accent); }
 .timeline__now { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--danger); border-radius: 1px; }
+
+/* ================= Nut (i) canh phien ban + bang gioi thieu (v0.5.66) ================= */
+.app-header__info {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+  margin-left: 4px; padding: 6px; min-width: 28px; min-height: 28px; border-radius: 50%;
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+}
+.app-header__info:hover, .app-header__info:focus-visible { color: var(--accent); background: var(--surface-2); }
+.about-sheet { text-align: center; padding: 4px 4px 12px; }
+.about-sheet .about-page__desc { max-width: 380px; }
+.about-sheet .about-page__donate--github { margin: 6px auto 18px; }
+.about-sheet__label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
+.about-page__donate--github { background: #24292f; border-color: #24292f; color: #ffffff; }
+/* Trong bang (i) nut nho hon trang Ve ung dung de khong xuong dong tren dien thoai. */
+.about-sheet .about-page__donate { width: 290px; padding: 11px 18px; font-size: 16px; white-space: nowrap; }
+.about-sheet .about-page__donate-icon { width: 22px; height: 22px; }
+.about-sheet .about-page__donate-list { gap: 10px; margin-bottom: 6px; }
+
+/* Cong tac tong "Hen gio" trong card dau Device Detail (v0.5.66), dong bo voi
+   cong tac tren card trang Nha (cung card_enabled). */
+.device-detail__master {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 260px; margin: 14px auto 0; padding: 10px 14px;
+  border-radius: var(--radius); background: var(--surface-2);
+  font-size: 14px; font-weight: 600; cursor: pointer; text-align: left;
+}
+.device-detail__master-state { font-weight: 500; color: var(--text-muted); }
+.device-detail__master-state--on { color: var(--success); }
