@@ -1381,3 +1381,91 @@ body {
 .device-card--list .device-card__time { font-size: 16px; }
 .device-card--list .device-card__action { margin: 1px 0 0; font-size: 11px; }
 .device-card__muted { font-size: 12px; color: var(--text-muted); }
+
+/* ================= Menu kieu xem + 2 kieu xem theo ngay (v0.5.64) ================= */
+
+.view-menu { position: relative; display: inline-flex; }
+.view-menu__scrim { position: fixed; inset: 0; z-index: 50; }
+.view-menu__popup {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 51;
+  min-width: 170px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.view-menu__item {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: none; color: var(--text); font: inherit; font-size: 14px;
+  padding: 9px 10px; border-radius: 8px; text-align: left; cursor: pointer;
+}
+.view-menu__item:hover { background: var(--surface-2); }
+.view-menu__item--active { color: var(--accent); font-weight: 600; }
+
+.day-view { margin-top: 8px; margin-bottom: 20px; }
+.day-view__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; margin-bottom: 8px; }
+.day-view__date { font-size: 15px; font-weight: 700; text-transform: capitalize; }
+.day-view__meta { font-size: 12px; color: var(--text-muted); }
+
+/* ---- Theo gio ---- */
+.agenda__list { background: var(--surface); border-radius: var(--radius-lg); padding: 4px 0; }
+.agenda__row {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  background: none; border: none; color: var(--text); font: inherit; text-align: left;
+  padding: 8px 12px; cursor: pointer; min-width: 0;
+}
+.agenda__row + .agenda__row { border-top: 1px solid var(--border); }
+.agenda__row:active { background: var(--surface-2); }
+.agenda__row--past { opacity: 0.5; }
+.agenda__row--skipped .agenda__time { text-decoration: line-through; }
+.agenda__time { width: 46px; flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
+.agenda__icon {
+  width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent);
+}
+.agenda__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.agenda__name { display: flex; align-items: center; min-width: 0; font-size: 14px; font-weight: 500; }
+.agenda__name-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agenda__name .missing-mark { flex-shrink: 0; }
+.agenda__action { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agenda__result { flex-shrink: 0; font-size: 12px; font-weight: 600; }
+.agenda__result--ok { color: var(--success); }
+.agenda__result--warn { color: var(--warning); }
+.agenda__now {
+  display: flex; align-items: center; gap: 8px; padding: 2px 12px;
+  color: var(--danger); font-size: 11px; font-weight: 700; scroll-margin: 120px;
+}
+.agenda__now::after { content: ""; flex: 1; height: 2px; background: var(--danger); border-radius: 1px; }
+
+/* ---- Bang 24h ---- */
+.timeline { --tl-name: 108px; }
+@media (min-width: 640px) { .timeline { --tl-name: 180px; } }
+.timeline__axis, .timeline__row { display: flex; align-items: center; gap: 8px; }
+.timeline__axis { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 4px 0 2px; }
+.timeline__name { width: var(--tl-name); flex-shrink: 0; display: flex; align-items: center; min-width: 0; }
+.timeline__name-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline__name .missing-mark { flex-shrink: 0; }
+.timeline__track {
+  position: relative; flex: 1; min-width: 0; height: 18px; border-radius: 4px;
+  background:
+    linear-gradient(to right, var(--border) 1px, transparent 1px) 0 0 / 25% 100%,
+    var(--surface-2);
+}
+.timeline__track--axis { background: none; height: 14px; }
+.timeline__hour { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.timeline__hour:first-child { transform: none; }
+.timeline__hour:last-child { transform: translateX(-100%); }
+.timeline__section { margin-top: 10px; }
+.timeline__section-title { font-size: 13px; font-weight: 700; color: var(--text-muted); margin: 0 0 4px; }
+.timeline__row {
+  width: 100%; background: none; border: none; color: var(--text); font: inherit; font-size: 13px;
+  text-align: left; padding: 4px 0; cursor: pointer;
+}
+.timeline__row--empty { opacity: 0.45; }
+.timeline__bar {
+  position: absolute; top: 3px; bottom: 3px; min-width: 3px; border-radius: 3px;
+  background: var(--accent); opacity: 0.85;
+}
+.timeline__bar--live { background: var(--star); opacity: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--star) 50%, transparent); }
+.timeline__mark { position: absolute; top: 1px; bottom: 1px; width: 3px; margin-left: -1px; border-radius: 2px; background: var(--accent); }
+.timeline__now { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--danger); border-radius: 1px; }

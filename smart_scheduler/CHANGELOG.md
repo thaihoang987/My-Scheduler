@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.64
+
+- Home view button now opens a menu with four views: Compact, List, **By time** and **24h chart**.
+- By time: every on/off of the day for the whole house in time order, with a "Now" line, past runs faded
+  and their result.
+- 24h chart: one row per device with bars for its on-periods today, the running period highlighted and
+  the most devices running at the same time.
+
+## 0.5.63
+
+- Home view button now switches between Compact and List only. Grid was removed because it looked
+  almost the same as Compact; a saved Grid choice now shows as Compact.
+
 ## 0.5.62
 
 - Home: new view button beside the theme button cycles Grid → Compact → List. List view shows one
