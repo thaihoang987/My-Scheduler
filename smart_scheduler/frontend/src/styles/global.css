@@ -1457,8 +1457,15 @@ body {
 .timeline__hour { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .timeline__hour:first-child { transform: none; }
 .timeline__hour:last-child { transform: translateX(-100%); }
-.timeline__section { margin-top: 10px; }
-.timeline__section-title { font-size: 13px; font-weight: 700; color: var(--text-muted); margin: 0 0 4px; }
+.timeline__section { margin-top: 18px; }
+/* Ten nhom dam + mau chu chinh nhu tieu de nhom o luoi card (v0.5.69) - truoc
+   chu xam nho, nhin giong 1 thiet bi bi mo/hu. */
+.timeline__section-title {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 15px; font-weight: 700; color: var(--text);
+  margin: 0 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.timeline__section-count { font-size: 13px; font-weight: 500; color: var(--text-muted); }
 .timeline__row {
   width: 100%; background: none; border: none; color: var(--text); font: inherit; font-size: 13px;
   text-align: left; padding: 4px 0; cursor: pointer;
