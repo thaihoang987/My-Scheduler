@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.65
+
+- Fixed By time and 24h chart staying on an old time after leaving and reopening the app on a phone;
+  countdowns also no longer fall behind after the app was in the background.
+- By time now shows seconds, and the "Now" line ticks every second.
+
 ## 0.5.64
 
 - Home view button now opens a menu with four views: Compact, List, **By time** and **24h chart**.

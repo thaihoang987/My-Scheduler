@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceGroup, EntitySummary, Group, Settings } from "../../types";
 import { dayEvents, daySpans, hhmm, type DayEvent } from "../../utils/dayPlan";
-import { dateInZone, secondsOfDayInZone, todayInZone } from "../../utils/appTime";
-import { serverNow } from "../../utils/serverTime";
+import { dateInZone, secondsOfDayInZone } from "../../utils/appTime";
+import { onServerTimeSync, serverNow } from "../../utils/serverTime";
 import { describeAction } from "../../utils/scheduleRange";
 import { visualFor } from "../../utils/deviceVisuals";
 import { useMdiIcons } from "../../utils/mdiIcons";
@@ -17,24 +17,55 @@ import { appLocale, tr } from "../../i18n";
  * - TimelineView "Bang 24h": moi thiet bi 1 hang, thanh mau = khoang dang bat
  *   trong ngay, de thay thiet bi nao chay chong gio nhau. */
 
-function useNowSeconds(): number {
-  const [now, setNow] = useState(() => secondsOfDayInZone(new Date(serverNow())));
+/** "Bay gio" (giay trong ngay) + "hom nay" theo GIO MAY CHU. Cap nhat ngay
+ * khi quay lai app/tab (visibilitychange, pageshow, focus) va sau moi lan dong
+ * bo gio, them nhip 5s phong khi trinh duyet khong bao su kien nao (v0.5.65:
+ * ra vao app thi bang 24h/theo gio dung o gio cu). `stepSec`: chi render
+ * lai khi doi buoc do (Theo gio 1s vi hien giay, Bang 24h 60s). */
+function readNow(): { now: number; today: string } {
+  const d = new Date(serverNow());
+  return { now: secondsOfDayInZone(d), today: dateInZone(d) };
+}
+
+function useNow(stepSec: number): { now: number; today: string } {
+  const [state, setState] = useState(readNow);
   useEffect(() => {
-    const id = window.setInterval(() => setNow(secondsOfDayInZone(new Date(serverNow()))), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
-  return now;
+    const update = () =>
+      setState((prev) => {
+        const next = readNow();
+        return Math.floor(next.now / stepSec) === Math.floor(prev.now / stepSec) && next.today === prev.today ? prev : next;
+      });
+    update();
+    const id = window.setInterval(update, Math.min(stepSec, 5) * 1000);
+    const onShow = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    document.addEventListener("visibilitychange", onShow);
+    window.addEventListener("pageshow", onShow);
+    window.addEventListener("focus", onShow);
+    const unsubscribe = onServerTimeSync(update);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onShow);
+      window.removeEventListener("pageshow", onShow);
+      window.removeEventListener("focus", onShow);
+      unsubscribe();
+    };
+  }, [stepSec]);
+  return state;
 }
 
-function clock(seconds: number, format: Settings["time_format"]): string {
-  const text = hhmm(seconds);
-  if (format === "24h") return text;
+function clock(seconds: number, format: Settings["time_format"], withSeconds = false): string {
+  const total = Math.max(0, Math.min(86399, Math.floor(seconds)));
+  const sec = withSeconds ? `:${String(total % 60).padStart(2, "0")}` : "";
+  const text = hhmm(total);
+  if (format === "24h") return text + sec;
   const [h, m] = text.split(":").map(Number);
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "CH" : "SA"}`;
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")}${sec} ${h >= 12 ? "CH" : "SA"}`;
 }
 
-function todayLabel(): string {
-  const [y, m, d] = todayInZone().split("-").map(Number);
+function todayLabel(today: string): string {
+  const [y, m, d] = today.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(appLocale(), { weekday: "long", day: "2-digit", month: "2-digit" });
 }
 
@@ -58,8 +89,7 @@ export function AgendaView({
   onOpen: (group: DeviceGroup) => void;
 }) {
   useMdiIcons();
-  const now = useNowSeconds();
-  const today = todayInZone();
+  const { now, today } = useNow(1);
   const events = useMemo(() => dayEvents(groups, today), [groups, today]);
   const nowRef = useRef<HTMLDivElement>(null);
   const scrolled = useRef(false);
@@ -80,14 +110,14 @@ export function AgendaView({
   const nowIndex = events.findIndex((e) => e.seconds > now);
   const nowLine = (
     <div ref={nowRef} className="agenda__now" key="__now">
-      <span>{tr("Bây giờ", "Now")} {clock(now, timeFormat)}</span>
+      <span>{tr("Bây giờ", "Now")} {clock(now, timeFormat, true)}</span>
     </div>
   );
 
   return (
     <div className="day-view agenda">
       <div className="day-view__head">
-        <span className="day-view__date">{todayLabel()}</span>
+        <span className="day-view__date">{todayLabel(today)}</span>
         <span className="day-view__meta">{events.length} {tr("lần chạy", "runs")}</span>
       </div>
       {events.length === 0 && <div className="empty-hint">{tr("Hôm nay không có lịch nào chạy.", "Nothing runs today.")}</div>}
@@ -104,7 +134,7 @@ export function AgendaView({
               style={{ "--accent": visual.color } as React.CSSProperties}
               onClick={() => onOpen(ev.group)}
             >
-              <span className="agenda__time">{clock(ev.seconds, timeFormat)}</span>
+              <span className="agenda__time">{clock(ev.seconds, timeFormat, true)}</span>
               <span className="agenda__icon">
                 <Icon path={visual.icon} size={16} />
               </span>
@@ -146,8 +176,7 @@ export function TimelineView({
   onOpen: (group: DeviceGroup) => void;
 }) {
   useMdiIcons();
-  const now = useNowSeconds();
-  const today = todayInZone();
+  const { now, today } = useNow(60);
   const plans = useMemo(() => new Map(groups.map((g) => [g.key, daySpans(g, today)])), [groups, today]);
 
   // Chia muc theo Nhom giong luoi card (thu tu nhom, "Chua phan nhom" cuoi).
@@ -182,7 +211,7 @@ export function TimelineView({
   return (
     <div className="day-view timeline">
       <div className="day-view__head">
-        <span className="day-view__date">{todayLabel()}</span>
+        <span className="day-view__date">{todayLabel(today)}</span>
         {peak.count > 1 && (
           <span className="day-view__meta">
             {tr(`Nhiều nhất ${peak.count} thiết bị chạy cùng lúc (${clock(peak.at, timeFormat)})`, `Up to ${peak.count} devices at once (${clock(peak.at, timeFormat)})`)}
