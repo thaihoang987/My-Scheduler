@@ -51,6 +51,20 @@ export function DeviceDetail({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Schedule | null>(null);
   const [devicePickerOpen, setDevicePickerOpen] = useState(false);
+  /** Cong tac TONG ca card (v0.5.66) - CUNG du lieu (card_enabled) va cung API
+   * voi cong tac tren card o trang Nha, nen bat/tat ben nao ben kia cung doi
+   * theo (WebSocket/poll tai lai lich cho moi tab dang mo). */
+  const [toggling, setToggling] = useState(false);
+  async function toggleCard() {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      await api.groupToggleSchedules(group.schedules.map((s) => s.id), !cardEnabled(group));
+      reload();
+    } finally {
+      setToggling(false);
+    }
+  }
   const rowListRef = useRef<HTMLDivElement | null>(null);
   // Tick 1s de dong Lich tu sang vang khi toi gio bat va tu tat mau khi het
   // khung (isRangeRowRunning), khong can cho reload tu backend.
@@ -172,6 +186,20 @@ export function DeviceDetail({
         <button className="device-detail__change-devices" onClick={() => setDevicePickerOpen(true)}>
           <Icon path={mdiPencilOutline} size={14} /> {tr("Đổi thiết bị", "Change devices")}
         </button>
+        {group.schedules.length > 0 && (
+          <label className="device-detail__master">
+            <span>
+              {tr("Hẹn giờ", "Scheduling")}{" "}
+              <span className={`device-detail__master-state ${cardEnabled(group) ? "device-detail__master-state--on" : ""}`}>
+                {cardEnabled(group) ? tr("đang bật", "on") : tr("đang tắt", "off")}
+              </span>
+            </span>
+            <span className="toggle toggle--small">
+              <input type="checkbox" checked={cardEnabled(group)} onChange={toggleCard} disabled={toggling} aria-label={tr("Bật/tắt toàn bộ hẹn giờ của thiết bị này", "Turn all schedules for this device on/off")} />
+              <span className="toggle__slider" />
+            </span>
+          </label>
+        )}
       </div>
 
       <div className="device-detail__manual">
@@ -193,7 +221,7 @@ export function DeviceDetail({
         </div>
       ) : (
         <div className="device-detail__hero device-detail__hero--empty">
-          {cardEnabled(group) ? tr("Chưa có lịch nào đang bật", "No enabled schedules") : tr("Hẹn giờ của thiết bị này đang tắt (bật lại bằng công tắc trên card ở trang Nhà)", "Scheduling for this device is paused (enable it using the switch on its Home card)")}
+          {cardEnabled(group) ? tr("Chưa có lịch nào đang bật", "No enabled schedules") : tr("Hẹn giờ của thiết bị này đang tắt (bật lại bằng công tắc Hẹn giờ ở trên)", "Scheduling for this device is paused (turn it back on with the Scheduling switch above)")}
         </div>
       )}
 

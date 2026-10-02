@@ -1,12 +1,7 @@
-import { mdiBeer, mdiCoffee, mdiHandHeart } from "@mdi/js";
+import { mdiGithub } from "@mdi/js";
 import { SubpageHeader } from "../SubpageHeader";
 import { tr } from "../../../i18n";
-
-export const DONATE_LINKS = [
-  { href: "https://buymeacoffee.com/leon_bell", icon: mdiBeer, modifier: "beer", vi: "Mời mình 1 ly bia", en: "Buy me a beer" },
-  { href: "https://ko-fi.com/leonbell", icon: mdiCoffee, modifier: "kofi", vi: "Ủng hộ qua Ko-fi", en: "Support on Ko-fi" },
-  { href: "https://paypal.me/leonbell95", icon: mdiHandHeart, modifier: "paypal", vi: "Ủng hộ qua PayPal", en: "Donate with PayPal" },
-];
+import { DONATE_LINKS, GITHUB_URL } from "../../../utils/aboutLinks";
 
 export function AboutSettings({ onBack }: { onBack: () => void }) {
   return (
@@ -22,6 +17,10 @@ export function AboutSettings({ onBack }: { onBack: () => void }) {
               <span>{tr(link.vi, link.en)}</span>
             </a>
           ))}
+          <a className="about-page__donate about-page__donate--github" href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
+            <svg className="about-page__donate-icon" viewBox="0 0 24 24" aria-hidden="true"><path d={mdiGithub} /></svg>
+            <span>{tr("Mã nguồn trên GitHub", "Source on GitHub")}</span>
+          </a>
         </div>
         <p className="about-page__desc">
           {tr("Hẹn giờ/lập lịch thiết bị Home Assistant kiểu iOS — không cần YAML, không cần tạo Helper tay. Scheduler chạy ở backend, không phụ thuộc trình duyệt đang mở.", "An iOS-style timer and scheduler for Home Assistant devices, with no YAML or manually created Helpers required. The scheduler runs in the backend and does not depend on an open browser.")}
