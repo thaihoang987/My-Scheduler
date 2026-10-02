@@ -12,6 +12,9 @@
   --danger: #ff3b30;
   --warning: #ff9f0a;
   --star: #ffb400;
+  /* Nen thanh Bang 24h (v0.5.72): sang = trang nhu card (noi tren nen
+     #f2f2f7), toi = #2c2c2e nhu ban dau. */
+  --timeline-track: #ffffff;
   --radius: 14px;
   --radius-lg: 22px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -27,6 +30,7 @@
     --bg: #000000;
     --surface: #1c1c1e;
     --surface-2: #2c2c2e;
+    --timeline-track: #2c2c2e;
     --surface-elevated: #323234;
     --text: #f2f2f7;
     --text-muted: #98989d;
@@ -38,6 +42,7 @@
   --bg: #000000;
   --surface: #1c1c1e;
   --surface-2: #2c2c2e;
+  --timeline-track: #2c2c2e;
   --surface-elevated: #323234;
   --text: #f2f2f7;
   --text-muted: #98989d;
@@ -1451,9 +1456,9 @@ body {
   position: relative; flex: 1; min-width: 0; height: 18px; border-radius: 4px;
   background:
     linear-gradient(to right, var(--border) 1px, transparent 1px) 0 0 / 25% 100%,
-    color-mix(in srgb, var(--text) 8%, transparent);
-  /* v0.5.71: truoc dung --surface-2, o giao dien sang TRUNG mau nen trang
-     (#f2f2f7) nen thanh bien mat; pha tu mau chu thi ca sang lan toi deu thay. */
+    var(--timeline-track);
+  /* --surface-2 o giao dien sang TRUNG mau nen trang (#f2f2f7) nen thanh bien
+     mat (v0.5.71) - dung bien rieng theo giao dien, xem :root. */
 }
 .timeline__track--axis { background: none; height: 14px; }
 .timeline__hour { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }

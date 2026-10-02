@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.72
+
+- 24h chart: bars are white in the light theme; the dark theme uses its original color again.
+
 ## 0.5.71
 
 - 24h chart: the bars are visible again in the light theme.
