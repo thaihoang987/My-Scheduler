@@ -46,17 +46,6 @@
 
 * { box-sizing: border-box; }
 
-/* Khoang den o day man hinh (phan hoi 2026-09-23, sau khi da bo double
-   safe-area o v0.5.16): `height:100%` tren html/body/#root can chuoi ancestor
-   resolve dung chieu cao THAT cua viewport - trong WKWebView cua app HA that
-   (Ingress nhung trong iframe long trong webview cua chinh app), chieu cao
-   "100%"/vh co the khong khop chieu cao HIEN THI thuc te (kieu bug 100vh
-   kinh dien tren mobile, cang de gap hon khi nhung trong app native), de lo
-   1 khoang trong ben duoi .app ma body tu lo mau nen (--bg) ra, nhin nhu 1
-   khoi den rieng khong lien quan gi toi tabbar. `100dvh` (dynamic viewport
-   height) bam theo vung hien thi THAT tai moi thoi diem, khong phu thuoc vao
-   viewport tinh cua trinh duyet cha - khai THEM sau 100% (trinh duyet khong
-   ho tro dvh se bo qua, van dung 100% nhu cu, khong mat gi). */
 /* Phan hoi 2026-09-23 "vẫn bị reload khi chạm vùng đó kéo xuống" - ban truoc
    (`contain` chi tren body) chua du: pull-to-refresh cua nhieu trinh
    duyet/WebView mobile (dac biet iOS Safari/WKWebView) doc theo gia tri tren
@@ -64,8 +53,10 @@
    DINH cua CHINH phan tu do dien ra (chi chan LAN TRUYEN len cha) - can
    `none` (chan hoan toan, khong chi "khong lan truyen") tren CA html va
    body de chan chac chan. */
-html { overscroll-behavior-y: none; }
-html, body, #root { width: 100%; height: 100%; height: 100dvh; min-height: 100%; min-height: 100dvh; }
+html { overscroll-behavior: none; overflow: hidden; }
+html, body, #root { width: 100%; height: 100%; min-width: 0; min-height: 0; }
+/* Ingress uses the iframe height; standalone follows Safari's visible viewport. */
+:root:not([data-embedded="true"]) { height: 100dvh; }
 
 body {
   margin: 0;
@@ -83,12 +74,13 @@ body {
   width: 100%;
   height: 100%;
   min-width: 0;
+  min-height: 0;
   position: relative;
 }
 
 .app-loading {
   display: flex; align-items: center; justify-content: center;
-  height: 100vh; color: var(--text-muted); font-size: 16px;
+  height: 100%; color: var(--text-muted); font-size: 16px;
 }
 
 .app-header {
@@ -113,6 +105,7 @@ body {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior-x: none;
   /* Phan hoi 2026-09-23 "vẫn bị reload khi chạm vùng đó kéo xuống" - day moi
      la vung CUON THAT (body o tren da overflow:hidden), pull-to-refresh cua
@@ -233,6 +226,8 @@ body {
 
 .input {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 12px 14px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -264,7 +259,7 @@ body {
 .btn--block { width: 100%; margin-bottom: 8px; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; overflow-x: auto; }
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
 
 .chip {
   padding: 8px 14px;
@@ -289,7 +284,7 @@ body {
 .field-label--inline { margin: 0 0 4px; display: block; }
 
 .date-range-fields { display: flex; gap: 10px; margin-top: 8px; }
-.date-range-field { flex: 1; }
+.date-range-field { flex: 1; min-width: 0; }
 .date-range-field .input { padding: 10px; font-size: 14px; }
 
 /* ---- Dieu kien phu (ScheduleEditor.tsx) - muc "chỉ chạy khi có điều kiện"
@@ -317,7 +312,7 @@ body {
    (bug thuc te 2026-09-22: grid 1fr lam 2 wheel bi day ra 2 rìa, khoang
    trong o giua qua rong, nhin "qua rong"). */
 .range-wheels { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; }
-.range-wheel { flex: 0 0 auto; text-align: center; }
+.range-wheel { flex: 0 1 auto; min-width: 0; max-width: 100%; text-align: center; }
 .range-wheel .time-wheel { padding-top: 4px; }
 
 .toggle { position: relative; display: inline-block; width: 46px; height: 28px; flex-shrink: 0; }
@@ -433,6 +428,8 @@ body {
 
 .device-card {
   position: relative;
+  min-width: 0;
+  overflow-wrap: anywhere;
   background: var(--surface);
   border-radius: var(--radius-lg);
   padding: 16px 14px 14px;
@@ -453,6 +450,7 @@ body {
 
 .device-card__top {
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap;
   margin-bottom: 8px;
 }
 
@@ -463,7 +461,7 @@ body {
 }
 .device-card__favorite--active { color: var(--star); }
 
-.device-card__top-actions { display: flex; align-items: center; gap: 2px; margin: -6px -6px 0 0; }
+.device-card__top-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; max-width: 100%; gap: 2px; margin: -6px -6px 0 auto; }
 
 .device-card__group-btn {
   background: none; border: none; color: var(--text-muted); padding: 8px;
@@ -602,6 +600,7 @@ body {
 
 .on-time__labels {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -629,6 +628,15 @@ body {
 }
 
 /* ================= Device detail ================= */
+
+.app > .device-detail {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  overflow-wrap: anywhere;
+}
 
 .device-detail__topbar {
   display: flex;
@@ -704,7 +712,9 @@ body {
 
 .schedule-row__main {
   flex: 1;
+  min-width: 0;
   display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap;
   padding: 8px 0;
   background: none; border: none;
   color: var(--text);
@@ -713,7 +723,7 @@ body {
 }
 
 .schedule-row__time { font-weight: 700; min-width: 74px; }
-.schedule-row__action { flex: 1; color: var(--text-muted); font-size: 14px; }
+.schedule-row__action { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text-muted); font-size: 14px; }
 .schedule-row__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
 .schedule-row__dot--on { background: var(--success); }
 
@@ -865,9 +875,9 @@ body {
 
 .entity-row__info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-.entity-row__name { font-size: 16px; font-weight: 500; }
+.entity-row__name { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
 
-.entity-row__domain, .entity-row__state, .entity-row__id { font-size: 13px; color: var(--text-muted); }
+.entity-row__domain, .entity-row__state, .entity-row__id { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 
 /* Dong thiet bi trong Cai dat -> Thiet bi: chu nho hon 2px, hang nut nho
    gon ben duoi ten, can trai (DevicesSettings.tsx). */
@@ -901,9 +911,10 @@ body {
 .sheet {
   background: var(--surface);
   width: 100%; max-width: 520px;
+  min-width: 0; min-height: 0;
   border-radius: 20px 20px 0 0;
   max-height: calc(100vh - env(safe-area-inset-top, 0px));
-  max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+  max-height: 100%;
   display: flex; flex-direction: column;
   padding: 10px max(14px, env(safe-area-inset-right, 0px)) calc(14px + var(--safe-bottom)) max(14px, env(safe-area-inset-left, 0px));
   overflow: hidden;
@@ -911,7 +922,7 @@ body {
 
 @media (min-width: 640px) {
   .sheet-backdrop { align-items: center; }
-  .sheet { width: min(680px, calc(100% - 48px)); max-width: 680px; border-radius: var(--radius-lg); max-height: min(820px, calc(100vh - 48px)); padding: 12px 22px 20px; }
+  .sheet { width: min(680px, calc(100% - 48px)); max-width: 680px; border-radius: var(--radius-lg); max-height: min(820px, calc(100% - 48px)); padding: 12px 22px 20px; }
 }
 
 .sheet__handle {
@@ -925,7 +936,9 @@ body {
    ScheduleEditor chua wheel picker chon gio) la 1 vung cuon RIENG, can chan
    pull-to-refresh o day nua vi day la vung nguoi dung dang thao tac luc gap
    phan hoi "cham nham wheel keo xuong reload trang". */
-.sheet__body { overflow-y: auto; flex: 1; overscroll-behavior-y: none; }
+.sheet__body { overflow-y: auto; overflow-x: hidden; min-width: 0; min-height: 0; flex: 1; overscroll-behavior: none; }
+.sheet__handle, .sheet__title, .sheet__footer { flex-shrink: 0; }
+.sheet__title { overflow-wrap: anywhere; }
 
 /* Scrollbar mong, xam, khong vien trang mac dinh cua browser (phan hoi
    thuc te 2026-09-22: "thanh slide scroll xau... mau xam khong vien
@@ -1015,7 +1028,8 @@ body {
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
   font-size: 22px; font-weight: 700; line-height: 1; cursor: pointer;
 }
-.offset-stepper__value { min-width: 120px; text-align: center; }
+.offset-stepper__value { min-width: 0; flex: 0 1 120px; overflow-wrap: anywhere; text-align: center; }
+.offset-stepper__btn { flex-shrink: 0; }
 .offset-stepper__label { font-size: 13px; color: var(--text-muted); }
 .offset-stepper__minutes { font-size: 20px; font-weight: 700; color: var(--text); margin-top: 2px; }
 .offset-stepper__preview { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
@@ -1126,7 +1140,9 @@ body {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px; background: var(--surface); border-radius: var(--radius);
   margin-bottom: 6px; font-size: 15px;
+  gap: 10px; flex-wrap: wrap; overflow-wrap: anywhere;
 }
+.settings-row > * { min-width: 0; max-width: 100%; }
 
 .settings-list-row {
   width: 100%;
@@ -1147,7 +1163,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 
-.settings-list-row__text { flex: 1; display: flex; flex-direction: column; }
+.settings-list-row__text { flex: 1; min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; }
 .settings-list-row__title { font-size: 16px; font-weight: 500; }
 .settings-list-row__hint { font-size: 13px; color: var(--text-muted); }
 .settings-list-row__chevron { color: var(--text-muted); flex-shrink: 0; }
@@ -1157,8 +1173,8 @@ body {
   padding: 4px 0 10px;
 }
 
-.subpage-header__title { font-size: 18px; font-weight: 700; }
-.subpage-header__spacer { width: 36px; }
+.subpage-header__title { min-width: 0; overflow-wrap: anywhere; text-align: center; font-size: 18px; font-weight: 700; }
+.subpage-header__spacer { width: 36px; flex-shrink: 0; }
 
 .status-text { font-size: 14px; }
 .status-text--on { color: var(--success); }
@@ -1206,7 +1222,7 @@ body {
 .home-banner--alert { background: color-mix(in srgb, var(--star) 18%, var(--surface)); }
 
 /* ---- Gia lap co nguoi (PresenceSettings.tsx) ---- */
-.presence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.presence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
 .presence-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .presence-field__label { font-size: 12px; color: var(--text-muted); }
 
@@ -1245,9 +1261,10 @@ body {
   display: flex; align-items: center; gap: 6px;
   background: none; border: none; padding: 2px 0; color: inherit;
   font: inherit; cursor: pointer; text-align: left;
+  min-width: 0; overflow-wrap: anywhere;
 }
 .section-header__toggle svg { color: var(--text-muted); flex-shrink: 0; }
-.section-header__move { display: flex; gap: 4px; }
+.section-header__move { display: flex; gap: 4px; flex-shrink: 0; }
 .section-header__move button {
   display: flex; align-items: center; justify-content: center;
   width: 32px; height: 28px; border-radius: 8px;
@@ -1259,7 +1276,7 @@ body {
 /* Danh sach Tu tat: moi dong 1 o luoi, desktop ~1/4 be ngang trang. */
 .auto-off__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr));
   gap: 10px;
   background: none;
   border-radius: 0;
@@ -1309,3 +1326,20 @@ body {
   padding: 3px 10px; border-radius: 999px;
 }
 .link-button { background: none; border: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
+
+@media (max-width: 390px) {
+  .page { padding-left: 10px; padding-right: 10px; }
+  .device-grid { gap: 8px; }
+  .device-card { padding: 12px 10px; }
+  .device-card__top-actions:has(.drag-handle) {
+    display: grid;
+    grid-template-columns: repeat(2, 38px);
+    justify-items: center;
+  }
+  .home-page > .chip-row { gap: 6px; }
+  .home-page > .chip-row .chip { padding: 8px 10px; font-size: 13px; }
+  .auto-off__row { gap: 8px; padding: 10px; flex-wrap: wrap; }
+  .auto-off__main { flex-basis: 100px; }
+  .range-wheels { gap: 8px 12px; }
+  .offset-stepper { gap: 12px; padding-left: 0; padding-right: 0; }
+}
