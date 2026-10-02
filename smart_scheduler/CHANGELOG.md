@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.69
+
+- 24h chart: group names are now bold with a device count, so they no longer look like a disabled device.
+
 ## 0.5.68
 
 - 24h chart: long device names now wrap onto two lines in the name column instead of being cut off.

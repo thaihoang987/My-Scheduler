@@ -230,7 +230,11 @@ export function TimelineView({
       </div>
       {sections.map((sec) => (
         <div key={sec.id} className="timeline__section">
-          {sec.name && <div className="timeline__section-title">{sec.name}</div>}
+          {sec.name && (
+            <div className="timeline__section-title">
+              {sec.name} <span className="timeline__section-count">{sec.groups.length}</span>
+            </div>
+          )}
           {sec.groups.map((g) => {
             const plan = plans.get(g.key)!;
             const visual = visualFor(g.domain, g.title, g.singleEntity?.icon);
