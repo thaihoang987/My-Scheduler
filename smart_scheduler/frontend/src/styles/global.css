@@ -1243,9 +1243,6 @@ body {
 .presence-status { padding: 12px 0; border-block: 1px solid var(--border); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .presence-settings .input--button { white-space: normal; overflow-wrap: anywhere; height: auto; }
 .presence-settings .btn--block { margin-top: 10px; }
-.presence-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.presence-plan-row > span:first-child { overflow-wrap: anywhere; }
-.presence-plan-row > span:last-child { white-space: nowrap; }
 
 /* ---- Danh sach "Tu tat sau khi bat" tren trang Nha (v0.5.45) ---- */
 .auto-off { margin: 4px 0 14px; }
