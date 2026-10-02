@@ -427,7 +427,7 @@ body {
   font-size: 15px; font-weight: 700; color: var(--text);
   margin: 0 0 4px; display: flex; align-items: baseline; gap: 6px;
 }
-.device-section__count { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.device-section__count { white-space: nowrap; flex-shrink: 0; font-size: 13px; font-weight: 500; color: var(--text-muted); }
 .device-grid--drop-target { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: var(--radius); }
 .device-section__empty {
   grid-column: 1 / -1; border: 2px dashed var(--border); border-radius: var(--radius);
@@ -1371,18 +1371,23 @@ body {
 }
 .device-card.device-card--list {
   flex-direction: row; align-items: center; gap: 10px;
+  flex-wrap: wrap;
   min-height: 0; padding: 8px 8px 8px 12px;
   border-radius: var(--radius);
 }
 .device-card--list .device-card__icon { width: 34px; height: 34px; margin: 0; flex-shrink: 0; }
 .device-card--list .device-card__main { flex: 1; min-width: 0; }
 .device-card--list .device-card__title { font-size: 14px; display: flex; align-items: center; min-width: 0; }
-/* Chi phan ten bi cat "..." - icon nhac entity mat luon hien sau ten. */
-.device-card__title-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+/* Keep the missing-entity indicator visible after the two-line name. */
+.device-card__title-text {
+  min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden;
+}
 .device-card--list .missing-mark, .device-card__fav-dot { flex-shrink: 0; }
 .device-card--list .device-card__state { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .device-card--list .on-time { margin-top: 4px; }
-.device-card--list .drag-handle { margin-left: -8px; }
+.device-card__list-tools { flex: 0 0 100%; display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
 .device-card__fav-dot { color: var(--star); vertical-align: -1px; margin-right: 4px; }
 .device-card__next-inline { text-align: right; flex-shrink: 0; }
 .device-card--list .device-card__time { font-size: 16px; }

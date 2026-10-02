@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.73
+
+- List: long device names now wrap onto two lines. Arrange controls use a separate row so names
+  remain visible on smaller phones.
+- Group headers keep the device count on one line, even beside long group names.
+
 ## 0.5.72
 
 - 24h chart: bars are white in the light theme; the dark theme uses its original color again.
