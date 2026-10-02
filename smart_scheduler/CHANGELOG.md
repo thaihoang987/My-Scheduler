@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.60
+
+- Smaller phones: device cards, editing controls, auto-off lists and form fields now fit narrow screens.
+- Keep navigation inside the add-on frame and scroll long device details and schedule sheets within it.
+
 ## 0.5.59
 
 - History card: the detail popup now closes when you tap anywhere outside it, tap the same segment
