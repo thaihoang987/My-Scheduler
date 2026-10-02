@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import Sortable from "sortablejs";
-import type { DeviceGroup, ManualTimer, Settings } from "../../types";
+import type { DeviceGroup, DisplayMode, ManualTimer, Settings } from "../../types";
 import { removeStaleFallbackClones } from "../../utils/sortableFallbackCleanup";
 import { DeviceCard } from "../DeviceCard/DeviceCard";
 import { tr } from "../../i18n";
@@ -19,7 +19,7 @@ import { tr } from "../../i18n";
  * cua card van bam mo binh thuong. */
 export function DeviceGrid({
   groups,
-  compact,
+  view,
   timeFormat,
   activeTimers,
   onOpen,
@@ -31,7 +31,7 @@ export function DeviceGrid({
   editMode,
 }: {
   groups: DeviceGroup[];
-  compact: boolean;
+  view: DisplayMode;
   timeFormat: Settings["time_format"];
   activeTimers: ManualTimer[];
   onOpen: (group: DeviceGroup) => void;
@@ -123,12 +123,12 @@ export function DeviceGrid({
   }
 
   return (
-    <div ref={gridRef} className={`device-grid ${compact ? "device-grid--compact" : ""}`}>
+    <div ref={gridRef} className={`device-grid device-grid--${view}`}>
       {groups.map((g) => (
         <DeviceCard
           key={g.key}
           group={g}
-          compact={compact}
+          view={view}
           timeFormat={timeFormat}
           activeTimers={activeTimers}
           onOpen={() => onOpen(g)}

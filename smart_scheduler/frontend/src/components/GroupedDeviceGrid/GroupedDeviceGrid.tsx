@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Sortable from "sortablejs";
 import { api } from "../../services/api";
-import type { DeviceGroup, EntitySummary, Group, ManualTimer, Settings } from "../../types";
+import type { DeviceGroup, DisplayMode, EntitySummary, Group, ManualTimer, Settings } from "../../types";
 import { removeStaleFallbackClones } from "../../utils/sortableFallbackCleanup";
 import { DeviceCard } from "../DeviceCard/DeviceCard";
 import { SectionHeader } from "../SectionHeader/SectionHeader";
@@ -47,7 +47,7 @@ export function GroupedDeviceGrid({
   groups,
   entities,
   categoryGroups,
-  compact,
+  view,
   timeFormat,
   activeTimers,
   onOpen,
@@ -68,7 +68,7 @@ export function GroupedDeviceGrid({
   groups: DeviceGroup[];
   entities: EntitySummary[];
   categoryGroups: Group[];
-  compact: boolean;
+  view: DisplayMode;
   timeFormat: Settings["time_format"];
   activeTimers: ManualTimer[];
   onOpen: (group: DeviceGroup) => void;
@@ -151,7 +151,7 @@ export function GroupedDeviceGrid({
         <SectionBlock
           controls={controls(section.id)}
           section={section}
-          compact={compact}
+          view={view}
           timeFormat={timeFormat}
           activeTimers={activeTimers}
           onOpen={onOpen}
@@ -207,7 +207,7 @@ export function GroupedDeviceGrid({
 
 function SectionBlock({
   section,
-  compact,
+  view,
   timeFormat,
   activeTimers,
   onOpen,
@@ -222,7 +222,7 @@ function SectionBlock({
 }: {
   controls: SectionControls;
   section: Section;
-  compact: boolean;
+  view: DisplayMode;
   timeFormat: Settings["time_format"];
   activeTimers: ManualTimer[];
   onOpen: (group: DeviceGroup) => void;
@@ -307,12 +307,12 @@ function SectionBlock({
   return (
     <div className="device-section">
       <SectionHeader title={section.name} count={section.groups.length} {...controls} />
-      <div ref={listRef} data-section-list data-section-id={section.id} className={`device-grid ${compact ? "device-grid--compact" : ""} ${controls.collapsed ? "is-collapsed" : ""}`}>
+      <div ref={listRef} data-section-list data-section-id={section.id} className={`device-grid device-grid--${view} ${controls.collapsed ? "is-collapsed" : ""}`}>
         {section.groups.map((g) => (
           <DeviceCard
             key={g.key}
             group={g}
-            compact={compact}
+            view={view}
             timeFormat={timeFormat}
             activeTimers={activeTimers}
             onOpen={() => onOpen(g)}

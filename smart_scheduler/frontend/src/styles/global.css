@@ -1347,3 +1347,37 @@ body {
   .range-wheels { gap: 8px 12px; }
   .offset-stepper { gap: 12px; padding-left: 0; padding-right: 0; }
 }
+
+/* ================= Dang xem "Danh sach" + dau nhac entity mat (v0.5.62) ================= */
+
+/* Dau nhac entity khong con trong HA: CO TINH nhe (mau chu mo, icon nho) -
+   co the chi la HA vua khoi dong, entity tam vang mat roi tu quay lai. */
+.missing-mark {
+  display: inline-flex; vertical-align: -2px; margin-left: 5px;
+  color: var(--text-muted); opacity: 0.75;
+}
+.device-detail__missing { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.4; }
+
+.device-grid--list { grid-template-columns: minmax(0, 1fr) !important; gap: 6px !important; }
+@media (min-width: 960px) {
+  .device-grid--list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+.device-card.device-card--list {
+  flex-direction: row; align-items: center; gap: 10px;
+  min-height: 0; padding: 8px 8px 8px 12px;
+  border-radius: var(--radius);
+}
+.device-card--list .device-card__icon { width: 34px; height: 34px; margin: 0; flex-shrink: 0; }
+.device-card--list .device-card__main { flex: 1; min-width: 0; }
+.device-card--list .device-card__title { font-size: 14px; display: flex; align-items: center; min-width: 0; }
+/* Chi phan ten bi cat "..." - icon nhac entity mat luon hien sau ten. */
+.device-card__title-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.device-card--list .missing-mark, .device-card__fav-dot { flex-shrink: 0; }
+.device-card--list .device-card__state { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.device-card--list .on-time { margin-top: 4px; }
+.device-card--list .drag-handle { margin-left: -8px; }
+.device-card__fav-dot { color: var(--star); vertical-align: -1px; margin-right: 4px; }
+.device-card__next-inline { text-align: right; flex-shrink: 0; }
+.device-card--list .device-card__time { font-size: 16px; }
+.device-card--list .device-card__action { margin: 1px 0 0; font-size: 11px; }
+.device-card__muted { font-size: 12px; color: var(--text-muted); }

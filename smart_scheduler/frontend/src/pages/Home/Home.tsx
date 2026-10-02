@@ -1,4 +1,4 @@
-import { mdiPencilOutline, mdiPlus, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
+import { mdiPencilOutline, mdiPlus, mdiViewAgendaOutline, mdiViewGridOutline, mdiViewListOutline, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
 import { useEffect, useMemo, useState } from "react";
 import { AutoOffList } from "../../components/AutoOffList/AutoOffList";
 import { Clock } from "../../components/Clock/Clock";
@@ -9,13 +9,22 @@ import { useCollapsedSections } from "../../hooks/useCollapsedSections";
 import { Icon } from "../../components/Icon/Icon";
 import { ScheduleEditor } from "../../components/ScheduleEditor/ScheduleEditor";
 import { api } from "../../services/api";
-import type { DeviceGroup, EntitySummary, Group, ManualTimer, PresenceStatus, Schedule, Settings } from "../../types";
+import type { DeviceGroup, DisplayMode, EntitySummary, Group, ManualTimer, PresenceStatus, Schedule, Settings } from "../../types";
 import { cardEnabled } from "../../utils/groupSchedules";
 import { saveScheduleDraft, type ScheduleDraft } from "../../utils/scheduleRange";
 import { tr } from "../../i18n";
 import { backdropProps } from "../../utils/backdrop";
 
 type Filter = "all" | "on" | "off" | "favorite";
+
+/** Nut doi kieu xem tren Nha (v0.5.62): bam xoay vong Luoi -> Thu gon ->
+ * Danh sach, luu vao Cai dat (cung khoa display_mode voi Cai dat -> Giao dien). */
+const VIEW_CYCLE: DisplayMode[] = ["normal", "compact", "list"];
+const VIEW_META: Record<DisplayMode, { icon: string; vi: string; en: string }> = {
+  normal: { icon: mdiViewGridOutline, vi: "Lưới", en: "Grid" },
+  compact: { icon: mdiViewAgendaOutline, vi: "Thu gọn", en: "Compact" },
+  list: { icon: mdiViewListOutline, vi: "Danh sách", en: "List" },
+};
 
 export function Home({
   groups,
@@ -139,6 +148,13 @@ export function Home({
   }, [groups, filter]);
 
   const activeCount = schedules.filter((s) => s.enabled).length;
+  const view: DisplayMode = VIEW_CYCLE.includes(settings.display_mode) ? settings.display_mode : "compact";
+  const nextView = VIEW_CYCLE[(VIEW_CYCLE.indexOf(view) + 1) % VIEW_CYCLE.length];
+
+  async function cycleView() {
+    await api.updateSettings({ display_mode: nextView });
+    reload();
+  }
 
   async function handleSave(draft: ScheduleDraft) {
     await saveScheduleDraft(draft, entities, editingRule, schedules);
@@ -233,6 +249,15 @@ export function Home({
             <Icon path={isDark ? mdiWhiteBalanceSunny : mdiWeatherNight} size={18} />
           </button>
           <button
+            type="button"
+            className="home-page__edit-btn"
+            onClick={cycleView}
+            aria-label={tr(`Kiểu xem: ${VIEW_META[view].vi} - bấm để đổi sang ${VIEW_META[nextView].vi}`, `View: ${VIEW_META[view].en} - tap for ${VIEW_META[nextView].en}`)}
+            title={tr(`Kiểu xem: ${VIEW_META[view].vi} → ${VIEW_META[nextView].vi}`, `View: ${VIEW_META[view].en} → ${VIEW_META[nextView].en}`)}
+          >
+            <Icon path={VIEW_META[view].icon} size={18} />
+          </button>
+          <button
             className={`home-page__edit-btn ${editMode ? "home-page__edit-btn--active" : ""}`}
             onClick={() => setEditMode((v) => !v)}
             aria-label={editMode ? tr("Xong sắp xếp", "Finish arranging") : tr("Sắp xếp thiết bị", "Arrange devices")}
@@ -276,7 +301,7 @@ export function Home({
               groups={filtered}
               entities={entities}
               categoryGroups={categoryGroups}
-              compact={settings.display_mode === "compact"}
+              view={view}
               timeFormat={settings.time_format}
               activeTimers={activeTimers}
               onOpen={onOpenDevice}
@@ -296,7 +321,7 @@ export function Home({
           groups.length === 0 && autoOffRules.length > 0 ? null : (
             <DeviceGrid
               groups={filtered}
-              compact={settings.display_mode === "compact"}
+              view={view}
               timeFormat={settings.time_format}
               activeTimers={activeTimers}
               onOpen={onOpenDevice}

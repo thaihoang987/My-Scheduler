@@ -158,10 +158,17 @@ export function DeviceDetail({
         {group.area && <div className="device-detail__area">{group.area}</div>}
         {group.singleEntity && (
           <div className={`device-detail__state ${group.singleEntity.state === "on" ? "device-detail__state--on" : ""}`}>
-            {group.singleEntity.state === "on" ? tr("● Đang bật", "● On") : group.singleEntity.state === "off" ? tr("○ Đang tắt", "○ Off") : tr("⚠ Không khả dụng", "⚠ Unavailable")}
+            {group.singleEntity.missing ? tr("Không tìm thấy trong HA", "Not found in HA") : group.singleEntity.state === "on" ? tr("● Đang bật", "● On") : group.singleEntity.state === "off" ? tr("○ Đang tắt", "○ Off") : tr("⚠ Không khả dụng", "⚠ Unavailable")}
           </div>
         )}
         {group.entityIds.length > 1 && <div className="device-detail__state">{entityNames(group.entityIds, entities)}</div>}
+        {/* v0.5.62: nhac nhe entity khong con trong HA, chi mau chu mo - co the
+            chi tam vang mat luc HA vua khoi dong. */}
+        {group.missingIds.length > 0 && (
+          <div className="device-detail__missing">
+            {tr(`Không tìm thấy ${group.missingIds.join(", ")} trong HA. Nếu entity đã bị xoá hoặc đổi tên, bấm "Đổi thiết bị" để chọn lại.`, `${group.missingIds.join(", ")} not found in HA. If it was deleted or renamed, tap "Change devices" to pick it again.`)}
+          </div>
+        )}
         <button className="device-detail__change-devices" onClick={() => setDevicePickerOpen(true)}>
           <Icon path={mdiPencilOutline} size={14} /> {tr("Đổi thiết bị", "Change devices")}
         </button>

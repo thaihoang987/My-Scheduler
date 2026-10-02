@@ -804,3 +804,30 @@ def test_backup_import_rejects_non_backup_before_wiping():
             _validate(bad)
     assert crud.list_schedules()  # khong bi xoa
     _validate(crud.export_all())
+
+
+# ---- entity khong con trong HA (v0.5.62) ----
+
+def test_missing_flag_only_for_entities_absent_from_ha(fake_ha, monkeypatch):
+    """Entity lich dang dung ma khong con trong HA -> missing; offline tam thoi
+    (van co trong states, state unavailable) va entity con trong HA nhung chua
+    "them" (scope=added bo qua) -> KHONG bi danh dau mat."""
+    from app import homeassistant
+    from app.api import entities
+
+    async def no_registries():
+        return {}
+
+    monkeypatch.setattr(homeassistant, "get_registries", no_registries)
+    fake_ha.states = [
+        {"entity_id": "switch.offline", "state": "unavailable", "attributes": {}},
+        {"entity_id": "switch.not_added", "state": "off", "attributes": {}},
+    ]
+    for eid in ("switch.offline", "switch.not_added", "switch.gone"):
+        make_schedule(target_entities=[eid])
+    crud.upsert_alias("switch.offline", "switch", {"alias": "Offline", "added": True})
+
+    out = {e.entity_id: e for e in run(entities.build_entities(added_only=True))}
+    assert out["switch.gone"].missing is True
+    assert not out["switch.offline"].missing
+    assert "switch.not_added" not in out

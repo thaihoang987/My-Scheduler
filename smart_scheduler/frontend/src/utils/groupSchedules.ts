@@ -40,6 +40,7 @@ export function groupSchedules(schedules: Schedule[], entities: EntitySummary[])
         schedules: [],
         favorite: isSingle ? Boolean(entity?.favorite) : schedule.favorite,
         isOn: entity?.state === "on",
+        missingIds: [],
         minSortOrder: schedule.sort_order,
       };
       groups.set(key, group);
@@ -47,7 +48,10 @@ export function groupSchedules(schedules: Schedule[], entities: EntitySummary[])
     group.schedules.push(schedule);
     group.minSortOrder = Math.min(group.minSortOrder, schedule.sort_order);
     for (const id of schedule.target_entities) {
-      if (!group.entityIds.includes(id)) group.entityIds.push(id);
+      if (!group.entityIds.includes(id)) {
+        group.entityIds.push(id);
+        if (entityMap.get(id)?.missing) group.missingIds.push(id);
+      }
       if (entityMap.get(id)?.state === "on") group.isOn = true;
     }
   }

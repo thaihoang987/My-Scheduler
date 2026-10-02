@@ -53,11 +53,11 @@ export function AppearanceSettings({ settings, reload, onBack }: { settings: Set
       </div>
 
       <div className="settings-section">
-        <div className="settings-section__title">{tr("Kích thước card", "Card size")}</div>
+        <div className="settings-section__title">{tr("Kiểu xem trang Nhà", "Home view")}</div>
         <div className="chip-row">
-          {(["compact", "normal"] as const).map((m) => (
+          {(["normal", "compact", "list"] as const).map((m) => (
             <button key={m} className={settings.display_mode === m ? "chip chip--active" : "chip"} onClick={() => update({ display_mode: m })}>
-              {m === "compact" ? "Compact" : "Normal"}
+              {m === "compact" ? tr("Thu gọn", "Compact") : m === "list" ? tr("Danh sách", "List") : tr("Lưới", "Grid")}
             </button>
           ))}
         </div>

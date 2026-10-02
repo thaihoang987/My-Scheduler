@@ -1,5 +1,5 @@
-import { mdiClose, mdiDragVertical, mdiFolderMoveOutline, mdiStar, mdiStarOutline } from "@mdi/js";
-import type { DeviceGroup, ManualTimer, Settings } from "../../types";
+import { mdiClose, mdiDragVertical, mdiFolderMoveOutline, mdiLinkVariantOff, mdiStar, mdiStarOutline } from "@mdi/js";
+import type { DeviceGroup, DisplayMode, ManualTimer, Settings } from "../../types";
 import { activeOnWindow, anyEnabled, cardEnabled, nextRunOf } from "../../utils/groupSchedules";
 import { visualFor } from "../../utils/deviceVisuals";
 import { useMdiIcons } from "../../utils/mdiIcons";
@@ -16,9 +16,36 @@ function actionWord(group: DeviceGroup, scheduleId: string | null): string {
   return s ? describeAction(s.action) : "";
 }
 
+/** Dau nhac NHE khi entity khong con trong HA (v0.5.62): icon nho mau mo
+ * canh ten + tooltip, khong to mau canh bao - co khi HA vua khoi dong, tich
+ * hop chua nap xong nen entity tam vang mat, tu het khi no quay lai. */
+export function missingHint(missingIds: string[], total: number): string | null {
+  if (missingIds.length === 0) return null;
+  return total > 1
+    ? tr(`${missingIds.length} entity không tìm thấy trong HA: ${missingIds.join(", ")}`, `${missingIds.length} entities not found in HA: ${missingIds.join(", ")}`)
+    : tr(`Không tìm thấy ${missingIds[0]} trong HA - có thể đã bị xoá hoặc đổi tên`, `${missingIds[0]} was not found in HA - it may have been deleted or renamed`);
+}
+
+/** Dung chung cho card thiet bi va dong "Tu tat" (AutoOffList). */
+export function MissingMark({ missingIds, total }: { missingIds: string[]; total: number }) {
+  const hint = missingHint(missingIds, total);
+  if (!hint) return null;
+  return (
+    <span className="missing-mark" title={hint} aria-label={hint}>
+      <Icon path={mdiLinkVariantOff} size={13} />
+    </span>
+  );
+}
+
+function stateText(group: DeviceGroup): string {
+  const st = group.singleEntity?.state;
+  if (group.singleEntity?.missing) return tr("Không tìm thấy trong HA", "Not found in HA");
+  return st === "on" ? tr("● Đang bật", "● On") : st === "off" ? tr("Đang tắt", "Off") : tr("Không khả dụng", "Unavailable");
+}
+
 export function DeviceCard({
   group,
-  compact,
+  view,
   timeFormat,
   activeTimers,
   onOpen,
@@ -30,7 +57,7 @@ export function DeviceCard({
   onDelete,
 }: {
   group: DeviceGroup;
-  compact: boolean;
+  view: DisplayMode;
   timeFormat: Settings["time_format"];
   activeTimers: ManualTimer[];
   onOpen: () => void;
@@ -64,6 +91,94 @@ export function DeviceCard({
   const hasSchedules = group.schedules.length > 0;
   const multiEntity = group.entityIds.length > 1;
   const onWindow = activeOnWindow(group, activeTimers);
+  const compact = view === "compact";
+
+  const toggle = hasSchedules && (
+    <label className="toggle toggle--small" onClick={(e) => e.stopPropagation()}>
+      <input type="checkbox" checked={enabled} onChange={onToggleEnabled} />
+      <span className="toggle__slider" />
+    </label>
+  );
+  const dragHandle = sortable && (
+    <span className="drag-handle" onClick={(e) => e.stopPropagation()} aria-label={tr("Kéo để đổi vị trí", "Drag to reorder")} title={tr("Kéo để đổi vị trí", "Drag to reorder")}>
+      <Icon path={mdiDragVertical} size={20} />
+    </span>
+  );
+  const categoryBtn = onChangeCategory && (
+    <button
+      className="device-card__group-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        onChangeCategory();
+      }}
+      aria-label={`${tr("Chuyển nhóm, hiện tại", "Move group, current")}: ${categoryLabel || tr("Chưa phân nhóm", "Ungrouped")}`}
+      title={`${tr("Chuyển nhóm", "Move group")}: ${categoryLabel || tr("Chưa phân nhóm", "Ungrouped")}`}
+    >
+      <Icon path={mdiFolderMoveOutline} size={19} />
+    </button>
+  );
+  const deleteBtn = sortable && onDelete && (
+    <button
+      className="device-card__delete-btn"
+      onClick={(e) => {
+        e.stopPropagation();
+        onDelete();
+      }}
+      aria-label={tr("Xoá thiết bị này khỏi hẹn giờ", "Remove this device from schedules")}
+      title={tr("Xoá thiết bị này khỏi hẹn giờ", "Remove this device from schedules")}
+    >
+      <Icon path={mdiClose} size={18} />
+    </button>
+  );
+
+  if (view === "list") {
+    // Dang "Danh sach" (v0.5.62): 1 hang gon/thiet bi - icon, ten + dong
+    // phu, gio chay tiep theo ben phai, cong tac. Van giu class device-card
+    // de SortableJS (draggable: ".device-card") keo-tha nhu dang luoi.
+    const sub = multiEntity
+      ? `${group.entityIds.length} ${tr("thiết bị", "devices")}`
+      : [group.singleEntity ? stateText(group) : null, group.area].filter(Boolean).join(" · ");
+    return (
+      <div
+        data-key={group.key}
+        style={{ "--accent": visual.color } as React.CSSProperties}
+        className={`device-card device-card--list ${!enabled ? "device-card--dim" : ""}`}
+        onClick={onOpen}
+      >
+        {dragHandle}
+        <div className={`device-card__icon ${group.isOn ? "device-card__icon--on" : ""}`}>
+          <Icon path={visual.icon} size={20} />
+        </div>
+        <div className="device-card__main">
+          <div className="device-card__title">
+            {group.favorite && <Icon path={mdiStar} size={13} className="device-card__fav-dot" />}
+            <span className="device-card__title-text">{group.title}</span>
+            <MissingMark missingIds={group.missingIds} total={group.entityIds.length} />
+          </div>
+          {onWindow ? (
+            <OnTimeProgress startAt={onWindow.startAt} endAt={onWindow.endAt} />
+          ) : (
+            sub && <div className={`device-card__state ${group.singleEntity?.state === "on" ? "device-card__state--on" : ""}`}>{sub}</div>
+          )}
+        </div>
+        <div className="device-card__next-inline">
+          {!hasSchedules ? (
+            <span className="device-card__muted">{tr("Chưa có lịch", "No schedules")}</span>
+          ) : nextRun ? (
+            <>
+              <div className="device-card__time">{formatTimeDisplay(hmsInZone(nextRun), timeFormat)}</div>
+              <div className="device-card__action">{actionWord(group, scheduleId)}</div>
+            </>
+          ) : (
+            <span className="device-card__muted">{!enabled ? tr("Tạm tắt", "Paused") : "—"}</span>
+          )}
+        </div>
+        {categoryBtn}
+        {toggle}
+        {deleteBtn}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -85,43 +200,10 @@ export function DeviceCard({
         </button>
 
         <div className="device-card__top-actions">
-          {sortable && (
-            <span className="drag-handle" onClick={(e) => e.stopPropagation()} aria-label={tr("Kéo để đổi vị trí", "Drag to reorder")} title={tr("Kéo để đổi vị trí", "Drag to reorder")}>
-              <Icon path={mdiDragVertical} size={20} />
-            </span>
-          )}
-          {onChangeCategory && (
-            <button
-              className="device-card__group-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChangeCategory();
-              }}
-              aria-label={`${tr("Chuyển nhóm, hiện tại", "Move group, current")}: ${categoryLabel || tr("Chưa phân nhóm", "Ungrouped")}`}
-              title={`${tr("Chuyển nhóm", "Move group")}: ${categoryLabel || tr("Chưa phân nhóm", "Ungrouped")}`}
-            >
-              <Icon path={mdiFolderMoveOutline} size={19} />
-            </button>
-          )}
-          {hasSchedules && (
-            <label className="toggle toggle--small" onClick={(e) => e.stopPropagation()}>
-              <input type="checkbox" checked={enabled} onChange={onToggleEnabled} />
-              <span className="toggle__slider" />
-            </label>
-          )}
-          {sortable && onDelete && (
-            <button
-              className="device-card__delete-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              aria-label={tr("Xoá thiết bị này khỏi hẹn giờ", "Remove this device from schedules")}
-              title={tr("Xoá thiết bị này khỏi hẹn giờ", "Remove this device from schedules")}
-            >
-              <Icon path={mdiClose} size={18} />
-            </button>
-          )}
+          {dragHandle}
+          {categoryBtn}
+          {toggle}
+          {deleteBtn}
         </div>
       </div>
 
@@ -129,13 +211,16 @@ export function DeviceCard({
         <Icon path={visual.icon} size={compact ? 22 : 30} />
       </div>
 
-      <div className="device-card__title">{group.title}</div>
+      <div className="device-card__title">
+        {group.title}
+        <MissingMark missingIds={group.missingIds} total={group.entityIds.length} />
+      </div>
       {group.area && !compact && <div className="device-card__area">{group.area}</div>}
       {multiEntity && <div className="device-card__area">{group.entityIds.length} {tr("thiết bị", "devices")}</div>}
 
       {group.singleEntity && !compact && !onWindow && (
         <div className={`device-card__state ${group.singleEntity.state === "on" ? "device-card__state--on" : ""}`}>
-          {group.singleEntity.state === "on" ? tr("● Đang bật", "● On") : group.singleEntity.state === "off" ? tr("Đang tắt", "Off") : tr("Không khả dụng", "Unavailable")}
+          {stateText(group)}
         </div>
       )}
 
