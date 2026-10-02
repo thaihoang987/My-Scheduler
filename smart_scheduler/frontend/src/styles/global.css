@@ -1499,3 +1499,16 @@ body {
 }
 .device-detail__master-state { font-weight: 500; color: var(--text-muted); }
 .device-detail__master-state--on { color: var(--success); }
+
+/* Bang 24h (v0.5.68): ten thiet bi xuong toi da 2 dong ngay trong cot trai,
+   chu nho hon + cot rong hon chut (truoc 1 dong 108px, cat mat qua nhieu
+   chu). Khong dua ten len dong rieng - phan hoi: "nam tren dong rieng xau". */
+.timeline { --tl-name: 124px; }
+.timeline__row .timeline__name-text {
+  font-size: 12px; line-height: 1.25; white-space: normal; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+@media (min-width: 640px) {
+  .timeline { --tl-name: 180px; }
+  .timeline__row .timeline__name-text { font-size: 13px; }
+}
