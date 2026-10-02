@@ -29,6 +29,7 @@ const TAP_SLOP_PX = 5;
 const ROW_PX = 30; // chieu cao 1 hang (26px thanh + 4px khe) - khop CSS .state-timeline__row
 
 function stateKind(s: string): "on" | "off" | "na" | "planned" {
+  if (s === "planned_off") return "off";
   if (s === "planned") return "planned";
   if (s === "unavailable" || s === "unknown" || !s) return "na";
   if (s === "off" || s === "closed" || s === "idle" || s === "standby") return "off";
@@ -36,6 +37,7 @@ function stateKind(s: string): "on" | "off" | "na" | "planned" {
 }
 
 function stateLabel(s: string): string {
+  if (s === "planned_off") return tr("Nghỉ dự kiến", "Planned rest");
   if (s === "planned") return tr("Dự kiến · chưa chạy", "Planned · not yet activated");
   if (s === "on") return tr("Bật", "On");
   if (s === "off") return tr("Tắt", "Off");
@@ -83,14 +85,36 @@ function segmentsIn(points: Point[], from: number, to: number, now: number): Seg
   return out;
 }
 
-export function StateTimeline({ entityIds, entities, liveKey, planned = [], lookAheadMs = 0 }: {
+// Sample rests are projected gaps, not observed Home Assistant states.
+function sampleSegments(planned: { entity_id: string; on_at: string; off_at: string }[], id: string, from: number, to: number): Segment[] {
+  const segments: Segment[] = [];
+  let cursor = from;
+  const events = planned.filter(p => p.entity_id === id).map(p => ({ from: Date.parse(p.on_at), to: Date.parse(p.off_at) }))
+    .filter(p => Number.isFinite(p.from) && Number.isFinite(p.to) && p.to > p.from).sort((a, b) => a.from - b.from);
+  for (const event of events) {
+    const start = Math.max(cursor, event.from), end = Math.min(to, event.to);
+    if (end <= start) continue;
+    if (start > cursor) segments.push({ from: cursor, to: start, s: "planned_off" });
+    segments.push({ from: start, to: end, s: "planned" });
+    cursor = end;
+  }
+  if (cursor < to) segments.push({ from: cursor, to, s: "planned_off" });
+  return segments;
+}
+
+export function StateTimeline({ entityIds, entities, liveKey, planned = [], lookAheadMs = 0, sampleWindow }: {
   entityIds: string[]; entities: EntitySummary[]; liveKey: string;
   planned?: { entity_id: string; on_at: string; off_at: string }[]; lookAheadMs?: number;
+  sampleWindow?: { start: string; end: string };
 }) {
-  const [spanMs, setSpanMs] = useState(24 * HOUR);
+  const sampleOnly = !!sampleWindow;
+  const sampleStart = sampleWindow ? Date.parse(sampleWindow.start) : 0;
+  const sampleEnd = sampleWindow ? Date.parse(sampleWindow.end) : 0;
+  const sampleSpan = sampleEnd - sampleStart;
+  const [spanMs, setSpanMs] = useState(() => sampleOnly ? sampleSpan : 24 * HOUR);
   const aheadMs = Math.min(lookAheadMs, spanMs / 4);
-  const [endMs, setEndMs] = useState(() => serverNow() + aheadMs);
-  const [follow, setFollow] = useState(true);
+  const [endMs, setEndMs] = useState(() => sampleOnly ? sampleEnd : serverNow() + aheadMs);
+  const [follow, setFollow] = useState(!sampleOnly);
   const [tick, setTick] = useState(0);
   const [data, setData] = useState<Record<string, Point[]>>({});
   const [loaded, setLoaded] = useState<{ from: number; to: number } | null>(null);
@@ -128,7 +152,7 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
 
   const fetchRange = useCallback(
     async (from: number, to: number) => {
-      if (busyRef.current || !entityIds.length || to <= from) return;
+      if (sampleOnly || busyRef.current || !entityIds.length || to <= from) return;
       busyRef.current = true;
       setLoading(true);
       try {
@@ -151,7 +175,7 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [idsKey],
+    [idsKey, sampleOnly],
   );
 
   // Dam bao da tai du vung dang xem + 1 khung ve truoc (keo lui khong bi trong).
@@ -169,18 +193,24 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
   // Moi 30s (va ngay khi trang thai thiet bi doi - liveKey): tai phan moi o
   // duoi, dang xem "bay gio" thi cuon theo thoi gian.
   useEffect(() => {
+    if (sampleOnly) return;
     const id = window.setInterval(() => setTick((x) => x + 1), TAIL_REFRESH_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [sampleOnly]);
 
   useEffect(() => {
+    if (sampleOnly) return;
     const t = serverNow();
     if (followRef.current) setEndMs(t + aheadMs);
     const l = loadedRef.current;
     if (l) fetchRange(l.to - 60_000, t);
-  }, [tick, liveKey, fetchRange, aheadMs]);
+  }, [tick, liveKey, fetchRange, aheadMs, sampleOnly]);
 
   function panTo(newEnd: number) {
+    if (sampleOnly) {
+      setEndMs(Math.max(sampleStart + spanMs, Math.min(newEnd, sampleEnd)));
+      return;
+    }
     const t = serverNow() + aheadMs;
     const clamped = Math.min(newEnd, t);
     setEndMs(clamped);
@@ -217,9 +247,9 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
     if (row < 0 || row >= entityIds.length || x < 0 || x > rect.width) return setTip(null);
     const entityId = entityIds[row];
     const t = startMs + (x / rect.width) * spanMs;
-    const seg = segmentsIn(data[entityId] || [], startMs, endMs, serverNow()).find((s) => s.from <= t && t < s.to)
+    const seg = (sampleOnly ? sampleSegments(planned, entityId, startMs, endMs) : segmentsIn(data[entityId] || [], startMs, endMs, serverNow())).find((s) => s.from <= t && t < s.to)
       ?? planned.filter(p => p.entity_id === entityId).map(p => ({ from: Date.parse(p.on_at), to: Date.parse(p.off_at), s: "planned" }))
-        .find(s => s.from <= t && t < s.to && t >= serverNow());
+        .find(s => s.from <= t && t < s.to && (sampleOnly || t >= serverNow()));
     // cham lai dung doan dang mo = dong popup
     setTip((prev) => (!seg || (prev && prev.entityId === entityId && prev.seg.from === seg.from) ? null : { entityId, seg, x, row }));
   }
@@ -267,20 +297,23 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
   const nowLine = serverNow();
   const tipWidth = Math.min(280, width);
   const names = new Map(entities.map((e) => [e.entity_id, e.alias || e.ha_friendly_name || e.entity_id]));
+  const spans = sampleOnly ? [{ ms: sampleSpan, label: () => tr("Khung giờ", "Window") },
+    ...[1, 3, 6].filter(h => h * HOUR < sampleSpan).map(h => ({ ms: h * HOUR, label: () => `${h}h` }))] : SPANS;
   const rangeText = `${fmtDateTime(new Date(startMs), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} – ${follow && !lookAheadMs ? tr("bây giờ", "now") : fmtDateTime(new Date(endMs), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`;
 
   return (
     <div className="state-timeline">
       <div className="state-timeline__head">
-        <div className="device-detail__section-title state-timeline__title">{tr("Lịch sử bật/tắt", "On/off history")}</div>
+        <div className="device-detail__section-title state-timeline__title">{sampleOnly ? tr("Lịch bật/tắt dự kiến", "Planned on/off timeline") : tr("Lịch sử bật/tắt", "On/off history")}</div>
         <div className="state-timeline__spans">
-          {SPANS.map((s) => (
+          {spans.map((s) => (
             <button
               key={s.ms}
               className={`state-timeline__chip ${s.ms === spanMs ? "state-timeline__chip--active" : ""}`}
               onClick={() => {
                 setTip(null);
                 setSpanMs(s.ms);
+                if (sampleOnly) setEndMs(sampleStart + s.ms);
               }}
             >
               {s.label()}
@@ -291,19 +324,19 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
 
       <div className="state-timeline__card">
         <div className="state-timeline__nav">
-          <button className="state-timeline__arrow" aria-label={tr("Lùi", "Back")} onClick={() => panTo(endMs - spanMs / 2)}>
+          <button className="state-timeline__arrow" aria-label={tr("Lùi", "Back")} disabled={sampleOnly && startMs <= sampleStart} onClick={() => panTo(endMs - spanMs / 2)}>
             <Icon path={mdiChevronLeft} size={18} />
           </button>
           <div className="state-timeline__range">
             {rangeText}
             {loading && <span className="state-timeline__loading"> · {tr("đang tải…", "loading…")}</span>}
           </div>
-          {!follow && (
+          {!sampleOnly && !follow && (
             <button className="state-timeline__now" onClick={() => panTo(serverNow() + aheadMs)}>
               {tr("Bây giờ", "Now")}
             </button>
           )}
-          <button className="state-timeline__arrow" aria-label={tr("Tới", "Forward")} disabled={follow} onClick={() => panTo(endMs + spanMs / 2)}>
+          <button className="state-timeline__arrow" aria-label={tr("Tới", "Forward")} disabled={sampleOnly ? endMs >= sampleEnd : follow} onClick={() => panTo(endMs + spanMs / 2)}>
             <Icon path={mdiChevronRight} size={18} />
           </button>
         </div>
@@ -330,10 +363,10 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
             ))}
             {entityIds.map((id) => {
               const pts = data[id] || [];
-              const segs = segmentsIn(pts, startMs, endMs, nowLine);
+              const segs = sampleOnly ? sampleSegments(planned, id, startMs, endMs) : segmentsIn(pts, startMs, endMs, nowLine);
               return (
                 <div key={id} className="state-timeline__row">
-                  {planned.filter(p => p.entity_id === id).map(p => {
+                  {!sampleOnly && planned.filter(p => p.entity_id === id).map(p => {
                     const from = Math.max(Date.parse(p.on_at), startMs, nowLine);
                     const to = Math.min(Date.parse(p.off_at), endMs);
                     return to > from && <div key={`planned-${p.on_at}`} className="state-timeline__seg state-timeline__seg--planned"
@@ -370,7 +403,7 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
                 </div>
                 <div>{tr("lúc", "from")} {fmtFull(tip.seg.from)}</div>
                 <div>
-                  {tip.seg.s !== "planned" && tip.seg.to >= serverNow() - 1000 ? tr("đến bây giờ", "until now") : `${tr("lúc", "to")} ${fmtFull(tip.seg.to)}`}
+                  {!sampleOnly && tip.seg.s !== "planned" && tip.seg.to >= serverNow() - 1000 ? tr("đến bây giờ", "until now") : `${tr("lúc", "to")} ${fmtFull(tip.seg.to)}`}
                 </div>
                 <div>{tr("Thời lượng", "Duration")}: {formatDuration(tip.seg.to - tip.seg.from)}</div>
               </div>
@@ -382,7 +415,8 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
           {ticks.map((t) => {
             const midnight = secondsOfDayInZone(new Date(t)) === 0;
             return (
-              <div key={`t${t}`} className={`state-timeline__tick ${midnight ? "state-timeline__tick--day" : ""}`} style={{ left: `${pct(t)}%` }}>
+              <div key={`t${t}`} className={`state-timeline__tick ${midnight ? "state-timeline__tick--day" : ""}`}
+                style={{ left: `${pct(t)}%`, transform: pct(t) > 85 ? "translateX(-100%)" : pct(t) < 15 ? "translateX(0)" : undefined }}>
                 {midnight ? fmtDateTime(new Date(t), { day: "numeric", month: "short" }) : fmtTime(new Date(t))}
               </div>
             );
@@ -390,9 +424,10 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
         </div>
 
         {error && <div className="state-timeline__error">{error}</div>}
-        {!!lookAheadMs && <div className="state-timeline__legend">
+        {(!!lookAheadMs || sampleOnly) && <div className="state-timeline__legend">
           <span><i className="state-timeline__swatch state-timeline__seg--planned" />{tr("Dự kiến · có thể bỏ qua", "Planned · may be skipped")}</span>
-          <span><i className="state-timeline__swatch state-timeline__seg--on" />{tr("Đã ghi nhận bật", "Recorded on")}</span>
+          {sampleOnly && <span><i className="state-timeline__swatch state-timeline__seg--off" />{tr("Nghỉ dự kiến", "Planned rest")}</span>}
+          {!sampleOnly && <span><i className="state-timeline__swatch state-timeline__seg--on" />{tr("Đã ghi nhận bật", "Recorded on")}</span>}
         </div>}
         {!error && loaded && entityIds.every((id) => !(data[id] || []).length) && (
           <div className="state-timeline__empty">{tr("Home Assistant chưa ghi lịch sử cho thiết bị này (kiểm tra Recorder).", "Home Assistant has no recorded history for this device (check Recorder).")}</div>

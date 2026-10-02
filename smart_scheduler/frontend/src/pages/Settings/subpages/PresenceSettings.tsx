@@ -36,6 +36,7 @@ export function PresenceSettings({ entities, reloadPresence, liveStatus, onBack 
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<PresencePreview | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewIds, setPreviewIds] = useState<string[]>([]);
   const [historyIds, setHistoryIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export function PresenceSettings({ entities, reloadPresence, liveStatus, onBack 
   async function showPreview() {
     if (!config || validation) return;
     setBusy(true); setError("");
-    try { setPreview(await api.previewPresence(config)); setPreviewOpen(true); }
+    try { const result = await api.previewPresence(config); setPreview(result); setPreviewIds([...config.entity_ids]); setPreviewOpen(true); }
     catch (e) { setError(String(e)); } finally { setBusy(false); }
   }
   const num = (key: keyof PresenceConfig, label: string, min: number, max: number) => config && (
@@ -149,7 +150,8 @@ export function PresenceSettings({ entities, reloadPresence, liveStatus, onBack 
         <p className="settings-hint">{tr("Lượt thực tế sẽ thay đổi theo trạng thái thiết bị và lịch khác.", "Actual activations vary with device states and other schedules.")}</p>
         <p>{tr("Tổng phút bật", "Total device-on minutes")}: {preview?.total_minutes ?? 0}</p>
         {!preview?.events.length && <p>{tr("Không có lượt phù hợp", "No eligible activations")}</p>}
-        {preview?.events.map((e, i) => <div className="presence-plan-row" key={i}><span>{entityNames([e.entity_id], entities)}</span><span>{fmtTime(e.on_at)} – {fmtTime(e.off_at)}</span></div>)}
+        {preview?.window_start && preview.window_end && <StateTimeline entityIds={previewIds} entities={entities} liveKey="" planned={preview.events}
+          sampleWindow={{ start: preview.window_start, end: preview.window_end }} />}
       </BottomSheet>
     </>}
   </div>;

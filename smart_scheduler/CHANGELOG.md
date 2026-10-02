@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.75
+
+- Presence sample-plan dialog now uses a recorder-style timeline: one row per selected device,
+  faint planned activations, gray projected rests, time-range controls and tap-to-inspect details.
+- Sample plans stay read-only and do not fetch or pretend to be recorded Home Assistant history.
+- Time-axis edge labels stay within the chart on narrow screens.
+
 ## 0.5.74
 
 - Presence: shorter activations, longer rests, same-device cooldown, room alternation,
