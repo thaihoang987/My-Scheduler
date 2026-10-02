@@ -57,3 +57,38 @@ def silent_ws(monkeypatch):
         return None
 
     monkeypatch.setattr(manager, "broadcast", broadcast)
+
+
+@pytest.fixture
+def presence_reset(monkeypatch, fake_ha):
+    from app import presence, homeassistant
+    for name in ("_on", "_owned", "_cooldown", "_retry", "_failures", "_visits", "_warnings"):
+        monkeypatch.setattr(presence, name, {})
+    for name in ("_shutdown", "_window_entities"):
+        monkeypatch.setattr(presence, name, set())
+    for name in ("_next_start_at", "_last_entity", "_last_status", "_last_runtime", "_planned"):
+        monkeypatch.setattr(presence, name, None)
+    for name in ("_window_id", "_closed_window_id"):
+        monkeypatch.setattr(presence, name, "")
+    monkeypatch.setattr(presence, "_used_minutes", 0.0)
+    monkeypatch.setattr(presence, "_phase", "disabled")
+    monkeypatch.setattr(presence.random, "uniform", lambda a, b: a)
+    fake_ha.states = [{"entity_id": e, "state": "off", "attributes": {}, "context": {"id": "initial"}}
+                      for e in ("light.a", "light.b", "switch.c")]
+    fake_ha.unreachable = set()
+    fake_ha.command_data = []
+
+    async def call_service(domain, service, entity_ids, data):
+        fake_ha.calls.append((domain, service, list(entity_ids)))
+        fake_ha.command_data.append(dict(data))
+        if set(entity_ids) & fake_ha.unreachable:
+            raise ConnectionError("offline")
+        changed = []
+        for e in entity_ids:
+            state = next(s for s in fake_ha.states if s["entity_id"] == e)
+            state["state"] = "on" if service == "turn_on" else "off"
+            state["context"] = {"id": str(len(fake_ha.calls))}
+            changed.append(dict(state))
+        return changed
+    monkeypatch.setattr(homeassistant, "call_service", call_service)
+    return fake_ha

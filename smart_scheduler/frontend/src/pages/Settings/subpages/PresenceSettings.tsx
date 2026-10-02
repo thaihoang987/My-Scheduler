@@ -1,160 +1,156 @@
 import { useEffect, useState } from "react";
+import { mdiEyeOutline, mdiContentSaveOutline } from "@mdi/js";
 import { DaySelector } from "../../../components/DaySelector/DaySelector";
 import { EntityPicker } from "../../../components/EntityPicker/EntityPicker";
+import { BottomSheet } from "../../../components/BottomSheet/BottomSheet";
+import { Icon } from "../../../components/Icon/Icon";
+import { StateTimeline } from "../../../components/StateTimeline/StateTimeline";
 import { api } from "../../../services/api";
-import type { EntitySummary, PresenceConfig, PresenceStatus } from "../../../types";
+import type { EntitySummary, PresenceConfig, PresencePreview, PresenceStatus } from "../../../types";
 import { entityNames } from "../../../utils/groupSchedules";
 import { SubpageHeader } from "../SubpageHeader";
 import { tr } from "../../../i18n";
 import { fmtTime } from "../../../utils/appTime";
 
-function hhmm(iso: string): string {
-  return fmtTime(iso);
+export function presencePhase(status: PresenceStatus): string {
+  const labels = {
+    disabled: tr("Đã dừng", "Stopped"), expired: tr("Hết ngày đi vắng", "Away period ended"),
+    waiting_window: tr("Chờ khung giờ", "Waiting for active window"),
+    waiting_next: tr("Đang nghỉ giữa các lượt", "Resting between activations"),
+    running: tr("Đang giả lập", "Simulating presence"),
+    budget_exhausted: tr("Đã đủ tổng phút bật", "On-time limit reached"),
+    error: tr("Cần kiểm tra kết nối hoặc lịch trùng", "Check connection or schedule conflicts"),
+    stopping: tr("Đang tắt thiết bị · sẽ thử lại nếu chưa tắt", "Turning devices off · retrying unconfirmed devices"),
+  };
+  return labels[status.phase ?? (status.active ? "running" : "disabled")];
 }
 
-/** "Giả lập có người" (v0.5.32) - khi di vang, trong khung gio da chon bat
- * LAN LUOT ngau nhien tung thiet bi, moi lan sang 1 khoang ngau nhien, nghi
- * 1 khoang ngau nhien roi toi thiet bi khac, nhin tu ngoai giong co nguoi o
- * nha. Chay o backend (app/presence.py), khong can mo trinh duyet. */
-export function PresenceSettings({
-  entities,
-  reloadPresence,
-  onBack,
-}: {
-  entities: EntitySummary[];
-  reloadPresence: () => void;
-  onBack: () => void;
+export function PresenceSettings({ entities, reloadPresence, liveStatus, onBack }: {
+  entities: EntitySummary[]; reloadPresence: () => void; liveStatus: PresenceStatus | null; onBack: () => void;
 }) {
   const [config, setConfig] = useState<PresenceConfig | null>(null);
-  const [status, setStatus] = useState<PresenceStatus | null>(null);
+  const [status, setStatus] = useState<PresenceStatus | null>(liveStatus);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [preview, setPreview] = useState<PresencePreview | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [historyIds, setHistoryIds] = useState<string[]>([]);
 
   useEffect(() => {
-    api.getPresence().then((r) => {
+    let mounted = true;
+    api.getPresence().then(r => {
+      if (!mounted) return;
       setConfig(r.config);
+      setHistoryIds(r.config.entity_ids);
       setStatus(r.status);
-    });
+    }).catch(() => { if (mounted) setError(tr("Không tải được cài đặt", "Could not load settings")); });
+    return () => { mounted = false; };
   }, []);
+  useEffect(() => {
+    if (!liveStatus) return;
+    setStatus(liveStatus);
+    if (liveStatus.enabled !== undefined) setConfig(c => c ? { ...c, enabled: liveStatus.enabled! } : c);
+  }, [liveStatus]);
+  const set = (patch: Partial<PresenceConfig>) => { setConfig(c => c ? { ...c, ...patch } : c); setSaved(false); };
+  const validation = config && (config.on_min > config.on_max || config.gap_min > config.gap_max)
+    ? tr("Giá trị ít nhất không được lớn hơn nhiều nhất", "Minimum must not exceed maximum") : "";
 
-  if (!config) return <div className="page"><SubpageHeader title={tr("Giả lập có người", "Presence simulation")} onBack={onBack} /></div>;
-
-  const set = (patch: Partial<PresenceConfig>) => {
-    setConfig((c) => (c ? { ...c, ...patch } : c));
-    setSaved(false);
-  };
-
-  async function save(patch: Partial<PresenceConfig> = {}) {
-    if (!config) return;
-    setSaving(true);
+  async function operate(enabled: boolean) {
+    setBusy(true); setError("");
     try {
-      const r = await api.updatePresence({ ...config, ...patch });
-      setConfig(r.config);
-      setStatus(r.status);
-      setSaved(true);
-      reloadPresence();
-    } finally {
-      setSaving(false);
-    }
+      const r = enabled ? await api.updatePresence({ enabled: true }) : await api.stopPresence();
+      setConfig(c => c ? { ...c, enabled: r.config.enabled } : c);
+      setStatus(r.status); reloadPresence();
+    } catch (e) { setError(String(e)); } finally { setBusy(false); }
   }
-
-  const num = (key: keyof PresenceConfig, label: string, min = 0) => (
-    <label className="presence-field">
-      <span className="presence-field__label">{label}</span>
-      <input
-        type="number"
-        className="input"
-        inputMode="numeric"
-        min={min}
-        value={config[key] as number}
-        onChange={(e) => set({ [key]: Math.max(min, Number(e.target.value) || 0) } as Partial<PresenceConfig>)}
-      />
+  async function save() {
+    if (!config || validation) return;
+    setBusy(true); setError("");
+    try {
+      const r = await api.updatePresence(config);
+      setConfig(r.config); setHistoryIds(r.config.entity_ids); setStatus(r.status); setSaved(true); reloadPresence();
+    } catch (e) { setError(String(e)); } finally { setBusy(false); }
+  }
+  async function showPreview() {
+    if (!config || validation) return;
+    setBusy(true); setError("");
+    try { setPreview(await api.previewPresence(config)); setPreviewOpen(true); }
+    catch (e) { setError(String(e)); } finally { setBusy(false); }
+  }
+  const num = (key: keyof PresenceConfig, label: string, min: number, max: number) => config && (
+    <label className="presence-field"><span className="presence-field__label">{label}</span>
+      <input type="number" className="input" inputMode="numeric" min={min} max={max} required
+        value={config[key] as number} onChange={e => set({ [key]: Number(e.target.value) })} />
     </label>
   );
 
-  return (
-    <div className="page">
-      <SubpageHeader title={tr("Giả lập có người", "Presence simulation")} onBack={onBack} />
-      <p className="settings-hint">
-        {tr("Khi đi vắng: trong khung giờ đã chọn, lần lượt bật ngẫu nhiên từng thiết bị, mỗi lần sáng một lúc rồi tắt, nghỉ một chút rồi bật thiết bị khác. Chạy ngay trên Add-on, không cần mở app.", "While away, randomly turn selected devices on one at a time during the chosen window, keep each on briefly, then pause before activating another. It runs in the add-on with no open app required.")}
-      </p>
-
-      <label className="settings-row">
-        <span>
-          <strong>{tr("Bật giả lập", "Enable simulation")}</strong>
-        </span>
-        <input type="checkbox" checked={config.enabled} onChange={(e) => save({ enabled: e.target.checked })} disabled={saving} />
+  return <div className="page presence-settings">
+    <SubpageHeader title={tr("Giả lập có người", "Presence simulation")} onBack={onBack} />
+    {error && <p className="settings-hint" role="alert">{error}</p>}
+    {config && <>
+      <label className="settings-row"><strong>{tr("Bật giả lập", "Enable simulation")}</strong>
+        <input type="checkbox" checked={config.enabled} disabled={busy} onChange={e => operate(e.target.checked)} />
       </label>
-
-      {status?.active && (
-        <div className="home-banner home-banner--presence">
-          <span className="home-banner__text">
-            {status.on.length > 0
-              ? `${tr("Đang bật", "On")}: ${entityNames(status.on.map((o) => o.entity_id), entities)} ${tr("đến", "until")} ${hhmm(status.on[0].off_at)}`
-              : status.next_start_at
-                ? `${tr("Đang trong khung giờ · bật thiết bị tiếp theo lúc", "Within active window · next device at")} ~${hhmm(status.next_start_at)}`
-                : tr("Đang chạy", "Running")}
-          </span>
-        </div>
-      )}
-
+      <p className="settings-hint">{tr("Hết giờ hoặc dừng: tắt toàn bộ thiết bị đã chọn, kể cả thiết bị bật tay.", "At window end or stop: turn off every selected device, including manually activated devices.")}</p>
+      {status && <div className="presence-status" role="status">
+        <strong>{presencePhase(status)}</strong>
+        {status.on.map(o => <div key={o.entity_id}>{entityNames([o.entity_id], entities)} · {tr("tắt lúc", "off at")} {fmtTime(o.off_at)}</div>)}
+        {status.next_start_at && <div>{tr("Lượt tiếp", "Next activation")}: ~{fmtTime(status.next_start_at)}</div>}
+        <div>{tr("Tổng phút bật", "Total device-on minutes")}: {status.used_minutes ?? 0} / {status.max_total_minutes ?? config.max_total_minutes}</div>
+        {!!status.pending_off?.length && <div>{tr("Chờ xác nhận tắt", "Awaiting off confirmation")}: {entityNames(status.pending_off, entities)}</div>}
+        {status.warnings?.map(w => <div key={w.entity_id}>{w.entity_id && `${entityNames([w.entity_id], entities)}: `}{w.message}</div>)}
+      </div>}
+      {!!historyIds.length && <StateTimeline key={historyIds.join(",")} entityIds={historyIds} entities={entities}
+        planned={status?.planned} lookAheadMs={6 * 3600_000}
+        liveKey={`${entities.filter(e => historyIds.includes(e.entity_id)).map(e => `${e.entity_id}:${e.state}`).join(",")}|${JSON.stringify(status?.on)}`} />}
       <div className="settings-section">
         <div className="settings-section__title">{tr("Thiết bị tham gia", "Participating devices")}</div>
         <button className="input input--button" onClick={() => setPickerOpen(true)}>
-          {config.entity_ids.length === 0 ? `+ ${tr("Chọn thiết bị (nên chọn đèn)", "Select devices (lights recommended)")}` : entityNames(config.entity_ids, entities)}
+          {config.entity_ids.length ? entityNames(config.entity_ids, entities) : tr("Chọn đèn hoặc công tắc đèn", "Select lights or light switches")}
         </button>
       </div>
-
       <div className="settings-section">
         <div className="settings-section__title">{tr("Khung giờ chạy", "Active window")}</div>
-        <div className="presence-grid">
-          <label className="presence-field">
-            <span className="presence-field__label">{tr("Từ", "From")}</span>
-            <input type="time" className="input" value={config.start} onChange={(e) => set({ start: e.target.value })} />
-          </label>
-          <label className="presence-field">
-            <span className="presence-field__label">{tr("Đến", "To")}</span>
-            <input type="time" className="input" value={config.end} onChange={(e) => set({ end: e.target.value })} />
-          </label>
+        <div className="chip-row" role="group" aria-label={tr("Bắt đầu", "Start mode")}>
+          {(["time", "sunset"] as const).map(mode => <button key={mode} className={`chip ${config.start_mode === mode ? "chip--active" : ""}`} aria-pressed={config.start_mode === mode} onClick={() => set({ start_mode: mode })}>
+            {mode === "time" ? tr("Giờ cố định", "Fixed time") : tr("Hoàng hôn", "Sunset")}
+          </button>)}
         </div>
-        <DaySelector value={config.days} onChange={(days) => set({ days })} />
+        <div className="presence-grid">
+          {config.start_mode === "time" && <label className="presence-field"><span className="presence-field__label">{tr("Từ", "From")}</span>
+            <input type="time" className="input" required value={config.start} onChange={e => set({ start: e.target.value })} /></label>}
+          <label className="presence-field"><span className="presence-field__label">{tr("Đến", "To")}</span>
+            <input type="time" className="input" required value={config.end} onChange={e => set({ end: e.target.value })} /></label>
+        </div>
+        <DaySelector value={config.days} onChange={days => set({ days })} />
+        <label className="presence-field"><span className="presence-field__label">{tr("Ngày đi vắng cuối cùng (tùy chọn)", "Last away date (optional)")}</span>
+          <input type="date" className="input" value={config.until} onChange={e => set({ until: e.target.value })} /></label>
       </div>
-
       <div className="settings-section">
-        <div className="settings-section__title">{tr("Mỗi thiết bị sáng trong (phút, ngẫu nhiên)", "On duration per device (random minutes)")}</div>
-        <div className="presence-grid">
-          {num("on_min", tr("Ít nhất", "Minimum"), 1)}
-          {num("on_max", tr("Nhiều nhất", "Maximum"), 1)}
-        </div>
-        <div className="settings-section__title">{tr("Nghỉ giữa 2 lần bật (phút, ngẫu nhiên)", "Gap between activations (random minutes)")}</div>
-        <div className="presence-grid">
-          {num("gap_min", tr("Ít nhất", "Minimum"))}
-          {num("gap_max", tr("Nhiều nhất", "Maximum"))}
-        </div>
+        <div className="settings-section__title">{tr("Mỗi lượt bật (phút)", "On duration (minutes)")}</div>
+        <div className="presence-grid">{num("on_min", tr("Ít nhất", "Minimum"), 1, 180)}{num("on_max", tr("Nhiều nhất", "Maximum"), 1, 180)}</div>
+        <div className="settings-section__title">{tr("Nghỉ giữa các lượt (phút)", "Gap between activations (minutes)")}</div>
+        <div className="presence-grid">{num("gap_min", tr("Ít nhất", "Minimum"), 0, 180)}{num("gap_max", tr("Nhiều nhất", "Maximum"), 0, 180)}</div>
+        {num("cooldown_minutes", tr("Chờ trước khi bật lại cùng thiết bị (phút)", "Same-device cooldown (minutes)"), 0, 240)}
+        {num("max_total_minutes", tr("Giới hạn tổng phút bật mỗi khung giờ", "Device-on minute limit per window"), 1, 720)}
+        <p className="settings-hint">{tr("2 đèn bật 10 phút = 20 phút. Không phải số đo điện năng.", "2 lights on for 10 minutes = 20 minutes. Not an energy measurement.")}</p>
         <div className="settings-section__title">{tr("Số thiết bị sáng cùng lúc", "Devices on at once")}</div>
-        <div className="chip-row">
-          {[1, 2, 3].map((n) => (
-            <button key={n} className={config.max_concurrent === n ? "chip chip--active" : "chip"} onClick={() => set({ max_concurrent: n })}>
-              {n === 1 ? tr("1 (lần lượt)", "1 (sequential)") : n}
-            </button>
-          ))}
-        </div>
+        <div className="chip-row">{[1, 2].map(n => <button key={n} className={`chip ${config.max_concurrent === n ? "chip--active" : ""}`} aria-pressed={config.max_concurrent === n} onClick={() => set({ max_concurrent: n })}>{n}</button>)}</div>
+        <label className="presence-field"><span className="presence-field__label">{tr("Độ sáng đèn hỗ trợ dim", "Dimmable-light brightness")}: {config.brightness_pct}%</span>
+          <input type="range" min={1} max={100} value={config.brightness_pct} onChange={e => set({ brightness_pct: Number(e.target.value) })} /></label>
       </div>
-
-      <button className="btn btn--primary btn--block" onClick={() => save()} disabled={saving}>
-        {saving ? tr("Đang lưu...", "Saving...") : saved ? tr("Đã lưu ✓", "Saved ✓") : tr("Lưu cài đặt", "Save settings")}
-      </button>
-
-      <EntityPicker
-        open={pickerOpen}
-        selected={config.entity_ids}
-        onClose={() => setPickerOpen(false)}
-        onConfirm={(ids) => {
-          set({ entity_ids: ids });
-          setPickerOpen(false);
-        }}
-      />
-    </div>
-  );
+      {validation && <p role="alert" className="settings-hint">{validation}</p>}
+      <button className="btn btn--block" onClick={showPreview} disabled={busy || !!validation}><Icon path={mdiEyeOutline} size={20} /> {tr("Xem lịch mẫu", "Preview sample plan")}</button>
+      <button className="btn btn--primary btn--block" onClick={save} disabled={busy || !!validation}><Icon path={mdiContentSaveOutline} size={20} /> {busy ? tr("Đang xử lý...", "Working...") : saved ? tr("Đã lưu", "Saved") : tr("Lưu cài đặt", "Save settings")}</button>
+      <EntityPicker open={pickerOpen} selected={config.entity_ids} onClose={() => setPickerOpen(false)} onConfirm={ids => { set({ entity_ids: ids }); setPickerOpen(false); }} />
+      <BottomSheet open={previewOpen} title={tr("Lịch mẫu · không bật thiết bị", "Sample plan · no devices activated")} onClose={() => setPreviewOpen(false)}>
+        <p className="settings-hint">{tr("Lượt thực tế sẽ thay đổi theo trạng thái thiết bị và lịch khác.", "Actual activations vary with device states and other schedules.")}</p>
+        <p>{tr("Tổng phút bật", "Total device-on minutes")}: {preview?.total_minutes ?? 0}</p>
+        {!preview?.events.length && <p>{tr("Không có lượt phù hợp", "No eligible activations")}</p>}
+        {preview?.events.map((e, i) => <div className="presence-plan-row" key={i}><span>{entityNames([e.entity_id], entities)}</span><span>{fmtTime(e.on_at)} – {fmtTime(e.off_at)}</span></div>)}
+      </BottomSheet>
+    </>}
+  </div>;
 }

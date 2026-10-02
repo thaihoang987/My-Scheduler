@@ -132,7 +132,7 @@ export function App() {
     let timer: ReturnType<typeof setInterval> | null = null;
     const start = () => {
       if (timer) return;
-      timer = setInterval(refreshEntityStates, ENTITY_POLL_MS);
+      timer = setInterval(() => { refreshEntityStates(); reloadPresence(); }, ENTITY_POLL_MS);
     };
     const stop = () => {
       if (timer) clearInterval(timer);
@@ -140,14 +140,14 @@ export function App() {
     };
     // Quay lai tab/app: doc lai ca lich + dem nguoc (co the da lo tin WebSocket
     // luc an), khong chi trang thai thiet bi - card tu dung, khong reload trang.
-    const onVisibility = () => (document.visibilityState === "visible" ? (reload(), reloadTimers(), start()) : stop());
+    const onVisibility = () => (document.visibilityState === "visible" ? (reload(), reloadTimers(), reloadPresence(), start()) : stop());
     document.addEventListener("visibilitychange", onVisibility);
     if (document.visibilityState === "visible") start();
     return () => {
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [refreshEntityStates, reload, reloadTimers]);
+  }, [refreshEntityStates, reload, reloadTimers, reloadPresence]);
 
   // Gop nhieu tin WS lien tiep (vd 12 lich cung gio -> 12 schedule_executed)
   // thanh 1 lan tai lai du lieu sau 300ms - do thuc te v0.5.53: truoc day 12 lan
@@ -247,6 +247,7 @@ export function App() {
               categoryGroups={categoryGroups}
               activeTimers={activeTimers}
               presence={presence}
+              reloadPresence={reloadPresence}
               reload={reload}
               onOpenDevice={(g) => setOpenDeviceKey(g.key)}
               setDragging={setDragging}
@@ -264,6 +265,7 @@ export function App() {
               haConnectionMode={haConnectionMode}
               reload={reload}
               reloadPresence={reloadPresence}
+              presence={presence}
             />
           )}
         </main>

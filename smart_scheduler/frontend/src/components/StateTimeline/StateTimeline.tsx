@@ -28,13 +28,15 @@ const TAIL_REFRESH_MS = 30_000;
 const TAP_SLOP_PX = 5;
 const ROW_PX = 30; // chieu cao 1 hang (26px thanh + 4px khe) - khop CSS .state-timeline__row
 
-function stateKind(s: string): "on" | "off" | "na" {
+function stateKind(s: string): "on" | "off" | "na" | "planned" {
+  if (s === "planned") return "planned";
   if (s === "unavailable" || s === "unknown" || !s) return "na";
   if (s === "off" || s === "closed" || s === "idle" || s === "standby") return "off";
   return "on";
 }
 
 function stateLabel(s: string): string {
+  if (s === "planned") return tr("Dự kiến · chưa chạy", "Planned · not yet activated");
   if (s === "on") return tr("Bật", "On");
   if (s === "off") return tr("Tắt", "Off");
   if (s === "unavailable") return tr("Mất kết nối", "Unavailable");
@@ -81,9 +83,13 @@ function segmentsIn(points: Point[], from: number, to: number, now: number): Seg
   return out;
 }
 
-export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: string[]; entities: EntitySummary[]; liveKey: string }) {
+export function StateTimeline({ entityIds, entities, liveKey, planned = [], lookAheadMs = 0 }: {
+  entityIds: string[]; entities: EntitySummary[]; liveKey: string;
+  planned?: { entity_id: string; on_at: string; off_at: string }[]; lookAheadMs?: number;
+}) {
   const [spanMs, setSpanMs] = useState(24 * HOUR);
-  const [endMs, setEndMs] = useState(() => serverNow());
+  const aheadMs = Math.min(lookAheadMs, spanMs / 4);
+  const [endMs, setEndMs] = useState(() => serverNow() + aheadMs);
   const [follow, setFollow] = useState(true);
   const [tick, setTick] = useState(0);
   const [data, setData] = useState<Record<string, Point[]>>({});
@@ -169,13 +175,13 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
 
   useEffect(() => {
     const t = serverNow();
-    if (followRef.current) setEndMs(t);
+    if (followRef.current) setEndMs(t + aheadMs);
     const l = loadedRef.current;
     if (l) fetchRange(l.to - 60_000, t);
-  }, [tick, liveKey, fetchRange]);
+  }, [tick, liveKey, fetchRange, aheadMs]);
 
   function panTo(newEnd: number) {
-    const t = serverNow();
+    const t = serverNow() + aheadMs;
     const clamped = Math.min(newEnd, t);
     setEndMs(clamped);
     setFollow(clamped >= t - 1000);
@@ -211,7 +217,9 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
     if (row < 0 || row >= entityIds.length || x < 0 || x > rect.width) return setTip(null);
     const entityId = entityIds[row];
     const t = startMs + (x / rect.width) * spanMs;
-    const seg = segmentsIn(data[entityId] || [], startMs, endMs, serverNow()).find((s) => s.from <= t && t < s.to);
+    const seg = segmentsIn(data[entityId] || [], startMs, endMs, serverNow()).find((s) => s.from <= t && t < s.to)
+      ?? planned.filter(p => p.entity_id === entityId).map(p => ({ from: Date.parse(p.on_at), to: Date.parse(p.off_at), s: "planned" }))
+        .find(s => s.from <= t && t < s.to && t >= serverNow());
     // cham lai dung doan dang mo = dong popup
     setTip((prev) => (!seg || (prev && prev.entityId === entityId && prev.seg.from === seg.from) ? null : { entityId, seg, x, row }));
   }
@@ -257,8 +265,9 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
   for (let t = startMs - (msOfDay % step) + (msOfDay % step === 0 ? 0 : step); t <= endMs; t += step) ticks.push(t);
   const pct = (t: number) => ((t - startMs) / spanMs) * 100;
   const nowLine = serverNow();
+  const tipWidth = Math.min(280, width);
   const names = new Map(entities.map((e) => [e.entity_id, e.alias || e.ha_friendly_name || e.entity_id]));
-  const rangeText = `${fmtDateTime(new Date(startMs), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} – ${follow ? tr("bây giờ", "now") : fmtDateTime(new Date(endMs), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+  const rangeText = `${fmtDateTime(new Date(startMs), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} – ${follow && !lookAheadMs ? tr("bây giờ", "now") : fmtDateTime(new Date(endMs), { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`;
 
   return (
     <div className="state-timeline">
@@ -290,7 +299,7 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
             {loading && <span className="state-timeline__loading"> · {tr("đang tải…", "loading…")}</span>}
           </div>
           {!follow && (
-            <button className="state-timeline__now" onClick={() => panTo(serverNow())}>
+            <button className="state-timeline__now" onClick={() => panTo(serverNow() + aheadMs)}>
               {tr("Bây giờ", "Now")}
             </button>
           )}
@@ -324,6 +333,13 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
               const segs = segmentsIn(pts, startMs, endMs, nowLine);
               return (
                 <div key={id} className="state-timeline__row">
+                  {planned.filter(p => p.entity_id === id).map(p => {
+                    const from = Math.max(Date.parse(p.on_at), startMs, nowLine);
+                    const to = Math.min(Date.parse(p.off_at), endMs);
+                    return to > from && <div key={`planned-${p.on_at}`} className="state-timeline__seg state-timeline__seg--planned"
+                      title={`${tr("Dự kiến", "Planned")}: ${fmtTime(p.on_at)} – ${fmtTime(p.off_at)}`}
+                      style={{ left: `${pct(from)}%`, width: `${((to - from) / spanMs) * 100}%` }} />;
+                  })}
                   {segs.map((seg) => {
                     const w = ((seg.to - seg.from) / spanMs) * width;
                     const kind = stateKind(seg.s);
@@ -345,7 +361,7 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
             {tip && (
               <div
                 className="state-timeline__tip"
-                style={{ left: Math.min(Math.max(tip.x, 120), Math.max(120, width - 120)), top: tip.row * ROW_PX }}
+                style={{ width: tipWidth, left: Math.min(Math.max(tip.x, tipWidth / 2), width - tipWidth / 2), top: tip.row * ROW_PX }}
               >
                 <div className="state-timeline__tip-title">{names.get(tip.entityId) || tip.entityId}</div>
                 <div className="state-timeline__tip-state">
@@ -354,7 +370,7 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
                 </div>
                 <div>{tr("lúc", "from")} {fmtFull(tip.seg.from)}</div>
                 <div>
-                  {tip.seg.to >= serverNow() - 1000 ? tr("đến bây giờ", "until now") : `${tr("lúc", "to")} ${fmtFull(tip.seg.to)}`}
+                  {tip.seg.s !== "planned" && tip.seg.to >= serverNow() - 1000 ? tr("đến bây giờ", "until now") : `${tr("lúc", "to")} ${fmtFull(tip.seg.to)}`}
                 </div>
                 <div>{tr("Thời lượng", "Duration")}: {formatDuration(tip.seg.to - tip.seg.from)}</div>
               </div>
@@ -374,6 +390,10 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
         </div>
 
         {error && <div className="state-timeline__error">{error}</div>}
+        {!!lookAheadMs && <div className="state-timeline__legend">
+          <span><i className="state-timeline__swatch state-timeline__seg--planned" />{tr("Dự kiến · có thể bỏ qua", "Planned · may be skipped")}</span>
+          <span><i className="state-timeline__swatch state-timeline__seg--on" />{tr("Đã ghi nhận bật", "Recorded on")}</span>
+        </div>}
         {!error && loaded && entityIds.every((id) => !(data[id] || []).length) && (
           <div className="state-timeline__empty">{tr("Home Assistant chưa ghi lịch sử cho thiết bị này (kiểm tra Recorder).", "Home Assistant has no recorded history for this device (check Recorder).")}</div>
         )}
