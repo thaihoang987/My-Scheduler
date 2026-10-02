@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from app import crud
 from app.i18n import tr
+from app.scheduler_engine import normalize_range_days
 from app.ws import manager
 
 router = APIRouter(prefix="/api/backup", tags=["backup"])
@@ -40,6 +41,7 @@ def _validate(payload: dict) -> None:
 async def import_backup(payload: dict):
     _validate(payload)
     restored = crud.import_all(payload)
+    normalize_range_days()  # file cu: moc Tat cua khung qua dem chua doi ngay
     # Cac tab/thiet bi khac dang mo tai lai ngay, khong phai cho poll.
     await manager.broadcast("schedule_updated", {"restored": True})
     await manager.broadcast("groups_updated", {})

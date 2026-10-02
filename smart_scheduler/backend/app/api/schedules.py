@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from app import crud
 from app import homeassistant
 from app.models import ScheduleGroupToggle, ScheduleIds, ScheduleIn, ScheduleOut, ScheduleReorder
-from app.scheduler_engine import compute_next_run, run_schedule_now, turn_off_running
+from app.scheduler_engine import compute_next_run, normalize_range_days, run_schedule_now, turn_off_running
 from app.ws import manager
 from app.i18n import tr
 
@@ -26,6 +26,8 @@ async def create_schedule(payload: ScheduleIn):
     data = payload.model_dump()
     data["action"] = payload.action.model_dump()
     created = crud.create_schedule(data)
+    if created.get("group_id") and normalize_range_days({created["group_id"]}):
+        created = crud.get_schedule(created["id"])
     await manager.broadcast("schedule_updated", created)
     return _with_next_run(created)
 
@@ -45,6 +47,8 @@ async def update_schedule(schedule_id: str, payload: ScheduleIn):
     updated = crud.update_schedule(schedule_id, data)
     if not updated:
         raise HTTPException(404, "Schedule not found")
+    if updated.get("group_id") and normalize_range_days({updated["group_id"]}):
+        updated = crud.get_schedule(schedule_id)
     await manager.broadcast("schedule_updated", updated)
     return _with_next_run(updated)
 

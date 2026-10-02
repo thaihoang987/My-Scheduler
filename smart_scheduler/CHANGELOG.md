@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.78
+
+- Fix: an overnight time range that does not repeat every day (e.g. Monday only, 22:00 → 02:00)
+  now turns off the next morning. Before, the OFF run used the same repeat days as the ON run, so it
+  fired before the ON time and the device stayed on until the next week. The OFF run's repeat days
+  (and date range) now follow the ON run, shifted by one day for overnight ranges. Applies to every
+  device type; existing schedules and restored backups are fixed automatically. Daily ranges are unchanged.
+
 ## 0.5.77
 
 - Schedule list on the device page shows a short condition chip on schedules that use conditions

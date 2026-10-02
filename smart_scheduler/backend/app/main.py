@@ -14,7 +14,7 @@ from app.api import backup, entities, groups, history, manual, presence as prese
 from app.db import init_db
 from app.homeassistant import connection_mode
 from app.i18n import tr
-from app.scheduler_engine import scheduler_loop
+from app.scheduler_engine import normalize_range_days, scheduler_loop
 from app.ws import manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -99,6 +99,9 @@ async def lifespan(app: FastAPI):
     init_db()
     log.info("Database ready")
     await _load_ha_timezone()
+    fixed = normalize_range_days()
+    if fixed:
+        log.info("Moved repeat days of %d overnight range end(s) to the next day", fixed)
     await _reset_devices_on_startup()
     await manual_timer.restore_active()
     frontend_version_file = Path(os.environ.get("STATIC_DIR", "/app/static")) / "build-version.txt"

@@ -133,6 +133,13 @@ def update_schedule(schedule_id: str, data: dict) -> Optional[dict]:
     return get_schedule(schedule_id)
 
 
+def set_days(schedule_id: str, days: list[int], start_date: Optional[str], end_date: Optional[str]) -> None:
+    """Chi ghi ngay lap + khoang ngay (dung cho normalize_range_days)."""
+    with tx() as c:
+        c.execute("UPDATE schedules SET days=?, start_date=?, end_date=?, updated_at=? WHERE id=?",
+                  (json.dumps(days), start_date, end_date, now_iso(), schedule_id))
+
+
 def delete_schedule(schedule_id: str) -> bool:
     with tx() as c:
         cur = c.execute("DELETE FROM schedules WHERE id=?", (schedule_id,))
