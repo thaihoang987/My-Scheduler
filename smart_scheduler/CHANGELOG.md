@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.71
+
+- 24h chart: the bars are visible again in the light theme.
+
 ## 0.5.70
 
 - On/off history card: the date and midnight labels on the time axis no longer flicker.
