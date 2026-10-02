@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.67
+
+- Auto-off list: long device names now wrap onto a second line instead of being cut off after one line.
+
 ## 0.5.66
 
 - New info button next to the version number: short introduction, GitHub link and donate buttons.
