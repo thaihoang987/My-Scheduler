@@ -1,9 +1,11 @@
-import { mdiPencilOutline, mdiPlus, mdiViewAgendaOutline, mdiViewGridOutline, mdiViewListOutline, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
+import { mdiPencilOutline, mdiPlus, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
 import { useEffect, useMemo, useState } from "react";
 import { AutoOffList } from "../../components/AutoOffList/AutoOffList";
 import { Clock } from "../../components/Clock/Clock";
 import { HomeBanners } from "../../components/HomeBanners/HomeBanners";
 import { DeviceGrid } from "../../components/DeviceGrid/DeviceGrid";
+import { AgendaView, TimelineView } from "../../components/DayViews/DayViews";
+import { VIEWS, VIEW_META } from "../../utils/views";
 import { GroupedDeviceGrid, UNGROUPED, type SectionControls } from "../../components/GroupedDeviceGrid/GroupedDeviceGrid";
 import { useCollapsedSections } from "../../hooks/useCollapsedSections";
 import { Icon } from "../../components/Icon/Icon";
@@ -17,14 +19,6 @@ import { backdropProps } from "../../utils/backdrop";
 
 type Filter = "all" | "on" | "off" | "favorite";
 
-/** Nut doi kieu xem tren Nha (v0.5.62): bam xoay vong Luoi -> Thu gon ->
- * Danh sach, luu vao Cai dat (cung khoa display_mode voi Cai dat -> Giao dien). */
-const VIEW_CYCLE: DisplayMode[] = ["normal", "compact", "list"];
-const VIEW_META: Record<DisplayMode, { icon: string; vi: string; en: string }> = {
-  normal: { icon: mdiViewGridOutline, vi: "Lưới", en: "Grid" },
-  compact: { icon: mdiViewAgendaOutline, vi: "Thu gọn", en: "Compact" },
-  list: { icon: mdiViewListOutline, vi: "Danh sách", en: "List" },
-};
 
 export function Home({
   groups,
@@ -148,11 +142,15 @@ export function Home({
   }, [groups, filter]);
 
   const activeCount = schedules.filter((s) => s.enabled).length;
-  const view: DisplayMode = VIEW_CYCLE.includes(settings.display_mode) ? settings.display_mode : "compact";
-  const nextView = VIEW_CYCLE[(VIEW_CYCLE.indexOf(view) + 1) % VIEW_CYCLE.length];
+  const view: DisplayMode = VIEWS.includes(settings.display_mode) ? settings.display_mode : "compact";
+  const dayView = view === "agenda" || view === "timeline";
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
 
-  async function cycleView() {
-    await api.updateSettings({ display_mode: nextView });
+  async function chooseView(next: DisplayMode) {
+    setViewMenuOpen(false);
+    if (next === view) return;
+    setEditMode(false);
+    await api.updateSettings({ display_mode: next });
     reload();
   }
 
@@ -248,15 +246,40 @@ export function Home({
           >
             <Icon path={isDark ? mdiWhiteBalanceSunny : mdiWeatherNight} size={18} />
           </button>
-          <button
-            type="button"
-            className="home-page__edit-btn"
-            onClick={cycleView}
-            aria-label={tr(`Kiểu xem: ${VIEW_META[view].vi} - bấm để đổi sang ${VIEW_META[nextView].vi}`, `View: ${VIEW_META[view].en} - tap for ${VIEW_META[nextView].en}`)}
-            title={tr(`Kiểu xem: ${VIEW_META[view].vi} → ${VIEW_META[nextView].vi}`, `View: ${VIEW_META[view].en} → ${VIEW_META[nextView].en}`)}
-          >
-            <Icon path={VIEW_META[view].icon} size={18} />
-          </button>
+          <span className="view-menu">
+            <button
+              type="button"
+              className={`home-page__edit-btn ${viewMenuOpen ? "home-page__edit-btn--active" : ""}`}
+              onClick={() => setViewMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={viewMenuOpen}
+              aria-label={tr(`Kiểu xem: ${VIEW_META[view].vi}`, `View: ${VIEW_META[view].en}`)}
+              title={tr(`Kiểu xem: ${VIEW_META[view].vi}`, `View: ${VIEW_META[view].en}`)}
+            >
+              <Icon path={VIEW_META[view].icon} size={18} />
+            </button>
+            {viewMenuOpen && (
+              <>
+                <span className="view-menu__scrim" onClick={() => setViewMenuOpen(false)} />
+                <span className="view-menu__popup" role="menu">
+                  {VIEWS.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={v === view}
+                      className={`view-menu__item ${v === view ? "view-menu__item--active" : ""}`}
+                      onClick={() => chooseView(v)}
+                    >
+                      <Icon path={VIEW_META[v].icon} size={18} />
+                      {tr(VIEW_META[v].vi, VIEW_META[v].en)}
+                    </button>
+                  ))}
+                </span>
+              </>
+            )}
+          </span>
+          {!dayView && (
           <button
             className={`home-page__edit-btn ${editMode ? "home-page__edit-btn--active" : ""}`}
             onClick={() => setEditMode((v) => !v)}
@@ -265,6 +288,7 @@ export function Home({
           >
             <Icon path={mdiPencilOutline} size={18} />
           </button>
+          )}
         </div>
       </div>
       {themeError && <div className="form-error" role="alert">{tr("Không đổi được giao diện. Vui lòng thử lại.", "Could not change theme. Please try again.")}</div>}
@@ -295,6 +319,18 @@ export function Home({
             onToggle={toggleRule}
           />
         );
+        // 2 kieu xem theo ngay: thay luoi card, khoi Tu tat van o duoi.
+        if (view === "agenda") {
+          return <><AgendaView groups={filtered} timeFormat={settings.time_format} onOpen={onOpenDevice} />{autoNode}</>;
+        }
+        if (view === "timeline") {
+          return (
+            <>
+              <TimelineView groups={filtered} entities={entities} categoryGroups={categoryGroups} timeFormat={settings.time_format} onOpen={onOpenDevice} />
+              {autoNode}
+            </>
+          );
+        }
         if (categoryGroups.length > 0) {
           return (
             <GroupedDeviceGrid

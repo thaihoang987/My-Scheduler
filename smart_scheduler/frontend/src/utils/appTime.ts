@@ -44,3 +44,8 @@ export function secondsOfDayInZone(v: string | Date): number {
 export function todayInZone(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
+
+/** "YYYY-MM-DD" cua 1 moc thoi gian theo mui gio add-on. */
+export function dateInZone(v: string | Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(toDate(v));
+}

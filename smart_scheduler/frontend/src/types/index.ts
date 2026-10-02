@@ -194,8 +194,10 @@ export interface HealthStatus {
  * "card" tren Home - day la don vi hien thi chinh cua UI moi (muc 6/102
  * SPEC_UI.md), khac han Schedule (don vi luu tru o backend). Tinh hoan
  * toan phia client tu danh sach schedules, khong doi schema backend. */
-/** Kieu xem trang Nha (v0.5.62 them "list" - hang gon 1 dong/thiet bi). */
-export type DisplayMode = "normal" | "compact" | "list";
+/** Kieu xem trang Nha: "compact" (luoi card), "list" (hang gon 1 dong/thiet
+ * bi, v0.5.62), "agenda" (Theo gio) va "timeline" (Bang 24h) - v0.5.64. v0.5.63 bo "normal" vi gan nhu y het "compact" - gia tri
+ * "normal" cu con luu trong Cai dat duoc hien thanh "compact". */
+export type DisplayMode = "compact" | "list" | "agenda" | "timeline";
 
 export interface DeviceGroup {
   key: string;

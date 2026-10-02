@@ -2,6 +2,7 @@ import { api } from "../../../services/api";
 import type { Settings as SettingsType } from "../../../types";
 import { SubpageHeader } from "../SubpageHeader";
 import { tr } from "../../../i18n";
+import { VIEWS, VIEW_META } from "../../../utils/views";
 
 const TOGGLE_FIELDS: [keyof SettingsType, string, string][] = [
   ["show_countdown", "Hiện countdown", "Show countdown"],
@@ -55,9 +56,9 @@ export function AppearanceSettings({ settings, reload, onBack }: { settings: Set
       <div className="settings-section">
         <div className="settings-section__title">{tr("Kiểu xem trang Nhà", "Home view")}</div>
         <div className="chip-row">
-          {(["normal", "compact", "list"] as const).map((m) => (
-            <button key={m} className={settings.display_mode === m ? "chip chip--active" : "chip"} onClick={() => update({ display_mode: m })}>
-              {m === "compact" ? tr("Thu gọn", "Compact") : m === "list" ? tr("Danh sách", "List") : tr("Lưới", "Grid")}
+          {VIEWS.map((m) => (
+            <button key={m} className={(VIEWS.includes(settings.display_mode) ? settings.display_mode : "compact") === m ? "chip chip--active" : "chip"} onClick={() => update({ display_mode: m })}>
+              {tr(VIEW_META[m].vi, VIEW_META[m].en)}
             </button>
           ))}
         </div>
