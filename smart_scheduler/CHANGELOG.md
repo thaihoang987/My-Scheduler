@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.70
+
+- On/off history card: the date and midnight labels on the time axis no longer flicker.
+
 ## 0.5.69
 
 - 24h chart: group names are now bold with a device count, so they no longer look like a disabled device.

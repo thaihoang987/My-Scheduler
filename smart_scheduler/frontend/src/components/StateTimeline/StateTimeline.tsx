@@ -249,8 +249,12 @@ export function StateTimeline({ entityIds, entities, liveKey }: { entityIds: str
   const minStep = (spanMs / Math.max(1, width)) * 64;
   const step = TICK_STEPS.find((s) => s >= minStep) ?? TICK_STEPS[TICK_STEPS.length - 1];
   const ticks: number[] = [];
-  const offset = (secondsOfDayInZone(new Date(startMs)) * 1000) % step;
-  for (let t = startMs + ((step - offset) % step); t <= endMs; t += step) ticks.push(Math.round(t / 1000) * 1000);
+  // Tinh ca phan mili-giay cua startMs (v0.5.70): truoc chi lay giay tron nen
+  // vach lech 0-999ms khoi moc tron, lam tron lai lung tung - moi 30s khung
+  // truot theo gio, vach 0h luc dung 00:00:00 (hien NGAY) luc 00:00:01 (hien
+  // "00:00"), nhan ngay/0h cu an hien lien tuc.
+  const msOfDay = secondsOfDayInZone(new Date(startMs)) * 1000 + (((startMs % 1000) + 1000) % 1000);
+  for (let t = startMs - (msOfDay % step) + (msOfDay % step === 0 ? 0 : step); t <= endMs; t += step) ticks.push(t);
   const pct = (t: number) => ((t - startMs) / spanMs) * 100;
   const nowLine = serverNow();
   const names = new Map(entities.map((e) => [e.entity_id, e.alias || e.ha_friendly_name || e.entity_id]));
