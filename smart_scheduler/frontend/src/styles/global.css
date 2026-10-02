@@ -733,6 +733,14 @@ body {
 
 .schedule-row__time { font-weight: 700; min-width: 74px; }
 .schedule-row__action { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text-muted); font-size: 14px; }
+/* Tom tat dieu kien cua lich (v0.5.77) - chip nho, 1 dong, cat "..." neu dai. */
+.schedule-row__cond {
+  display: inline-flex; align-items: center; gap: 3px; flex: 0 1 auto; min-width: 0; max-width: 45%;
+  padding: 2px 7px; border-radius: 999px; font-size: 12px; line-height: 1.3;
+  color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.schedule-row__cond svg { flex: none; }
 .schedule-row__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
 .schedule-row__dot--on { background: var(--success); }
 

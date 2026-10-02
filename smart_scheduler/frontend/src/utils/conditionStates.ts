@@ -1,4 +1,4 @@
-import type { ConditionOperator, EntitySummary } from "../types";
+import type { ConditionOperator, EntitySummary, ScheduleCondition } from "../types";
 import { tr } from "../i18n";
 
 /** Cac trang thai co san de chon cho 1 dieu kien (phan hoi 2026-09-24 "để
@@ -116,4 +116,28 @@ export function operatorLabel(operator: ConditionOperator): string {
 
 export function operatorsFor(entity: EntitySummary | undefined): ConditionOperator[] {
   return conditionStateOptions(entity) ? ["eq", "ne"] : ["eq", "ne", "gt", "gte", "lt", "lte"];
+}
+
+/** Tom tat dieu kien NGAN NHAT de hien ngoai danh sach lich (v0.5.77, dung
+ * chung moi thiet bi): dieu kien tren chinh thiet bi cua lich thi bo ten
+ * (vd may lanh "Làm lạnh"), thiet bi khac thi them ten ("Đèn hành lang Bật");
+ * nhan bo phan "(Cool)" trong ngoac; nhieu dieu kien thi hien cai dau + "+N".
+ * Khong co dieu kien -> null. */
+export function conditionSummary(
+  conditions: ScheduleCondition[] | undefined,
+  targetIds: string[],
+  entities: EntitySummary[],
+): string | null {
+  if (!conditions?.length) return null;
+  const one = (c: ScheduleCondition) => {
+    const entity = entities.find((e) => e.entity_id === c.entity_id);
+    const op = c.operator ?? "eq";
+    const option = conditionStateOptions(entity)?.find((o) => o.value === c.state);
+    const state = option ? option.label.replace(/\s*\(.*\)$/, "") : c.state;
+    const value = op === "eq" ? state : `${operatorLabel(op)} ${state}`;
+    if (targetIds.length === 1 && targetIds[0] === c.entity_id) return value;
+    const name = entity?.alias || entity?.ha_friendly_name || c.entity_id;
+    return `${name} ${value}`;
+  };
+  return conditions.length === 1 ? one(conditions[0]) : `${one(conditions[0])} +${conditions.length - 1}`;
 }
