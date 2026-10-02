@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.61
+
+- Home: tap the moon or sun icon beside the arrange button to switch between light and dark themes.
+  The selection is saved and shared with Appearance settings.
+
 ## 0.5.60
 
 - Smaller phones: device cards, editing controls, auto-off lists and form fields now fit narrow screens.

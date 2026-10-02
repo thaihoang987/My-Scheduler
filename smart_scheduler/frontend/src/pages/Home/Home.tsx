@@ -1,5 +1,5 @@
-import { mdiPencilOutline, mdiPlus } from "@mdi/js";
-import { useMemo, useState } from "react";
+import { mdiPencilOutline, mdiPlus, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
+import { useEffect, useMemo, useState } from "react";
 import { AutoOffList } from "../../components/AutoOffList/AutoOffList";
 import { Clock } from "../../components/Clock/Clock";
 import { HomeBanners } from "../../components/HomeBanners/HomeBanners";
@@ -48,6 +48,32 @@ export function Home({
   const [editingRule, setEditingRule] = useState<Schedule | null>(null);
   const autoOffRules = useMemo(() => schedules.filter((s) => s.trigger_type === "auto_off"), [schedules]);
   const [collapsed, toggleCollapsed] = useCollapsedSections();
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const [savingTheme, setSavingTheme] = useState(false);
+  const [themeError, setThemeError] = useState(false);
+  const isDark = settings.theme === "dark" || (settings.theme === "auto" && systemDark);
+  const themeLabel = isDark ? tr("Chuyển sang giao diện sáng", "Switch to light theme") : tr("Chuyển sang giao diện tối", "Switch to dark theme");
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystemDark(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  async function toggleTheme() {
+    if (savingTheme) return;
+    setSavingTheme(true);
+    setThemeError(false);
+    try {
+      await api.updateSettings({ theme: isDark ? "light" : "dark" });
+      await reload();
+    } catch {
+      setThemeError(true);
+    } finally {
+      setSavingTheme(false);
+    }
+  }
 
   // Thu tu cac khoi tren Nha: nhom phan loai (theo sort_order) + "Chua phan
   // nhom" (luon cuoi) + khoi "Tu tat" chen o vi tri auto_off_section_index
@@ -194,15 +220,29 @@ export function Home({
         <div className="home-page__summary">
           {groups.length} {tr("thiết bị", "devices")} · {schedules.length} {tr("lịch", "schedules")}{activeCount ? ` · ${activeCount} ${tr("đang bật", "enabled")}` : ""}
         </div>
-        <button
-          className={`home-page__edit-btn ${editMode ? "home-page__edit-btn--active" : ""}`}
-          onClick={() => setEditMode((v) => !v)}
-          aria-label={editMode ? tr("Xong sắp xếp", "Finish arranging") : tr("Sắp xếp thiết bị", "Arrange devices")}
-          title={editMode ? tr("Xong sắp xếp", "Finish arranging") : tr("Sắp xếp thiết bị", "Arrange devices")}
-        >
-          <Icon path={mdiPencilOutline} size={18} />
-        </button>
+        <div className="home-page__actions">
+          <button
+            type="button"
+            className="home-page__theme-btn"
+            onClick={toggleTheme}
+            disabled={savingTheme}
+            aria-label={themeLabel}
+            aria-busy={savingTheme}
+            title={themeLabel}
+          >
+            <Icon path={isDark ? mdiWhiteBalanceSunny : mdiWeatherNight} size={18} />
+          </button>
+          <button
+            className={`home-page__edit-btn ${editMode ? "home-page__edit-btn--active" : ""}`}
+            onClick={() => setEditMode((v) => !v)}
+            aria-label={editMode ? tr("Xong sắp xếp", "Finish arranging") : tr("Sắp xếp thiết bị", "Arrange devices")}
+            title={editMode ? tr("Xong sắp xếp", "Finish arranging") : tr("Sắp xếp thiết bị", "Arrange devices")}
+          >
+            <Icon path={mdiPencilOutline} size={18} />
+          </button>
+        </div>
       </div>
+      {themeError && <div className="form-error" role="alert">{tr("Không đổi được giao diện. Vui lòng thử lại.", "Could not change theme. Please try again.")}</div>}
 
       <div className="chip-row">
         {(["all", "on", "off", "favorite"] as Filter[]).map((f) => (

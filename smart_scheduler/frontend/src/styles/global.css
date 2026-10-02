@@ -367,13 +367,17 @@ body {
   font-variant-numeric: tabular-nums; letter-spacing: 0.5px; margin-top: 4px;
 }
 .home-page__header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 2px; }
-.home-page__summary { font-size: 13px; color: var(--text-muted); margin: 0; }
-.home-page__edit-btn {
+.home-page__summary { min-width: 0; overflow-wrap: anywhere; font-size: 13px; color: var(--text-muted); margin: 0; }
+.home-page__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.home-page__edit-btn, .home-page__theme-btn {
   flex-shrink: 0;
   background: none; border: 1px solid var(--border); color: var(--text-muted);
   padding: 8px; min-width: 36px; min-height: 36px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
 }
+.home-page__theme-btn { width: 36px; height: 36px; padding: 0; cursor: pointer; }
+.home-page__theme-btn:disabled { opacity: 0.45; cursor: wait; }
+.home-page__theme-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .home-page__edit-btn--active { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
 
 .fab {
