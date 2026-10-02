@@ -145,7 +145,6 @@ export function DeviceCard({
         className={`device-card device-card--list ${!enabled ? "device-card--dim" : ""}`}
         onClick={onOpen}
       >
-        {dragHandle}
         <div className={`device-card__icon ${group.isOn ? "device-card__icon--on" : ""}`}>
           <Icon path={visual.icon} size={20} />
         </div>
@@ -173,9 +172,14 @@ export function DeviceCard({
             <span className="device-card__muted">{!enabled ? tr("Tạm tắt", "Paused") : "—"}</span>
           )}
         </div>
-        {categoryBtn}
         {toggle}
-        {deleteBtn}
+        {(dragHandle || categoryBtn || deleteBtn) && (
+          <div className="device-card__list-tools">
+            {dragHandle}
+            {categoryBtn}
+            {deleteBtn}
+          </div>
+        )}
       </div>
     );
   }
