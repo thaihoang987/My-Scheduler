@@ -55,8 +55,11 @@ export function dayEvents(groups: DeviceGroup[], date = todayInZone()): DayEvent
 }
 
 /** Doan dang bat trong ngay cua 1 card (Bang 24h): moi cap Khung gio Bat->Tat
- * thanh 1 doan, qua dem thi tach 2 doan [bat, 24h) + [0, tat). Lenh don (vd
- * may lanh dat nhiet do) thanh 1 moc. */
+ * thanh 1 doan; khung qua dem bat dau hom nay ve [bat, 24h), con doan [0, tat)
+ * dau ngay la DUOI cua khung bat dau HOM QUA - giong backend `_window_end`:
+ * Bat chay hom qua + Tat chay hom nay (v0.5.76; truoc do lay Bat cua hom nay
+ * nen ngay dau/cuoi chuoi ngay lap bi ve sai, sang thanh sai sau 0h). Lenh don
+ * (vd may lanh dat nhiet do) thanh 1 moc. */
 export interface DaySpan {
   start: number;
   end: number;
@@ -64,32 +67,59 @@ export interface DaySpan {
   off: Schedule;
 }
 
+function previousDate(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+}
+
 export function daySpans(group: DeviceGroup, date = todayInZone()): { spans: DaySpan[]; marks: DayEvent[] } {
   const events = dayEvents([group], date);
+  const yesterday = previousDate(date);
   const spans: DaySpan[] = [];
   const marks: DayEvent[] = [];
   const used = new Set<string>();
+  const partnerOf = (s: Schedule) =>
+    s.group_id ? group.schedules.find((x) => x.id !== s.id && x.group_id === s.group_id) : undefined;
+
+  // Duoi khung qua dem bat dau hom qua.
+  for (const on of group.schedules) {
+    const off = partnerOf(on);
+    if (on.action.service !== "turn_on" || !off || !runsOn(on, yesterday) || !runsOn(off, date)) continue;
+    const onSec = timeSeconds(on);
+    const offSec = timeSeconds(off);
+    if (onSec !== null && offSec !== null && offSec <= onSec && offSec > 0) {
+      spans.push({ start: 0, end: offSec, on, off });
+    }
+  }
+
   for (const ev of events) {
     const s = ev.schedule;
     if (used.has(s.id)) continue;
-    const partner = s.group_id ? group.schedules.find((x) => x.id !== s.id && x.group_id === s.group_id) : undefined;
-    const partnerEv = partner && events.find((e) => e.schedule.id === partner.id);
-    if (!partner || !partnerEv) {
+    const partner = partnerOf(s);
+    if (!partner) {
       marks.push(ev);
       continue;
     }
     used.add(s.id);
     used.add(partner.id);
-    const onEv = s.action.service === "turn_on" ? ev : partnerEv;
-    const offEv = onEv === ev ? partnerEv : ev;
-    if (offEv.seconds > onEv.seconds) {
-      spans.push({ start: onEv.seconds, end: offEv.seconds, on: onEv.schedule, off: offEv.schedule });
+    const on = s.action.service === "turn_on" ? s : partner;
+    const off = on === s ? partner : s;
+    const onEv = events.find((e) => e.schedule.id === on.id);
+    const offEv = events.find((e) => e.schedule.id === off.id);
+    if (!onEv) {
+      // Chi co Tat hom nay: da ve o duoi khung hom qua, neu khong thi la 1 moc.
+      if (offEv && !spans.some((sp) => sp.off.id === off.id)) marks.push(offEv);
+      continue;
+    }
+    const offSec = timeSeconds(off);
+    if (offSec !== null && offSec > onEv.seconds) {
+      if (offEv) spans.push({ start: onEv.seconds, end: offEv.seconds, on, off });
+      else marks.push(onEv);
     } else {
-      spans.push({ start: onEv.seconds, end: 86400, on: onEv.schedule, off: offEv.schedule });
-      if (offEv.seconds > 0) spans.push({ start: 0, end: offEv.seconds, on: onEv.schedule, off: offEv.schedule });
+      spans.push({ start: onEv.seconds, end: 86400, on, off });
     }
   }
-  return { spans, marks };
+  return { spans: spans.sort((a, b) => a.start - b.start), marks };
 }
 
 /** "HH:MM" tu so giay trong ngay (bo giay cho gon). */

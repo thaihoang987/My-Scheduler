@@ -237,6 +237,9 @@ export function TimelineView({
           )}
           {sec.groups.map((g) => {
             const plan = plans.get(g.key)!;
+            // Bang 24h la 1 vong tron: khung qua dem bi cat 2 doan [bat, 24h) + [0, tat)
+            // - 1 doan dang chay thi doan kia cung sang (biet con bat toi luc nao).
+            const live = new Set(plan.spans.filter((s) => s.start <= now && now < s.end).map((s) => s.on.id));
             const visual = visualFor(g.domain, g.title, g.singleEntity?.icon);
             const empty = plan.spans.length === 0 && plan.marks.length === 0;
             return (
@@ -255,7 +258,7 @@ export function TimelineView({
                   {plan.spans.map((s, i) => (
                     <span
                       key={i}
-                      className={`timeline__bar ${s.start <= now && now < s.end ? "timeline__bar--live" : ""}`}
+                      className={`timeline__bar ${live.has(s.on.id) ? "timeline__bar--live" : ""}`}
                       style={{ left: pct(s.start), width: pct(s.end - s.start) }}
                       title={`${clock(s.start, timeFormat)} → ${clock(s.end % 86400, timeFormat)}`}
                     />

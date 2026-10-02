@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.76
+
+- Home 24h view: an overnight time range is drawn as one 24h loop — while it runs, both halves
+  (start → 24:00 and 00:00 → end) are highlighted.
+- The 00:00 → end part now comes from the previous day's ON run, so ranges on the first/last day
+  of a repeat pattern (e.g. Monday only) no longer show a wrong segment after midnight.
+
 ## 0.5.75
 
 - Presence sample-plan dialog now uses a recorder-style timeline: one row per selected device,
