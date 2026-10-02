@@ -334,9 +334,11 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
       action_service: "turn_on",
       time: onS.time,
       end_time: offS.time,
-      days: schedule.days,
-      start_date: schedule.start_date,
-      end_date: schedule.end_date,
+      // Ngay lap/khoang ngay lay tu moc BAT: moc Tat cua khung qua dem da doi
+      // +1 ngay (backend normalize_range_days, v0.5.78).
+      days: onS.days,
+      start_date: onS.start_date,
+      end_date: onS.end_date,
       // Moc BAT cua khung gio co the theo binh minh/hoang hon (v0.5.32),
       // moc TAT luon la gio co dinh.
       trigger_type: onS.trigger_type ?? "time",

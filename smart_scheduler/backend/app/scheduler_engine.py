@@ -386,6 +386,49 @@ async def run_schedule_now(schedule: dict) -> tuple[str, str | None]:
     return status, message
 
 
+def _shift_date(value: str | None) -> str | None:
+    return (date_cls.fromisoformat(value) + timedelta(days=1)).isoformat() if value else value
+
+
+def normalize_range_days(group_ids: set[str] | None = None) -> int:
+    """Ngay lap cua moc Tat trong 1 khung gio (cap turn_on/turn_off cung
+    group_id - moi loai thiet bi: switch, may lanh, rem, quat, den, nhom...)
+    luon suy ra tu moc Bat (v0.5.78): khung trong ngay -> giong het; khung
+    QUA DEM (gio Tat <= gio Bat) -> doi +1 ngay (T2 -> T3, CN -> T2) va
+    start_date/end_date +1 ngay, vi lan Tat cua lan Bat ngay D chay ngay D+1.
+    Truoc day editor luu Tat cung `days` voi Bat: khung "chi T2 22:00 -> 02:00"
+    tat luc 02:00 sang T2 (truoc khi bat), sang T3 khong tat -> thiet bi bat
+    toi 02:00 T2 tuan sau. Lich hang ngay khong doi gi. Goi sau moi lan
+    tao/sua lich, khoi phuc sao luu va luc khoi dong (sua du lieu cu) -
+    idempotent vi chi tinh tu moc Bat. Tra ve so moc Tat da sua."""
+    by_group: dict[str, list[dict]] = {}
+    for s in crud.list_schedules():
+        if s.get("group_id") and (group_ids is None or s["group_id"] in group_ids):
+            by_group.setdefault(s["group_id"], []).append(s)
+    changed = 0
+    for items in by_group.values():
+        ons = [s for s in items if s["action"].get("service") == "turn_on"]
+        offs = [s for s in items if s["action"].get("service") == "turn_off"]
+        if len(ons) != 1 or len(offs) != 1:
+            continue
+        on, off = ons[0], offs[0]
+        tz = _tz(on.get("timezone") or DEFAULT_TIMEZONE)
+        today = datetime.now(tz).date()
+        on_dt = _scheduled_dt_for_date(on, today, tz)
+        off_dt = _scheduled_dt_for_date(off, today, tz)
+        if on_dt is None or off_dt is None:
+            continue  # chua co vi tri HA cho binh minh/hoang hon - de lan sau
+        on_days = sorted(set(on.get("days") or []))
+        if off_dt.time() <= on_dt.time():
+            want = (sorted({(d + 1) % 7 for d in on_days}), _shift_date(on.get("start_date")), _shift_date(on.get("end_date")))
+        else:
+            want = (on_days, on.get("start_date"), on.get("end_date"))
+        if (sorted(set(off.get("days") or [])), off.get("start_date"), off.get("end_date")) != want:
+            crud.set_days(off["id"], *want)
+            changed += 1
+    return changed
+
+
 def _window_end(on: dict, start: datetime, schedules: list[dict], require_enabled: bool = True) -> datetime | None:
     """Moc Tat dong khung gio bat dau luc `start` cua lich Bat `on` (cung
     group_id, cung thiet bi); khung qua dem thi ket thuc ngay hom sau."""
