@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.86
+
+- While a group is skipping, "Next run" on cards and in device detail shows the first real ON after the skip ends (it no longer shows a time-range OFF that only runs for safety). Device detail also shows "Group is skipping until the end of <day>".
+
 ## 0.5.85
 
 - Home groups get two controls on their header:

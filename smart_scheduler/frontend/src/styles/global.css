@@ -706,6 +706,7 @@ body {
 
 .device-detail__hero-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
 .device-detail__hero-time { font-size: 40px; font-weight: 700; line-height: 1.15; }
+.device-detail__skip { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--star); }
 .device-detail__hero-action { font-size: 14px; color: var(--text-muted); margin-bottom: 4px; }
 
 .device-detail__section-title {
