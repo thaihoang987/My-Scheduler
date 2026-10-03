@@ -6,8 +6,12 @@ Enjoying it? 🍺 [Buy me a beer](https://buymeacoffee.com/leon_bell) · ☕ [Ko
 
 1. Start the add-on and enable **Show in sidebar**.
 2. Open **My Scheduler** from the sidebar.
-3. Tap **+** on the Home page and add the devices you want to schedule.
-4. Open a device and create a schedule: a single time, or an on → off time range.
+3. Go to **Settings → Devices** and add the devices you want to schedule. This step is for the
+   person who manages the add-on: pick devices from Home Assistant and give them friendly names so
+   family members can easily find and use them. **Only devices added here can be added to the
+   Home page.**
+4. Tap **+** on the Home page, pick a device and create a schedule: a single time, or an on → off
+   time range.
 
 The add-on talks to Home Assistant through the Supervisor, so no token or URL is needed.
 
