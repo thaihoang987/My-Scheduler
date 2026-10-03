@@ -15,6 +15,33 @@ An iPhone-style timer and scheduler for Home Assistant devices — no YAML autom
 created by hand for each device. Pick a device, pick a time, done. Schedules run in the add-on
 backend, so they keep working with the browser closed.
 
+## Screenshots
+
+**Desktop**
+
+<p>
+<img src="screenshots/desktop-1.png" width="49%" alt="My Scheduler on desktop">
+<img src="screenshots/desktop-2.png" width="49%" alt="My Scheduler on desktop">
+<img src="screenshots/desktop-3.png" width="49%" alt="My Scheduler on desktop">
+<img src="screenshots/desktop-4.png" width="49%" alt="My Scheduler on desktop">
+<img src="screenshots/desktop-5.png" width="49%" alt="My Scheduler on desktop">
+<img src="screenshots/desktop-6.png" width="49%" alt="My Scheduler on desktop">
+</p>
+
+**Mobile**
+
+<p>
+<img src="screenshots/mobile-1.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-2.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-3.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-4.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-5.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-6.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-7.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-8.png" width="19%" alt="My Scheduler on mobile">
+<img src="screenshots/mobile-9.png" width="19%" alt="My Scheduler on mobile">
+</p>
+
 ## Installation
 
 [![Open your Home Assistant instance and show the add add-on repository dialog with this repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fthaihoang987%2FMy-addon-Scheduler)
