@@ -2,6 +2,8 @@
 
 Enjoying it? 🍺 [Buy me a beer](https://buymeacoffee.com/leon_bell) · ☕ [Ko-fi](https://ko-fi.com/leonbell) · 💙 [PayPal](https://paypal.me/leonbell95)
 
+💬 Questions, feedback and screenshots: [community forum thread](https://community.home-assistant.io/t/my-scheduler-iphone-style-timer-scheduler-add-on-for-any-device-no-yaml-no-helpers/1027265)
+
 ## Getting started
 
 1. Start the add-on and enable **Show in sidebar**.

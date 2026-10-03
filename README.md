@@ -30,6 +30,8 @@ then install **My Scheduler** (formerly Smart Scheduler), start it and open it f
 Updates are prebuilt images (amd64 / aarch64), so updating only downloads — nothing is compiled on
 your Home Assistant machine.
 
+💬 Questions, feedback and screenshots: [community forum thread](https://community.home-assistant.io/t/my-scheduler-iphone-style-timer-scheduler-add-on-for-any-device-no-yaml-no-helpers/1027265)
+
 ## Getting started
 
 1. Open **My Scheduler** from the sidebar.

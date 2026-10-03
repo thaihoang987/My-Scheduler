@@ -17,6 +17,8 @@ created by hand for each device. Pick a device, pick a time, done.
 - Schedules run in the add-on backend — they keep working with the browser closed
 - Interface language (English / Vietnamese): **Settings → Appearance → Language**
 
+💬 Questions, feedback and screenshots: [community forum thread](https://community.home-assistant.io/t/my-scheduler-iphone-style-timer-scheduler-add-on-for-any-device-no-yaml-no-helpers/1027265)
+
 ## Getting started
 
 1. Open **My Scheduler** from the sidebar.
