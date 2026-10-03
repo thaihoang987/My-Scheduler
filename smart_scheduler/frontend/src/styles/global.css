@@ -749,9 +749,6 @@ body {
 .toggle--small input:checked + .toggle__slider::before { transform: translateX(16px); }
 
 .add-time-btn { margin-top: 4px; }
-/* Khuc "Tu tat sau khi bat" rieng duoi danh sach Lich (Device Detail). */
-.device-detail__auto-off { margin-top: 22px; min-width: 0; }
-.device-detail__auto-off .schedule-row-list { margin-bottom: 8px; }
 
 @media (min-width: 900px) {
   .device-detail {
@@ -765,8 +762,7 @@ body {
       "header manual"
       "header schedule-title"
       "header schedule-list"
-      "header add-time"
-      "header auto-off";
+      "header add-time";
     column-gap: 36px;
     align-items: start;
   }
@@ -785,7 +781,6 @@ body {
   .device-detail__schedule-title { grid-area: schedule-title; }
   .schedule-row-list { grid-area: schedule-list; width: 100%; }
   .add-time-btn { grid-area: add-time; }
-  .device-detail__auto-off { grid-area: auto-off; }
 }
 
 /* ---- Lich su bat/tat keo qua lai (StateTimeline.tsx) ---- */

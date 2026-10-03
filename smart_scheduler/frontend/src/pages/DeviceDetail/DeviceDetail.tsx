@@ -18,7 +18,7 @@ import { visualFor } from "../../utils/deviceVisuals";
 import { useMdiIcons } from "../../utils/mdiIcons";
 import { formatTimeDisplay } from "../../utils/formatTime";
 import { activeOnWindow, cardEnabled, entityNames, isRangeRowRunning, nextRunOf } from "../../utils/groupSchedules";
-import { deleteScheduleWithSibling, describeAction, formatDuration, groupIntoRows, saveScheduleDraft, triggerLabelWithClock, type ScheduleDraft } from "../../utils/scheduleRange";
+import { deleteScheduleWithSibling, describeAction, groupIntoRows, saveScheduleDraft, triggerLabelWithClock, type ScheduleDraft } from "../../utils/scheduleRange";
 import { tr } from "../../i18n";
 
 export function DeviceDetail({
@@ -50,8 +50,6 @@ export function DeviceDetail({
   const [detailSchedule, setDetailSchedule] = useState<Schedule | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Schedule | null>(null);
-  /** Sheet dang mo cho Lich (cong tac Hen gio) hay khuc Tu tat rieng. */
-  const [editorMode, setEditorMode] = useState<"schedule" | "auto_off">("schedule");
   const [devicePickerOpen, setDevicePickerOpen] = useState(false);
   /** Cong tac TONG ca card (v0.5.66) - CUNG du lieu (card_enabled) va cung API
    * voi cong tac tren card o trang Nha, nen bat/tat ben nao ben kia cung doi
@@ -81,12 +79,8 @@ export function DeviceDetail({
   const visual = visualFor(group.domain, group.title, group.singleEntity?.icon);
   const { time: nextRun, scheduleId } = nextRunOf(group);
   const nextSchedule = group.schedules.find((s) => s.id === scheduleId);
-  const autoOffSchedules = allSchedules.filter((s) => s.trigger_type === "auto_off"
-    && s.target_entities.length === group.entityIds.length
-    && s.target_entities.every((id) => group.entityIds.includes(id)));
-  const detailSchedules = [...group.schedules, ...autoOffSchedules.filter((s) => !group.schedules.some((g) => g.id === s.id))];
-  // "Tu tat sau khi bat" la khuc RIENG duoi danh sach Lich (phan hoi 2026-10-03):
-  // khong thuoc cong tac Hen gio cua card, khong chung thu tu keo-tha voi Lich.
+  // "Tu tat sau khi bat" KHONG nam trong timer card (phan hoi 2026-10-03):
+  // khong chiu cong tac Hen gio, de chung lam sai y nghia - chi quan ly o Nha.
   const defaultRows = groupIntoRows(group.schedules);
   const savedOrder = settings.detail_row_order?.[group.key] ?? [];
   const rows = [...defaultRows].sort((a, b) => {
@@ -94,15 +88,12 @@ export function DeviceDetail({
     if (ai >= 0 && bi >= 0) return ai - bi;
     return ai >= 0 ? -1 : bi >= 0 ? 1 : 0;
   });
-  // Scene/script chay 1 lan, khong co "dang bat" de tu tat (xem domainProfile).
-  const canAutoOff = group.entityIds.some((id) => !["scene", "script"].includes(id.split(".", 1)[0]));
   const onWindow = activeOnWindow(group, activeTimers);
   const stateMap = new Map(entities.map((e) => [e.entity_id, e.state]));
   const liveKey = group.entityIds.map((id) => stateMap.get(id) ?? "").join("|");
 
   async function handleSave(draft: ScheduleDraft, id?: string) {
-    // Tu tat moi luon bat - khong an theo cong tac Hen gio cua card.
-    await saveScheduleDraft(draft, entities, editing, allSchedules, editorMode === "auto_off" || cardEnabled(group));
+    await saveScheduleDraft(draft, entities, editing, allSchedules, cardEnabled(group));
     setEditorOpen(false);
     setEditing(null);
     reload();
@@ -151,7 +142,7 @@ export function DeviceDetail({
   // trang thay vi phai mo sheet Sua lich moi doi duoc. Ap dung target_entities
   // moi cho TAT CA dong (ca cap Bat/Tat neu la Khung gio) de giu dong bo.
   async function changeDevices(ids: string[]) {
-    await Promise.all(detailSchedules.map((s) => api.updateSchedule(s.id, { ...s, target_entities: ids })));
+    await Promise.all(group.schedules.map((s) => api.updateSchedule(s.id, { ...s, target_entities: ids })));
     setDevicePickerOpen(false);
     reload();
   }
@@ -239,7 +230,6 @@ export function DeviceDetail({
             running={isRangeRowRunning(item, group.isOn, nowMs)}
             onOpen={() => {
               if (item.isRange) {
-                setEditorMode("schedule");
                 setEditing(item.primary);
                 setEditorOpen(true);
               } else {
@@ -259,68 +249,12 @@ export function DeviceDetail({
       <button
         className="btn btn--ghost btn--block add-time-btn"
         onClick={() => {
-          setEditorMode("schedule");
           setEditing(null);
           setEditorOpen(true);
         }}
       >
         <Icon path={mdiPlus} size={16} /> {tr("Thêm giờ", "Add time")}
       </button>
-
-      {canAutoOff && (
-        <div className="device-detail__auto-off">
-          <div className="device-detail__section-title">⏱ {tr("Tự tắt sau khi bật", "Auto-off after on")}</div>
-          {autoOffSchedules.length > 0 ? (
-            <div className="schedule-row-list">
-              {autoOffSchedules.map((rule) => {
-                const enabled = rule.enabled && rule.card_enabled !== false;
-                const timer = enabled && group.isOn
-                  ? activeTimers.find((t) => t.source === "auto_off" && t.started_at && t.off_at && rule.target_entities.includes(t.entity_ids[0]))
-                  : undefined;
-                return (
-                  <div key={rule.id} className={`auto-off__row ${!enabled ? "auto-off__row--dim" : ""}`} onClick={() => {
-                    setEditorMode("auto_off");
-                    setEditing(rule);
-                    setEditorOpen(true);
-                  }}>
-                    <div className="auto-off__main">
-                      <div className="auto-off__name">{tr("Tắt sau", "Off after")} {formatDuration(rule.time)}</div>
-                      {timer ? (
-                        <OnTimeProgress startAt={timer.started_at!} endAt={timer.off_at!} />
-                      ) : (
-                        <div className="auto-off__state">{tr("Mỗi lần thiết bị bật, từ bất kỳ đâu", "Every time the device turns on, from anywhere")}</div>
-                      )}
-                    </div>
-                    <label className="toggle toggle--small" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={enabled} onChange={async () => {
-                        await api.groupToggleSchedules([rule.id], !enabled);
-                        reload();
-                      }} aria-label={tr("Bật/tắt tự tắt", "Turn auto-off on/off")} />
-                      <span className="toggle__slider" />
-                    </label>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <button
-              className="btn btn--ghost btn--block"
-              onClick={() => {
-                setEditorMode("auto_off");
-                setEditing(null);
-                setEditorOpen(true);
-              }}
-            >
-              <Icon path={mdiPlus} size={16} /> {tr("Thêm tự tắt", "Add auto-off")}
-            </button>
-          )}
-          {autoOffSchedules.length > 1 && (
-            <div className="device-detail__missing">
-              {tr("Có nhiều lịch tự tắt cho thiết bị này - chỉ thời gian ngắn nhất có tác dụng. Hãy xóa bớt, chỉ giữ một.", "This device has several auto-off rules - only the shortest one takes effect. Delete the extras and keep one.")}
-            </div>
-          )}
-        </div>
-      )}
 
       <ScheduleDetailSheet
         open={Boolean(detailSchedule)}
@@ -360,15 +294,15 @@ export function DeviceDetail({
         entities={entities}
         presetEntities={group.entityIds}
         lockEntities
-        mode={editorMode}
+        mode="schedule"
         onClose={() => {
           setEditorOpen(false);
           setEditing(null);
         }}
         onSave={handleSave}
         onDelete={async (id) => {
-          const s = detailSchedules.find((x) => x.id === id);
-          if (s) await deleteScheduleWithSibling(s, detailSchedules);
+          const s = group.schedules.find((x) => x.id === id);
+          if (s) await deleteScheduleWithSibling(s, group.schedules);
           setEditorOpen(false);
           setEditing(null);
           reload();
