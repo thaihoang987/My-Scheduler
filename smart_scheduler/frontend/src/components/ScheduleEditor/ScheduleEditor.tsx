@@ -115,10 +115,9 @@ export function ScheduleEditor({
    * tranh 2 duong doi thiet bi khac nhau de gay lech du lieu. Sheet nay van
    * cho chon thiet bi binh thuong khi tao lich HOAN TOAN MOI tu trang Nha. */
   lockEntities?: boolean;
-  /** Device Detail tach "Tu tat sau khi bat" thanh khuc rieng (khong thuoc
-   * cong tac Hen gio cua card): "schedule" an chip Tu tat, "auto_off" chi sua
-   * Tu tat (an ca hang chip kieu lich). Bo trong = du 3 kieu (trang Nha). */
-  mode?: "schedule" | "auto_off";
+  /** "schedule" (Device Detail) an chip Tu tat: Tu tat khong thuoc timer card
+   * (khong chiu cong tac Hen gio), chi tao/sua o trang Nha. */
+  mode?: "schedule";
   onClose: () => void;
   onSave: (draft: ScheduleDraft, id?: string) => void;
   onDelete?: (id: string) => void;
@@ -133,10 +132,7 @@ export function ScheduleEditor({
     if (schedule) {
       setDraft(draftFromSchedule(schedule, allSchedules));
     } else if (open) {
-      const fresh = { ...EMPTY_DRAFT, target_entities: presetEntities ?? [] };
-      setDraft(mode === "auto_off"
-        ? { ...fresh, trigger_type: "auto_off", action_service: "turn_off", time: lastAutoOffDuration(allSchedules) }
-        : fresh);
+      setDraft({ ...EMPTY_DRAFT, target_entities: presetEntities ?? [] });
     }
   }, [schedule, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -256,7 +252,7 @@ export function ScheduleEditor({
     <>
       <BottomSheet
         open={open}
-        title={mode === "auto_off" ? `⏱ ${tr("Tự tắt sau khi bật", "Auto-off after on")}` : schedule ? tr("Sửa lịch", "Edit schedule") : tr("Thêm lịch", "Add schedule")}
+        title={schedule ? tr("Sửa lịch", "Edit schedule") : tr("Thêm lịch", "Add schedule")}
         onClose={onClose}
         footer={
           <div className="sheet__actions">
@@ -284,7 +280,7 @@ export function ScheduleEditor({
           </button>
         )}
 
-        {mode !== "auto_off" && (!profile || profile.range || profile.autoOff) && <div className="chip-row">
+        {(!profile || profile.range || profile.autoOff) && <div className="chip-row">
           <button className={!isRange && !isAutoOff ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, end_time: null, ...leaveAutoOff(d) }))}>
             {tr("Mốc thời gian", "Time point")}
           </button>

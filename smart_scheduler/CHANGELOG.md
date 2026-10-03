@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.81
+
+- Auto-off is removed from the device detail page entirely: it is not controlled by the card's Scheduling switch, so it does not belong to the timer card. Create, edit and toggle auto-off rules only in the "Auto-off after on" section on Home. Changing a card's devices no longer changes auto-off rules.
+- Still one auto-off rule per device (editor and API).
+
 ## 0.5.80
 
 - Device detail: auto-off now has its own section below the schedule list instead of being mixed into it. It is not affected by the card's Scheduling switch and has its own on/off toggle and countdown.
