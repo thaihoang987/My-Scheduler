@@ -9,6 +9,7 @@ import { OnTimeProgress } from "../../components/OnTimeProgress/OnTimeProgress";
 import { ScheduleDetailSheet } from "../../components/ScheduleDetailSheet/ScheduleDetailSheet";
 import { ScheduleEditor } from "../../components/ScheduleEditor/ScheduleEditor";
 import { ScheduleRow } from "../../components/ScheduleRow/ScheduleRow";
+import { skipLabel } from "../../components/GroupControls/GroupControls";
 import { StateTimeline } from "../../components/StateTimeline/StateTimeline";
 import { api } from "../../services/api";
 import type { DeviceGroup, EntitySummary, ManualTimer, Schedule, Settings } from "../../types";
@@ -79,6 +80,7 @@ export function DeviceDetail({
   const visual = visualFor(group.domain, group.title, group.singleEntity?.icon);
   const { time: nextRun, scheduleId } = nextRunOf(group);
   const nextSchedule = group.schedules.find((s) => s.id === scheduleId);
+  const skipUntil = group.schedules.find((s) => s.group_skip_until)?.group_skip_until ?? null;
   // "Tu tat sau khi bat" KHONG nam trong timer card (phan hoi 2026-10-03):
   // khong chiu cong tac Hen gio, de chung lam sai y nghia - chi quan ly o Nha.
   const defaultRows = groupIntoRows(group.schedules);
@@ -209,6 +211,7 @@ export function DeviceDetail({
           </div>
           <div className="device-detail__hero-action">{describeAction(nextSchedule.action)}</div>
           <Countdown nextRun={nextRun} />
+          {skipUntil && <div className="device-detail__skip">⏭ {tr(`Nhóm đang bỏ qua tới hết ${skipLabel(skipUntil)}`, `Group is skipping until the end of ${skipLabel(skipUntil)}`)}</div>}
           {onWindow?.source === "schedule" && <OnTimeProgress startAt={onWindow.startAt} endAt={onWindow.endAt} />}
         </div>
       ) : (

@@ -138,6 +138,10 @@ export function nextRunOf(group: DeviceGroup): { time: string | null; scheduleId
   let best: Schedule | null = null;
   for (const s of group.schedules) {
     if (!s.enabled || s.skip_once || !s.next_run) continue;
+    // Nhom dang "Bo qua": moc Tat cua Khung gio trong luc bo qua van chay (an
+    // toan) nhung Bat da bi bo nen khong phai "lan tiep theo" that - lan tiep
+    // theo la moc Bat sau khi het bo qua (backend da doi next_run cua Bat).
+    if (s.group_skip_until && s.group_id && s.action.service === "turn_off" && Date.parse(s.next_run) < Date.parse(s.group_skip_until)) continue;
     if (!best || s.next_run! < best.next_run!) best = s;
   }
   return { time: best?.next_run ?? null, scheduleId: best?.id ?? null };
