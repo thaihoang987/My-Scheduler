@@ -339,6 +339,7 @@ def test_split_conditions_migration_clears_copied_off_conditions(tmp_path, monke
 
 
 def test_verify_state_resends_then_reports(fake_ha):
+    crud.update_settings({"verify_state": True})  # gui lai chi khi tuy chon chung dang bat
     s = make_schedule()
     action = {"domain": "homeassistant", "service": "turn_off", "service_data": {}}
     fake_ha.states = [{"entity_id": "switch.a", "state": "on"}]

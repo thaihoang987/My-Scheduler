@@ -16,7 +16,8 @@ export interface ScheduleDraft {
   // domain (xem ClimateActionEditor/LightActionEditor/CoverActionEditor/
   // FanActionEditor.tsx) - chi hien khi TAT CA thiet bi chon cung domain do,
   // chi ap dung che do "1 gio" (giong trigger_type sunrise/sunset).
-  action_service: "turn_on" | "turn_off" | "toggle" | "climate_set" | "light_set" | "cover_set" | "fan_set";
+  // "cover_open"/"cover_close"/"cover_stop" (v0.5.79): cover.open_cover/close_cover/stop_cover.
+  action_service: "turn_on" | "turn_off" | "toggle" | "climate_set" | "light_set" | "cover_set" | "fan_set" | "cover_open" | "cover_close" | "cover_stop";
   time: string;
   end_time: string | null; // co gia tri = che do "khung gio" (bat->tat)
   days: number[];
@@ -32,10 +33,13 @@ export interface ScheduleDraft {
   // hoang hon +/- phut - vd bat luc hoang hon, tat luc binh minh.
   end_trigger_type: "time" | "sunrise" | "sunset";
   end_offset_minutes: number;
+  // Khung gio co moc mat troi: Tat cung ngay (0) / hom sau (1), null = theo
+  // kieu gio (xem rangeDayOffset) - v0.5.79.
+  range_day_offset: 0 | 1 | null;
   // Chi dung khi action_service === "climate_set".
   climate_hvac_mode: string | null;
   climate_temperature: number | null;
-  // Chi dung khi action_service === "light_set".
+  // action_service === "light_set", hoac moc Bat cua khung gio den (v0.5.79).
   light_brightness_pct: number | null;
   light_color_temp_kelvin: number | null;
   light_rgb_color: [number, number, number] | null;
@@ -69,6 +73,7 @@ export const EMPTY_DRAFT: ScheduleDraft = {
   offset_minutes: 0,
   end_trigger_type: "time",
   end_offset_minutes: 0,
+  range_day_offset: null,
   climate_hvac_mode: null,
   climate_temperature: null,
   light_brightness_pct: null,
@@ -80,10 +85,6 @@ export const EMPTY_DRAFT: ScheduleDraft = {
   conditions: [],
   end_conditions: [],
 };
-
-function actionLabel(action: "turn_on" | "turn_off" | "toggle"): string {
-  return { turn_on: tr("Bật", "Turn on"), turn_off: tr("Tắt", "Turn off"), toggle: tr("Đảo trạng thái", "Toggle") }[action];
-}
 
 /** Nhan tieng Viet cho hvac_mode cua climate - dung chung ScheduleEditor
  * (chon mode) va draftName/describeAction (hien thi). Mode la khoa API
@@ -201,6 +202,14 @@ export function describeAction(action: HAAction): string {
     if (pos === 100) return tr("Mở hoàn toàn", "Fully open");
     return tr(`Mở ${pos}%`, `Open ${pos}%`);
   }
+  if (action.domain === "cover") {
+    const word = { open_cover: tr("Mở", "Open"), turn_on: tr("Mở", "Open"), close_cover: tr("Đóng", "Close"), turn_off: tr("Đóng", "Close"), stop_cover: tr("Dừng", "Stop") }[action.service];
+    if (word) return word;
+  }
+  if (action.domain === "scene" && action.service === "turn_on") return tr("Kích hoạt", "Activate");
+  if (action.domain === "script" && action.service === "turn_on") return tr("Chạy", "Run");
+  if (action.domain === "automation" && action.service === "turn_on") return tr("Cho phép", "Enable");
+  if (action.domain === "automation" && action.service === "turn_off") return tr("Vô hiệu hoá", "Disable");
   if (action.domain === "fan" && action.service === "set_percentage") return `${tr("Quạt", "Fan")} ${action.service_data.percentage}%`;
   if (action.domain === "fan" && action.service === "set_preset_mode") return `${tr("Quạt", "Fan")}: ${action.service_data.preset_mode}`;
   if (action.service === "turn_on") return tr("Bật", "Turn on");
@@ -284,7 +293,15 @@ export function draftName(draft: ScheduleDraft, entities: EntitySummary[]): stri
     return `${deviceLabel} · ${describeAction(draftToAction(draft))}`;
   }
   const triggerSuffix = draft.trigger_type === "time" ? "" : ` (${triggerLabel(draft.trigger_type, draft.offset_minutes, draft.time)})`;
-  return `${deviceLabel} · ${actionLabel(draft.action_service)}${triggerSuffix}`;
+  return `${deviceLabel} · ${describeAction(draftToAction(draft))}${triggerSuffix}`;
+}
+
+function lightServiceData(draft: ScheduleDraft): Record<string, unknown> {
+  const service_data: Record<string, unknown> = {};
+  if (draft.light_brightness_pct != null) service_data.brightness_pct = draft.light_brightness_pct;
+  if (draft.light_color_temp_kelvin != null) service_data.color_temp_kelvin = draft.light_color_temp_kelvin;
+  if (draft.light_rgb_color != null) service_data.rgb_color = draft.light_rgb_color;
+  return service_data;
 }
 
 export function draftToAction(draft: ScheduleDraft): HAAction {
@@ -299,12 +316,10 @@ export function draftToAction(draft: ScheduleDraft): HAAction {
     return { domain: "climate", service: "set_hvac_mode", service_data: { hvac_mode: mode } };
   }
   if (draft.action_service === "light_set") {
-    const service_data: Record<string, unknown> = {};
-    if (draft.light_brightness_pct != null) service_data.brightness_pct = draft.light_brightness_pct;
-    if (draft.light_color_temp_kelvin != null) service_data.color_temp_kelvin = draft.light_color_temp_kelvin;
-    if (draft.light_rgb_color != null) service_data.rgb_color = draft.light_rgb_color;
-    return { domain: "light", service: "turn_on", service_data };
+    return { domain: "light", service: "turn_on", service_data: lightServiceData(draft) };
   }
+  const coverService = { cover_open: "open_cover", cover_close: "close_cover", cover_stop: "stop_cover" }[draft.action_service as string];
+  if (coverService) return { domain: "cover", service: coverService, service_data: {} };
   if (draft.action_service === "cover_set") {
     return { domain: "cover", service: "set_cover_position", service_data: { position: draft.cover_position ?? 100 } };
   }
@@ -315,6 +330,23 @@ export function draftToAction(draft: ScheduleDraft): HAAction {
     return { domain: "fan", service: "set_percentage", service_data: { percentage: draft.fan_percentage ?? 100 } };
   }
   return { domain, service: draft.action_service, service_data: {} };
+}
+
+type RangePoint = Pick<Schedule, "trigger_type" | "time" | "offset_minutes" | "range_day_offset">;
+
+/** Giong backend scheduler_engine.range_day_offset (v0.5.79): moc Tat roi vao
+ * cung ngay (0) hay hom sau (1) cua moc Bat. Chon tay thi theo do; 2 gio co
+ * dinh: Tat <= Bat la qua dem; hoang hon -> binh minh: hom sau, binh minh ->
+ * hoang hon: trong ngay; tron gio co dinh + mat troi: trong ngay. */
+export function rangeDayOffset(on: RangePoint, off: RangePoint): 0 | 1 {
+  if (on.range_day_offset === 0 || on.range_day_offset === 1) return on.range_day_offset;
+  const sun = (t: string) => t === "sunrise" || t === "sunset";
+  if (on.trigger_type === "time" && off.trigger_type === "time") return toSeconds(off.time) <= toSeconds(on.time) ? 1 : 0;
+  if (sun(on.trigger_type) && sun(off.trigger_type)) {
+    if (on.trigger_type !== off.trigger_type) return on.trigger_type === "sunset" ? 1 : 0;
+    return (off.offset_minutes ?? 0) <= (on.offset_minutes ?? 0) ? 1 : 0;
+  }
+  return 0;
 }
 
 export function findSibling(schedule: Schedule, allSchedules: Schedule[]): Schedule | null {
@@ -345,11 +377,12 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
       offset_minutes: onS.offset_minutes ?? 0,
       end_trigger_type: (offS.trigger_type === "sunrise" || offS.trigger_type === "sunset" ? offS.trigger_type : "time"),
       end_offset_minutes: offS.offset_minutes ?? 0,
+      range_day_offset: onS.range_day_offset ?? null,
       climate_hvac_mode: null,
       climate_temperature: null,
-      light_brightness_pct: null,
-      light_color_temp_kelvin: null,
-      light_rgb_color: null,
+      light_brightness_pct: (onS.action.service_data.brightness_pct as number) ?? null,
+      light_color_temp_kelvin: (onS.action.service_data.color_temp_kelvin as number) ?? null,
+      light_rgb_color: (onS.action.service_data.rgb_color as [number, number, number]) ?? null,
       cover_position: null,
       fan_percentage: null,
       fan_preset_mode: null,
@@ -362,7 +395,11 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
   const isLightAction = domain === "light" && service === "turn_on" && (service_data.brightness_pct != null || service_data.color_temp_kelvin != null || service_data.rgb_color != null);
   const isCoverAction = domain === "cover" && service === "set_cover_position";
   const isFanAction = domain === "fan" && (service === "set_percentage" || service === "set_preset_mode");
-  const actionService: ScheduleDraft["action_service"] = isClimateAction
+  // Rem: lich cu "Tat" (turn_off) = Dong, "Bat" = Mo.
+  const coverAction = domain === "cover"
+    ? ({ open_cover: "cover_open", turn_on: "cover_open", close_cover: "cover_close", turn_off: "cover_close", stop_cover: "cover_stop" } as const)[service as "open_cover"]
+    : undefined;
+  const actionService: ScheduleDraft["action_service"] = coverAction ? coverAction : isClimateAction
     ? "climate_set"
     : isLightAction
       ? "light_set"
@@ -383,6 +420,7 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
     offset_minutes: schedule.offset_minutes,
     end_trigger_type: "time",
     end_offset_minutes: 0,
+    range_day_offset: null,
     climate_hvac_mode: isClimateAction ? ((service_data.hvac_mode as string) ?? null) : null,
     climate_temperature: isClimateAction ? ((service_data.temperature as number) ?? null) : null,
     light_brightness_pct: isLightAction ? ((service_data.brightness_pct as number) ?? null) : null,
@@ -434,6 +472,7 @@ export async function saveScheduleDraft(
       time: draft.time,
       trigger_type: draft.trigger_type,
       offset_minutes: draft.offset_minutes,
+      range_day_offset: null,
     };
     if (editing) await api.updateSchedule(editing.id, payload);
     else await api.createSchedule({ ...payload, card_enabled: cardEnabled });
@@ -452,12 +491,14 @@ export async function saveScheduleDraft(
   const onPayload = {
     ...base,
     name,
-    action: { domain, service: "turn_on", service_data: {} },
+    // Den: do sang/mau luc bat (v0.5.79) - rong = bat nhu lan truoc.
+    action: { domain, service: "turn_on", service_data: domain === "light" ? lightServiceData(draft) : {} },
     time: draft.time,
     group_id: groupId,
     trigger_type: draft.trigger_type,
     offset_minutes: draft.trigger_type === "time" ? 0 : draft.offset_minutes,
     conditions: draft.conditions,
+    range_day_offset: draft.range_day_offset,
   };
   const offPayload = {
     ...base,
@@ -468,6 +509,7 @@ export async function saveScheduleDraft(
     trigger_type: draft.end_trigger_type,
     offset_minutes: draft.end_trigger_type === "time" ? 0 : draft.end_offset_minutes,
     conditions: draft.end_conditions,
+    range_day_offset: draft.range_day_offset,
   };
 
   const cardFlag = editing ? editing.card_enabled : cardEnabled;

@@ -73,12 +73,19 @@ async def start(entity_ids: list[str], auto_off_minutes: float | None) -> dict:
 async def _auto_off(tid: str, entity_ids: list[str], delay_seconds: float) -> None:
     try:
         await asyncio.sleep(delay_seconds)
+        attempt = 0
         while True:
+            # Lan thu lai chi gui khi ket noi HA da on dinh (v0.5.79) - khong ban
+            # lenh moi 30s trong luc HA/mang chap chon.
+            if attempt and not await homeassistant.ensure_stable():
+                await asyncio.sleep(RETRY_SECONDS)
+                continue
+            attempt += 1
             try:
                 await homeassistant.call_service("homeassistant", "turn_off", entity_ids, {})
                 break
             except Exception as exc:  # noqa: BLE001 - HA co the chua san sang sau restart
-                log.warning("Manual timer %s tu tat that bai, thu lai sau %ss: %s", tid, RETRY_SECONDS, exc)
+                log.warning("Manual timer %s tu tat that bai, thu lai khi HA on dinh: %s", tid, exc)
                 await asyncio.sleep(RETRY_SECONDS)
     except asyncio.CancelledError:
         return  # shutdown giu DB; cancel() chu dong se xoa DB truoc khi huy task

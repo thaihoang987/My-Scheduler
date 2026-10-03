@@ -53,6 +53,8 @@ export function ScheduleRow({
             <span className="schedule-row__time">
               {rowTimeLabel(primary, timeFormat)} → {rowTimeLabel(secondary, timeFormat)}
             </span>
+            {/* Den bat kem do sang/mau (v0.5.79) */}
+            {Object.keys(primary.action.service_data ?? {}).length > 0 && <span className="schedule-row__action">{describeAction(primary.action)}</span>}
             {condChip}
           </>
         ) : (
@@ -63,10 +65,10 @@ export function ScheduleRow({
           </>
         )}
       </button>
-      <label className="toggle toggle--small" onClick={(e) => e.stopPropagation()}>
+      {primary.trigger_type !== "auto_off" && <label className="toggle toggle--small" onClick={(e) => e.stopPropagation()}>
         <input type="checkbox" checked={primary.enabled} onChange={onToggle} />
         <span className="toggle__slider" />
-      </label>
+      </label>}
     </div>
   );
 }

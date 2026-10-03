@@ -1,5 +1,6 @@
 import type { DeviceGroup, Schedule } from "../types";
 import { secondsOfDayInZone, todayInZone } from "./appTime";
+import { rangeDayOffset } from "./scheduleRange";
 
 /** Lich chay TRONG HOM NAY (theo mui gio add-on) - dung chung cho 2 kieu xem
  * "Theo gio" va "Bang 24h" tren Nha (v0.5.64). Tinh hoan toan phia client tu
@@ -85,9 +86,8 @@ export function daySpans(group: DeviceGroup, date = todayInZone()): { spans: Day
   for (const on of group.schedules) {
     const off = partnerOf(on);
     if (on.action.service !== "turn_on" || !off || !runsOn(on, yesterday) || !runsOn(off, date)) continue;
-    const onSec = timeSeconds(on);
     const offSec = timeSeconds(off);
-    if (onSec !== null && offSec !== null && offSec <= onSec && offSec > 0) {
+    if (rangeDayOffset(on, off) === 1 && offSec !== null && offSec > 0) {
       spans.push({ start: 0, end: offSec, on, off });
     }
   }
@@ -112,12 +112,13 @@ export function daySpans(group: DeviceGroup, date = todayInZone()): { spans: Day
       continue;
     }
     const offSec = timeSeconds(off);
-    if (offSec !== null && offSec > onEv.seconds) {
+    if (rangeDayOffset(on, off) === 1) {
+      spans.push({ start: onEv.seconds, end: 86400, on, off });
+    } else if (offSec !== null && offSec > onEv.seconds) {
       if (offEv) spans.push({ start: onEv.seconds, end: offEv.seconds, on, off });
       else marks.push(onEv);
-    } else {
-      spans.push({ start: onEv.seconds, end: 86400, on, off });
     }
+    // Khung trong ngay bi dao thu tu hom nay (gio mat troi): backend bo qua ca 2 moc.
   }
   return { spans: spans.sort((a, b) => a.start - b.start), marks };
 }

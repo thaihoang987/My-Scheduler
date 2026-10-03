@@ -1,4 +1,5 @@
 """v0.5.78: moc Tat cua khung gio qua dem chay vao NGAY HOM SAU cua moc Bat."""
+import asyncio
 from datetime import datetime
 
 from app import crud, scheduler_engine
@@ -59,3 +60,31 @@ def test_monday_only_window_ends_tuesday():
     monday_22 = datetime(2026, 9, 28, 22, 0, tzinfo=TZ)
     end = scheduler_engine._window_end(crud.get_schedule(on["id"]), monday_22, crud.list_schedules())
     assert end == datetime(2026, 9, 29, 2, 0, tzinfo=TZ)
+
+
+# ---- v0.5.79: kiem tra trang thai theo loai thiet bi ----
+
+def test_closed_cover_counts_as_off():
+    assert scheduler_engine._state_matches("turn_off", "closed")
+    assert scheduler_engine._state_matches("turn_on", "open")
+
+
+def test_script_runs_but_is_not_verified(fake_ha, monkeypatch):
+    """Script tu ve "off" khi chay xong - kiem tra trang thai se tuong sai roi chay lai."""
+    from datetime import timedelta
+    crud.update_settings({"verify_state": True})
+    started = []
+
+    async def fake_verify(*args, **kwargs):
+        started.append(args)
+        return []
+
+    monkeypatch.setattr(scheduler_engine, "verify_state", fake_verify)
+    now = datetime.now(TZ)
+    for domain, expect in (("script", 0), ("switch", 1)):
+        s = make_schedule(time=(now - timedelta(seconds=5)).strftime("%H:%M:%S"), target_entities=[f"{domain}.a"],
+                          action={"domain": domain, "service": "turn_on", "service_data": {}})
+        asyncio.run(scheduler_engine._process_schedule(s, "skip", None, None))
+        asyncio.run(asyncio.sleep(0))
+        assert len(started) == expect, domain
+    assert [c[2] for c in fake_ha.calls] == [["script.a"], ["switch.a"]]

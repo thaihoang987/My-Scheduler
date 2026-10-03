@@ -15,6 +15,8 @@ chua khop) va xu ly theo `missed_execution_policy`:
       run_once  -> chay bu dung 1 lan roi thoi.
 """
 import asyncio
+import hashlib
+import json
 import logging
 import time
 from datetime import date as date_cls, datetime, timedelta
@@ -134,6 +136,95 @@ def _in_date_range(schedule: dict, day: date_cls) -> bool:
 
 _UNSET = object()
 
+# ---- Khung gio: ket thuc trong ngay hay hom sau (v0.5.79) ----
+_SUN = ("sunrise", "sunset")
+# Chay 1 lan (scene kich hoat, script chay): khong co lenh Tat/Dao that su,
+# khong kiem tra trang thai, khong tu tat, khong tat bu.
+ONE_SHOT_DOMAINS = ("scene", "script")
+
+
+def _is_one_shot(entity_id: str) -> bool:
+    return entity_id.split(".", 1)[0] in ONE_SHOT_DOMAINS
+
+
+def one_shot_only(entity_ids: list[str]) -> bool:
+    return bool(entity_ids) and all(_is_one_shot(e) for e in entity_ids)
+
+
+def _clock_seconds(value: str) -> int:
+    h, m, s = _parse_time(value)
+    return h * 3600 + m * 60 + s
+
+
+def range_day_offset(on: dict, off: dict) -> int:
+    """Moc Tat cua khung gio roi vao cung ngay (0) hay ngay hom sau (1) cua moc
+    Bat. Chon tay (range_day_offset 0/1, luu tren dong Bat) thi theo do; NULL =
+    theo kieu gio:
+    - 2 gio co dinh: Tat <= Bat la qua dem (nhu truoc);
+    - hoang hon -> binh minh: hom sau; binh minh -> hoang hon: trong ngay;
+      cung loai mat troi: so do lech phut;
+    - tron gio co dinh + mat troi: trong ngay (du lieu cu da duoc chuyen sang
+      gia tri chon tay theo hanh vi cu, xem normalize_range_days).
+    Co dinh theo cau hinh, KHONG phu thuoc gio mat troi tung ngay - mua dong
+    hoang hon som hon gio Tat co dinh khong lam khung bi hieu nham thanh qua dem."""
+    explicit = on.get("range_day_offset")
+    if explicit in (0, 1):
+        return int(explicit)
+    ton, toff = on.get("trigger_type") or "time", off.get("trigger_type") or "time"
+    if ton == "time" and toff == "time":
+        return 1 if _clock_seconds(off["time"]) <= _clock_seconds(on["time"]) else 0
+    if ton in _SUN and toff in _SUN:
+        if ton != toff:
+            return 1 if ton == "sunset" else 0
+        return 1 if (off.get("offset_minutes") or 0) <= (on.get("offset_minutes") or 0) else 0
+    return 0
+
+
+def _range_pair(schedule: dict, schedules: list[dict]) -> tuple[dict, dict] | None:
+    """(Bat, Tat) cua khung gio chua `schedule`, None neu la lich don."""
+    if not schedule.get("group_id") or schedule["action"].get("service") not in ("turn_on", "turn_off"):
+        return None
+    want = "turn_off" if schedule["action"]["service"] == "turn_on" else "turn_on"
+    other = next((s for s in schedules if s["id"] != schedule["id"] and s.get("group_id") == schedule["group_id"]
+                  and s["action"].get("service") == want), None)
+    if other is None:
+        return None
+    return (schedule, other) if want == "turn_off" else (other, schedule)
+
+
+def _range_inverted(on: dict, off: dict, on_date: date_cls) -> bool:
+    """Khung TRONG NGAY ma hom do gio Tat <= gio Bat (vd Bat 17:00 -> Tat hoang
+    hon, mua dong hoang hon 16:55): bo qua ca Bat lan Tat cua khung ngay do,
+    khong bien thanh khung gan 24 gio."""
+    if range_day_offset(on, off) != 0:
+        return False
+    tz = _tz(on.get("timezone") or DEFAULT_TIMEZONE)
+    on_dt = _scheduled_dt_for_date(on, on_date, tz)
+    off_dt = _scheduled_dt_for_date(off, on_date, tz)
+    return on_dt is not None and off_dt is not None and off_dt <= on_dt
+
+
+def _slot_inverted(schedule: dict, day: date_cls, schedules: list[dict] | None) -> bool:
+    if not schedules:
+        return False
+    pair = _range_pair(schedule, schedules)
+    if pair is None:
+        return False
+    on, off = pair
+    on_date = day if schedule is on else day - timedelta(days=range_day_offset(on, off))
+    return _range_inverted(on, off, on_date)
+
+
+def _revision(schedule: dict) -> str:
+    """Dau van tay cau hinh 1 moc (gio, kieu gio, hanh dong, thiet bi...) - KHONG
+    gom updated_at vi keo tha doi thu tu cung cap nhat cot do."""
+    raw = json.dumps([
+        schedule.get("time"), schedule.get("trigger_type") or "time", schedule.get("offset_minutes") or 0,
+        sorted(schedule.get("target_entities") or []), schedule.get("action"), schedule.get("group_id"),
+        schedule.get("range_day_offset"),
+    ], sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
 
 def paused_until(settings: dict | None = None) -> datetime | None:
     """Moc ket thuc "Tam dung tat ca lich" (che do di vang, Cai dat ->
@@ -149,7 +240,8 @@ def paused_until(settings: dict | None = None) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=_tz(crud.settings_timezone()))
 
 
-def compute_next_run(schedule: dict, now: datetime | None = None, pause=_UNSET) -> str | None:
+def compute_next_run(schedule: dict, now: datetime | None = None, pause=_UNSET,
+                     schedules: list[dict] | None = None) -> str | None:
     tz = _tz(schedule.get("timezone") or DEFAULT_TIMEZONE)
     now = now.astimezone(tz) if now else datetime.now(tz)
     # Dang tam dung -> lan chay tiep theo tinh tu luc het tam dung.
@@ -169,6 +261,8 @@ def compute_next_run(schedule: dict, now: datetime | None = None, pause=_UNSET) 
         if date.weekday() not in days or not _in_date_range(schedule, date):
             continue
         candidate = _scheduled_dt_for_date(schedule, date, tz)
+        if candidate is not None and _slot_inverted(schedule, date, schedules):
+            continue  # khung trong ngay bi dao thu tu hom do - se bo qua
         if candidate is not None and candidate >= now.replace(microsecond=0):
             # Bug v0.5.51 (test "cho card tu bat"): frontend reload ngay khi lich
             # vua chay, CUNG GIAY voi moc -> `>= now` (da cat micro giay) van tra
@@ -238,8 +332,25 @@ def _armed_at(schedule: dict) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=ZoneInfo("UTC"))
 
 
+_slot_locks: dict[str, asyncio.Lock] = {}
+
+
+def _slot_lock(schedule_id: str) -> asyncio.Lock:
+    """1 khe gio chi duoc xu ly 1 lan: vong lich binh thuong va tat bu sau restart
+    (recover_ranges) cung giu khoa nay, doc lai last_scheduled_for sau khi giu."""
+    lock = _slot_locks.get(schedule_id)
+    if lock is None:
+        lock = _slot_locks[schedule_id] = asyncio.Lock()
+    return lock
+
+
+def _close_if_off(schedule: dict, slot: str) -> None:
+    if schedule.get("group_id") and schedule["action"].get("service") == "turn_off":
+        crud.close_ranges_for_off(schedule["id"], slot)
+
+
 async def _process_schedule(schedule: dict, missed_policy: str, expires_at: datetime | None = None,
-                            pause_end: datetime | None = None) -> None:
+                            pause_end: datetime | None = None, schedules: list[dict] | None = None) -> None:
     tz = _tz(schedule.get("timezone") or DEFAULT_TIMEZONE)
     now = datetime.now(tz)
     if not schedule.get("enabled", True) or not schedule.get("card_enabled", True):
@@ -257,6 +368,15 @@ async def _process_schedule(schedule: dict, missed_policy: str, expires_at: date
     slot = _slot_key(scheduled_dt)
     if schedule.get("last_scheduled_for") == slot:
         return  # da xu ly khe gio nay roi (idempotent)
+    async with _slot_lock(schedule["id"]):
+        fresh = crud.get_schedule(schedule["id"])
+        if fresh is None or fresh.get("last_scheduled_for") == slot:
+            return  # vua xoa, hoac tat bu da xu ly khe nay
+        await _run_slot(schedule, missed_policy, expires_at, pause_end, schedules, now, scheduled_dt, slot)
+
+
+async def _run_slot(schedule: dict, missed_policy: str, expires_at: datetime | None, pause_end: datetime | None,
+                    schedules: list[dict] | None, now: datetime, scheduled_dt: datetime, slot: str) -> None:
 
     # Khe gio da qua TRUOC khi lich duoc tao/sua/bat (updated_at) thi khong
     # phai "lo gio" - vd tao khung 23:30->02:30 luc 22:12 thi moc Tat 02:30
@@ -271,7 +391,18 @@ async def _process_schedule(schedule: dict, missed_policy: str, expires_at: date
     # khi het tam dung, ke ca voi missed_policy="run_once").
     if pause_end is not None and scheduled_dt < pause_end:
         crud.mark_executed(schedule["id"], slot, "skipped_paused")
+        _close_if_off(schedule, slot)
         await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": "skipped_paused"})
+        return
+
+    # Khung trong ngay bi dao thu tu hom nay -> bo qua ca Bat lan Tat (v0.5.79).
+    if _slot_inverted(schedule, scheduled_dt.date(), schedules if schedules is not None else crud.list_schedules()):
+        crud.mark_executed(schedule["id"], slot, "skipped_inverted", consume_skip_once=False)
+        _close_if_off(schedule, slot)
+        crud.add_history(schedule["id"], schedule["name"], slot, "skipped_inverted",
+                         tr("Hôm nay giờ Tắt đến trước giờ Bật (giờ mặt trời) - bỏ qua khung này",
+                            "Today the end time comes before the start time (sun times) - range skipped"))
+        await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": "skipped_inverted"})
         return
 
     # Never replay an ON after its paired OFF deadline (including restart).
@@ -290,17 +421,26 @@ async def _process_schedule(schedule: dict, missed_policy: str, expires_at: date
 
     if schedule.get("skip_once"):
         crud.mark_executed(schedule["id"], slot, "skipped_once")
+        _close_if_off(schedule, slot)
         await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": "skipped_once"})
         return
 
     if not await _conditions_met(schedule.get("conditions") or []):
         crud.mark_executed(schedule["id"], slot, "skipped_condition")
+        _close_if_off(schedule, slot)
         crud.add_history(schedule["id"], schedule["name"], slot, "skipped_condition", tr("Điều kiện chưa thoả", "Conditions were not met"))
         await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": "skipped_condition"})
         return
 
     action = _execution_action(schedule)
     targets = schedule.get("target_entities") or []
+    # Scene/script khong co lenh Tat/Dao (du lieu cu, nhap tu file, nhom tron).
+    if action["service"] in ("turn_off", "toggle") and any(_is_one_shot(e) for e in targets):
+        targets = [e for e in targets if not _is_one_shot(e)]
+        if not targets:
+            crud.mark_executed(schedule["id"], slot, "skipped_unsupported")
+            _close_if_off(schedule, slot)
+            return
     status, message = "success", None
     started = time.monotonic()
     log.info("Dispatch schedule=%s service=%s.%s targets=%s due=%s lateness=%.3fs",
@@ -318,16 +458,39 @@ async def _process_schedule(schedule: dict, missed_policy: str, expires_at: date
     log.info("Complete schedule=%s status=%s elapsed=%.3fs", schedule["id"], status, time.monotonic() - started)
     crud.mark_executed(schedule["id"], slot, status)
     crud.add_history(schedule["id"], schedule["name"], slot, status, message)
-    if status == "success" and action["service"] in ("turn_on", "turn_off") and crud.get_settings().get("verify_state"):
-        task = asyncio.create_task(verify_state(schedule, action, targets))
+    if status == "success":
+        _track_range(schedule, scheduled_dt, slot, schedules)
+    verify_targets = [e for e in targets if not _is_one_shot(e)]
+    if status == "success" and verify_targets and action["service"] in ("turn_on", "turn_off") and crud.get_settings().get("verify_state"):
+        task = asyncio.create_task(verify_state(schedule, action, verify_targets, slot_dt=scheduled_dt))
         _verify_tasks.add(task)
         task.add_done_callback(_verify_tasks.discard)
     await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": status, "message": message})
 
 
+def _track_range(schedule: dict, scheduled_dt: datetime, slot: str, schedules: list[dict] | None) -> None:
+    """Bat khung gio thanh cong -> ghi active_ranges (tat bu neu lo moc Tat);
+    Tat thanh cong -> dong."""
+    if not schedule.get("group_id"):
+        return
+    service = schedule["action"].get("service")
+    if service == "turn_off":
+        crud.close_ranges_for_off(schedule["id"], slot)
+        return
+    if service != "turn_on":
+        return
+    all_schedules = schedules if schedules is not None else crud.list_schedules()
+    pair = _range_pair(schedule, all_schedules)
+    if pair is None:
+        return
+    end = _window_end(schedule, scheduled_dt, all_schedules, require_enabled=False)
+    if end is not None:
+        crud.open_range(schedule["id"], pair[1]["id"], slot, _slot_key(end), _revision(schedule), _revision(pair[1]))
+
+
 VERIFY_DELAY_SECONDS = 30
 _verify_tasks: set[asyncio.Task] = set()
-_OFF_STATES = ("off",)
+_OFF_STATES = ("off", "closed")  # rem dong = "closed" (khung gio Mo -> Dong)
 _NO_STATE = ("unavailable", "unknown", None)
 
 
@@ -337,12 +500,49 @@ def _state_matches(service: str, state: str | None) -> bool:
     return state not in _OFF_STATES and state not in _NO_STATE
 
 
-async def verify_state(schedule: dict, action: dict, targets: list[str], delay: float = VERIFY_DELAY_SECONDS) -> list[str]:
-    """Tuy chon "Tự kiểm tra trạng thái thiết bị" (v0.5.35): 30s sau khi lich
-    Bat/Tat chay, doc trang thai THAT tu HA. Thiet bi nao chua dung (vd rot
-    lenh Zigbee/WiFi, thiet bi mat ket noi) thi gui lai lenh 1 lan, doi them
-    30s kiem lai; van sai -> ghi Nhat ky "verify_failed" (hien canh bao o
-    trang Nha). Tra ve danh sach thiet bi van sai sau khi gui lai."""
+def _eligible_retry_targets(schedule: dict, targets: list[str], seq: dict[str, int], slot_dt: datetime | None) -> list[str]:
+    """Read current retry permissions without yielding to another task."""
+    if not crud.get_settings().get("verify_state"):
+        return []
+    fresh = crud.get_schedule(schedule["id"])
+    if (fresh is None or not fresh.get("enabled", True) or not fresh.get("card_enabled", True)
+            or _revision(fresh) != _revision(schedule)):
+        return []
+    tz = _tz(schedule.get("timezone") or DEFAULT_TIMEZONE)
+    now = datetime.now(tz)
+    pause_end = paused_until()
+    if pause_end is not None and pause_end > now:
+        return []
+    if slot_dt is not None and fresh.get("group_id") and fresh["action"].get("service") == "turn_on":
+        end = _window_end(fresh, slot_dt, crud.list_schedules(), require_enabled=False)
+        if end is not None and now >= end:
+            return []
+    allowed = [e for e in targets if homeassistant.command_seq(e) == seq.get(e)]
+    return allowed
+
+
+async def _retry_targets(schedule: dict, targets: list[str], seq: dict[str, int], slot_dt: datetime | None) -> list[str]:
+    """Check eligibility both before and after the HA health request."""
+    allowed = _eligible_retry_targets(schedule, targets, seq, slot_dt)
+    if not allowed or not await homeassistant.ensure_stable():
+        return []
+    # The health request yields: schedule/settings/deadline may have changed.
+    # Re-read every guard, without another await before dispatch.
+    return _eligible_retry_targets(schedule, allowed, seq, slot_dt)
+
+
+async def verify_state(schedule: dict, action: dict, targets: list[str], delay: float = VERIFY_DELAY_SECONDS,
+                       slot_dt: datetime | None = None) -> list[str]:
+    """Tuy chon CHUNG "Tự kiểm tra trạng thái thiết bị" (v0.5.35, mac dinh tat):
+    30s sau khi lich Bat/Tat chay, doc trang thai THAT tu HA. Thiet bi nao chua
+    dung thi gui lai lenh 1 lan (chi khi _retry_targets cho phep), doi them 30s
+    kiem lai; van sai -> ghi Nhat ky "verify_failed". Relay xung (bam 1 lan doi
+    trang thai): nguoi dung tu tat tuy chon - add-on khong tu nhan dien. Scene/
+    script khong bao gio kiem tra (chay xong tu ve "off" -> se bi chay lai)."""
+    targets = [e for e in targets if not _is_one_shot(e)]
+    if not targets:
+        return []
+    seq = {e: homeassistant.command_seq(e) for e in targets}
     try:
         wrong = targets
         for attempt in range(2):
@@ -355,8 +555,13 @@ async def verify_state(schedule: dict, action: dict, targets: list[str], delay: 
                                      tr("Kiểm tra lại: đã gửi lại lệnh, thiết bị đã đúng trạng thái", "Verification: command retried and device state is now correct"))
                 return []
             if attempt == 0:
-                log.warning("Schedule %s: %s chua dung trang thai sau %ss - gui lai lenh", schedule["id"], wrong, delay)
-                await homeassistant.call_service(action["domain"], action["service"], wrong, action.get("service_data") or {})
+                retry = await _retry_targets(schedule, wrong, seq, slot_dt)
+                if not retry:
+                    log.info("Schedule %s: %s chua dung trang thai nhung khong gui lai (lich/thiet bi da doi hoac HA chua on dinh)", schedule["id"], wrong)
+                    return []
+                log.warning("Schedule %s: %s chua dung trang thai sau %ss - gui lai lenh", schedule["id"], retry, delay)
+                await homeassistant.call_service(action["domain"], action["service"], retry, action.get("service_data") or {})
+                wrong = retry
         word = tr("tắt", "turn off") if action["service"] == "turn_off" else tr("bật", "turn on")
         crud.add_history(schedule["id"], schedule["name"], None, "verify_failed",
                          tr(f"Thiết bị vẫn chưa {word} sau khi gửi lại lệnh: {', '.join(wrong)}", f"Devices still failed to {word} after retry: {', '.join(wrong)}"))
@@ -412,14 +617,21 @@ def normalize_range_days(group_ids: set[str] | None = None) -> int:
         if len(ons) != 1 or len(offs) != 1:
             continue
         on, off = ons[0], offs[0]
-        tz = _tz(on.get("timezone") or DEFAULT_TIMEZONE)
-        today = datetime.now(tz).date()
-        on_dt = _scheduled_dt_for_date(on, today, tz)
-        off_dt = _scheduled_dt_for_date(off, today, tz)
-        if on_dt is None or off_dt is None:
-            continue  # chua co vi tri HA cho binh minh/hoang hon - de lan sau
+        mixed = ((on.get("trigger_type") or "time") == "time") != ((off.get("trigger_type") or "time") == "time")
+        if mixed and on.get("range_day_offset") not in (0, 1):
+            # Du lieu cu tron gio co dinh + mat troi (v0.5.79): giu hanh vi truoc
+            # do (Tat <= Bat hom nay = qua dem) bang cach ghi gia tri chon tay.
+            tz = _tz(on.get("timezone") or DEFAULT_TIMEZONE)
+            today = datetime.now(tz).date()
+            on_dt = _scheduled_dt_for_date(on, today, tz)
+            off_dt = _scheduled_dt_for_date(off, today, tz)
+            if on_dt is None or off_dt is None:
+                continue  # chua co vi tri HA - de lan sau
+            on["range_day_offset"] = 1 if off_dt.time() <= on_dt.time() else 0
+            crud.set_range_day_offset([on["id"], off["id"]], on["range_day_offset"])
+            changed += 1
         on_days = sorted(set(on.get("days") or []))
-        if off_dt.time() <= on_dt.time():
+        if range_day_offset(on, off) == 1:
             want = (sorted({(d + 1) % 7 for d in on_days}), _shift_date(on.get("start_date")), _shift_date(on.get("end_date")))
         else:
             want = (on_days, on.get("start_date"), on.get("end_date"))
@@ -431,7 +643,7 @@ def normalize_range_days(group_ids: set[str] | None = None) -> int:
 
 def _window_end(on: dict, start: datetime, schedules: list[dict], require_enabled: bool = True) -> datetime | None:
     """Moc Tat dong khung gio bat dau luc `start` cua lich Bat `on` (cung
-    group_id, cung thiet bi); khung qua dem thi ket thuc ngay hom sau."""
+    group_id, cung thiet bi); ngay cua moc Tat theo range_day_offset."""
     for other in schedules:
         if require_enabled and not (other.get("enabled", True) and other.get("card_enabled", True)):
             continue
@@ -439,12 +651,11 @@ def _window_end(on: dict, start: datetime, schedules: list[dict], require_enable
                 and other["action"]["service"] == "turn_off"
                 and set(other.get("target_entities") or []) == set(on.get("target_entities") or [])):
             off_tz = _tz(other.get("timezone") or DEFAULT_TIMEZONE)
-            day = start.astimezone(off_tz).date()
+            day = start.astimezone(off_tz).date() + timedelta(days=range_day_offset(on, other))
             end = _scheduled_dt_for_date(other, day, off_tz)
-            if end is not None and end <= start:
-                day += timedelta(days=1)
-                end = _scheduled_dt_for_date(other, day, off_tz)
-            if end and day.weekday() in (other.get("days") or []) and _in_date_range(other, day):
+            if end is None or end <= start:
+                return None  # chua tinh duoc gio mat troi, hoac khung trong ngay bi dao
+            if day.weekday() in (other.get("days") or []) and _in_date_range(other, day):
                 return end
     return None
 
@@ -508,7 +719,8 @@ async def turn_off_running(schedule_ids: list[str], reason: str) -> list[str]:
     for on in ons.values():
         if running_window_end(on, schedules) is not None:
             names.append(on["name"])
-            targets.extend(e for e in on.get("target_entities") or [] if e not in targets)
+            targets.extend(e for e in on.get("target_entities") or [] if e not in targets and not _is_one_shot(e))
+        crud.close_range(on["id"])  # tat ngay o day, khong tat bu nua
     if not targets:
         return []
     reason_en = {
@@ -527,10 +739,124 @@ async def turn_off_running(schedule_ids: list[str], reason: str) -> list[str]:
     return targets
 
 
+RECOVERY_INTERVAL_SECONDS = 30
+RECOVERY_MAX_AGE = timedelta(hours=48)
+
+
+def _parse_dt(value: str | None) -> datetime | None:
+    try:
+        return datetime.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def seed_active_ranges() -> int:
+    """Lan dau sau khi nang cap (bang active_ranges con trong): dung last_scheduled_for/
+    last_status cua moc Bat de ghi lai khung dang mo ma moc Tat chua xu ly. Chi dung
+    1 lan luc khoi dong - cot last_status bi lan sau ghi de nen khong dua mai vao no."""
+    schedules = crud.list_schedules()
+    existing = {r["on_id"] for r in crud.list_ranges()}
+    added = 0
+    for on in schedules:
+        if (on["id"] in existing or on["action"].get("service") != "turn_on" or not on.get("group_id")
+                or on.get("last_status") != "success"):
+            continue
+        start = _parse_dt(on.get("last_scheduled_for"))
+        pair = _range_pair(on, schedules)
+        if start is None or pair is None:
+            continue
+        off = pair[1]
+        end = _window_end(on, start, schedules, require_enabled=False)
+        if end is None:
+            continue
+        off_last = _parse_dt(off.get("last_scheduled_for"))
+        if off_last is not None and (off_last > end or (off_last == end and off.get("last_status") not in ("skipped_missed", "error"))):
+            continue  # moc Tat cua khung nay (hoac khung sau) da xu ly
+        crud.open_range(on["id"], off["id"], _slot_key(start), _slot_key(end), _revision(on), _revision(off))
+        added += 1
+    return added
+
+
+async def recover_ranges(now: datetime | None = None) -> list[str]:
+    """Tat bu (v0.5.79): khung gio da BAT thanh cong ma qua moc Tat chua tat (add-on
+    tat/khoi dong lai, HA mat ket noi luc toi gio Tat), ke ca khung bat tu hom
+    truoc. Chi tat bu khi: 2 moc con nguyen cau hinh (dau van tay), lich + card
+    con bat, khong tam dung, khong qua RECOVERY_MAX_AGE, moc Tat chua chay khe
+    sau do, dieu kien Tat dung, skip_once chua dat va ket noi HA on dinh. Khung
+    chua tung bat thi khong bao gio tat bu, cung khong bat bu. Tra ve on_id da tat."""
+    now = now or datetime.now(_tz(DEFAULT_TIMEZONE))
+    schedules = crud.list_schedules()
+    by_id = {s["id"]: s for s in schedules}
+    pause_end = paused_until()
+    done: list[str] = []
+    for row in crud.list_ranges():
+        deadline = _parse_dt(row["deadline"])
+        if deadline is not None and now < deadline + timedelta(seconds=GRACE_SECONDS):
+            continue  # moc Tat binh thuong van dang phu trach
+        on, off = by_id.get(row["on_id"]), by_id.get(row["off_id"])
+        off_last = _parse_dt(off.get("last_scheduled_for")) if off else None
+        stale = (
+            deadline is None or on is None or off is None
+            or _revision(on) != row["on_rev"] or _revision(off) != row["off_rev"]
+            or not (on.get("enabled", True) and on.get("card_enabled", True))
+            or not (off.get("enabled", True) and off.get("card_enabled", True))
+            or now - deadline > RECOVERY_MAX_AGE
+            or (pause_end is not None and pause_end > now)
+            or (off_last is not None and off_last > deadline)
+            or (off_last == deadline and off.get("last_status") not in ("skipped_missed", "error", "skipped_inactive"))
+        )
+        targets = [e for e in (off or {}).get("target_entities") or [] if not _is_one_shot(e)]
+        if stale or not targets:
+            crud.close_range(row["on_id"])
+            continue
+        async with _slot_lock(off["id"]):
+            fresh = crud.get_schedule(off["id"])
+            if fresh is None or (fresh.get("last_scheduled_for") == row["deadline"] and fresh.get("last_status") == "success"):
+                crud.close_range(row["on_id"])
+                continue
+            if not await homeassistant.ensure_stable():
+                continue  # giu lai, thu khi HA on dinh
+            if fresh.get("skip_once"):
+                crud.mark_executed(off["id"], row["deadline"], "skipped_once")
+                crud.close_range(row["on_id"])
+                continue
+            if not await _conditions_met(fresh.get("conditions") or []):
+                crud.mark_executed(off["id"], row["deadline"], "skipped_condition")
+                crud.add_history(off["id"], off["name"], row["deadline"], "skipped_condition", tr("Điều kiện chưa thoả", "Conditions were not met"))
+                crud.close_range(row["on_id"])
+                continue
+            action = _execution_action(fresh)
+            try:
+                await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
+            except Exception as exc:  # noqa: BLE001 - giu lai, thu khi HA on dinh tro lai
+                log.warning("Tat bu khung %s that bai: %s", row["on_id"], exc)
+                continue
+            crud.mark_executed(off["id"], row["deadline"], "success")
+            crud.add_history(off["id"], off["name"], row["deadline"], "success",
+                             tr("Tắt bù: quá giờ Tắt khi Add-on/Home Assistant không chạy", "Catch-up off: the end time passed while the add-on/Home Assistant was down"))
+            crud.close_range(row["on_id"])
+            await manager.broadcast("schedule_executed", {"id": off["id"], "status": "success"})
+            done.append(row["on_id"])
+    return done
+
+
+async def _maintenance() -> None:
+    """Viec dinh ky, chay ngoai nhip dong ho: chuyen du lieu khung tron gio co
+    dinh/mat troi khi da co vi tri HA, roi tat bu khung lo moc Tat."""
+    try:
+        if normalize_range_days():
+            await manager.broadcast("schedule_updated", {"normalized": True})
+        await recover_ranges()
+    except Exception:  # noqa: BLE001
+        log.exception("Loi khi tat bu khung gio")
+
+
 async def scheduler_loop() -> None:
     log.info("Scheduler engine started (tick=%ss)", TICK_SECONDS)
     pending: dict[str, asyncio.Task] = {}
     observer_task: asyncio.Task | None = None
+    maintenance_task: asyncio.Task | None = None
+    last_maintenance = 0.0
     try:
         while True:
             tick_started = time.monotonic()
@@ -552,15 +878,20 @@ async def scheduler_loop() -> None:
                     if sid not in pending:
                         pending[sid] = asyncio.create_task(_process_schedule(
                             schedule, settings.get("missed_execution_policy", "skip"),
-                            _on_deadline(schedule, schedules), pause_end,
+                            _on_deadline(schedule, schedules), pause_end, schedules,
                         ))
+                if (time.monotonic() - last_maintenance >= RECOVERY_INTERVAL_SECONDS
+                        and (maintenance_task is None or maintenance_task.done())):
+                    last_maintenance = time.monotonic()
+                    maintenance_task = asyncio.create_task(_maintenance())
             except Exception:
                 log.exception("Loi khong mong doi trong scheduler_loop")
             await asyncio.sleep(max(0, TICK_SECONDS - (time.monotonic() - tick_started)))
     finally:
-        tasks = list(pending.values())
-        if observer_task is not None:
-            tasks.append(observer_task)
+        tasks = list(pending.values()) + list(_verify_tasks)
+        for extra in (observer_task, maintenance_task):
+            if extra is not None:
+                tasks.append(extra)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)

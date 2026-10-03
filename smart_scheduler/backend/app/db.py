@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS schedules (
     end_date TEXT,
     trigger_type TEXT NOT NULL DEFAULT 'time',
     offset_minutes INTEGER NOT NULL DEFAULT 0,
+    range_day_offset INTEGER,
     last_scheduled_for TEXT,
     last_run TEXT,
     last_status TEXT,
@@ -99,6 +100,18 @@ CREATE TABLE IF NOT EXISTS manual_timers (
     off_at TEXT NOT NULL
 );
 
+-- Khung gio da BAT thanh cong ma chua TAT (v0.5.79): de tat bu sau khi add-on
+-- khoi dong lai/HA mat ket noi luc toi gio Tat. on_rev/off_rev = dau van tay
+-- cau hinh 2 moc luc bat - lich bi sua thi bo, khong tat bu theo cau hinh cu.
+CREATE TABLE IF NOT EXISTS active_ranges (
+    on_id TEXT PRIMARY KEY,
+    off_id TEXT NOT NULL,
+    start TEXT NOT NULL,
+    deadline TEXT NOT NULL,
+    on_rev TEXT NOT NULL,
+    off_rev TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS auto_off_state (
     entity_id TEXT PRIMARY KEY,
     on_since TEXT NOT NULL
@@ -130,6 +143,8 @@ _MIGRATIONS = [
     "ALTER TABLE entity_aliases ADD COLUMN category_id TEXT",
     "ALTER TABLE schedules ADD COLUMN group_off INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE schedules ADD COLUMN conditions TEXT NOT NULL DEFAULT '[]'",
+    # Khung gio ket thuc trong ngay (0) / hom sau (1) / NULL = theo kieu gio (v0.5.79).
+    "ALTER TABLE schedules ADD COLUMN range_day_offset INTEGER",
 ]
 
 # Chuyen du lieu cu 1 LAN DUY NHAT, ngay sau khi cot card_enabled vua duoc

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.79
+
+- Add auto-off rules to device detail, with saved drag-and-drop ordering independent of Home. Changing devices also updates matching auto-off rules; the auto-off toggle remains on Home.
+- Cancel stale state-verification retries after the Home Assistant health request if the schedule, settings, command order or range deadline changed.
+- Improve missed range-OFF recovery, HA connection checks, solar range handling and one-shot scene/script behavior.
+- Retry Home Assistant timezone synchronization when HA is not ready at startup.
+- Keep the accepted safety catch-up OFF behavior and existing mixed fixed/solar overnight selection policy.
+
 ## 0.5.78
 
 - Fix: an overnight time range that does not repeat every day (e.g. Monday only, 22:00 → 02:00)
