@@ -40,6 +40,8 @@ export interface Schedule {
   // HH:MM:SS, khong phai gio dong ho) - backend theo doi trang thai that.
   trigger_type: "time" | "sunrise" | "sunset" | "auto_off";
   offset_minutes: number;
+  /** Khung gio: moc Tat cung ngay (0) / hom sau (1) cua moc Bat, null = theo kieu gio (v0.5.79). */
+  range_day_offset?: 0 | 1 | null;
   conditions: ScheduleCondition[];
   /** Cong tac TONG cua card tren trang Nha - doc lap voi `enabled` cua tung
    * lich (phan hoi 2026-09-24), lich chi chay khi ca hai deu bat. */
@@ -160,6 +162,7 @@ export interface Settings {
   verify_state: boolean;
   /** Vi tri khoi "Tu tat sau khi bat" giua cac nhom tren Nha (0 = tren cung). */
   auto_off_section_index: number;
+  detail_row_order?: Record<string, string[]>;
   /** Mui gio doc tu cau hinh Home Assistant (chi doc), null neu chua doc duoc. */
   ha_timezone?: string | null;
 }

@@ -70,8 +70,8 @@ def create_schedule(data: dict) -> dict:
             """INSERT INTO schedules
             (id, name, enabled, target_entities, action, days, time, timezone,
              sort_order, group_id, favorite, start_date, end_date, trigger_type,
-             offset_minutes, conditions, card_enabled, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             offset_minutes, conditions, card_enabled, created_at, updated_at, range_day_offset)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 sid,
                 data["name"],
@@ -92,6 +92,7 @@ def create_schedule(data: dict) -> dict:
                 0 if data.get("card_enabled") is False else 1,
                 ts,
                 ts,
+                data.get("range_day_offset"),
             ),
         )
     return get_schedule(sid)
@@ -107,7 +108,8 @@ def update_schedule(schedule_id: str, data: dict) -> Optional[dict]:
         c.execute(
             """UPDATE schedules SET name=?, enabled=?, target_entities=?, action=?, days=?, time=?,
                timezone=?, sort_order=?, group_id=?, favorite=?, start_date=?, end_date=?,
-               trigger_type=?, offset_minutes=?, conditions=?, card_enabled=?, updated_at=?
+               trigger_type=?, offset_minutes=?, conditions=?, card_enabled=?, updated_at=?,
+               range_day_offset=?
                WHERE id=?""",
             (
                 merged["name"],
@@ -127,10 +129,41 @@ def update_schedule(schedule_id: str, data: dict) -> Optional[dict]:
                 json.dumps(merged.get("conditions", [])),
                 1 if merged.get("card_enabled", True) else 0,
                 now_iso(),
+                merged.get("range_day_offset"),
                 schedule_id,
             ),
         )
     return get_schedule(schedule_id)
+
+
+def set_range_day_offset(schedule_ids: list[str], value: Optional[int]) -> None:
+    """Ghi range_day_offset cho ca 2 moc cua khung (chuyen du lieu cu, v0.5.79)."""
+    with tx() as c:
+        for sid in schedule_ids:
+            c.execute("UPDATE schedules SET range_day_offset=? WHERE id=?", (value, sid))
+
+
+# ---- Khung gio dang bat (tat bu sau restart, v0.5.79) ----
+
+def open_range(on_id: str, off_id: str, start: str, deadline: str, on_rev: str, off_rev: str) -> None:
+    with tx() as c:
+        c.execute("INSERT OR REPLACE INTO active_ranges (on_id, off_id, start, deadline, on_rev, off_rev) VALUES (?,?,?,?,?,?)",
+                  (on_id, off_id, start, deadline, on_rev, off_rev))
+
+
+def list_ranges() -> list[dict]:
+    return [dict(r) for r in get_conn().execute("SELECT * FROM active_ranges ORDER BY deadline").fetchall()]
+
+
+def close_range(on_id: str) -> None:
+    with tx() as c:
+        c.execute("DELETE FROM active_ranges WHERE on_id=?", (on_id,))
+
+
+def close_ranges_for_off(off_id: str, deadline: str) -> None:
+    """Moc Tat da xu ly khe `deadline` (tat that, bo qua vi dieu kien/tam dung...)."""
+    with tx() as c:
+        c.execute("DELETE FROM active_ranges WHERE off_id=? AND deadline=?", (off_id, deadline))
 
 
 def set_days(schedule_id: str, days: list[int], start_date: Optional[str], end_date: Optional[str]) -> None:
@@ -142,6 +175,7 @@ def set_days(schedule_id: str, days: list[int], start_date: Optional[str], end_d
 
 def delete_schedule(schedule_id: str) -> bool:
     with tx() as c:
+        c.execute("DELETE FROM active_ranges WHERE on_id=? OR off_id=?", (schedule_id, schedule_id))
         cur = c.execute("DELETE FROM schedules WHERE id=?", (schedule_id,))
     return cur.rowcount > 0
 
@@ -555,6 +589,7 @@ def import_all(data: dict) -> dict:
     luong da khoi phuc de UI bao lai."""
     with tx() as c:
         c.execute("DELETE FROM schedules")
+        c.execute("DELETE FROM active_ranges")  # thuoc ve lich cu
         c.execute("DELETE FROM entity_aliases")
         # Moc "dang bat tu luc" cua Tu tat thuoc ve lich CU - bo, auto_off tu
         # ghi lai theo lich moi o vong kiem tra tiep theo.
@@ -580,8 +615,8 @@ def import_all(data: dict) -> dict:
                 """INSERT INTO schedules (id, name, enabled, target_entities, action, days, time, timezone,
                    sort_order, group_id, favorite, skip_once, skip_until, start_date, end_date,
                    trigger_type, offset_minutes, conditions, card_enabled, last_scheduled_for, last_run, last_status,
-                   created_at, updated_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   created_at, updated_at, range_day_offset)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     s["id"], s["name"], s.get("enabled", 1), s.get("target_entities", "[]"), s.get("action", "{}"),
                     s.get("days", "[0,1,2,3,4,5,6]"), s["time"], s.get("timezone", DEFAULT_TIMEZONE),
@@ -590,7 +625,7 @@ def import_all(data: dict) -> dict:
                     s.get("trigger_type", "time"), s.get("offset_minutes", 0),
                     s.get("conditions") or "[]", s.get("card_enabled", 1),
                     s.get("last_scheduled_for"), s.get("last_run"), s.get("last_status"),
-                    s.get("created_at", now_iso()), s.get("updated_at", now_iso()),
+                    s.get("created_at", now_iso()), s.get("updated_at", now_iso()), s.get("range_day_offset"),
                 ),
             )
         for a in data.get("entity_aliases", []):

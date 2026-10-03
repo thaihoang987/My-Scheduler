@@ -8,7 +8,7 @@ import { BottomSheet } from "../BottomSheet/BottomSheet";
 import { Icon } from "../Icon/Icon";
 import { tr } from "../../i18n";
 
-const DOMAIN_FILTERS = ["Tất cả", "switch", "light", "climate", "fan", "cover", "input_boolean", "script", "scene"];
+const DOMAIN_FILTERS = ["Tất cả", "switch", "light", "climate", "fan", "cover", "input_boolean", "media_player", "automation", "script", "scene"];
 const USED_MAX = 8;
 /** Ve dan danh sach (v0.5.51): Them thiet bi tung ve TOAN BO entity cua HA
  * (co the 10.000 dong co icon) -> go tim/cuon lag. Ve 100 dong truoc, cuon toi

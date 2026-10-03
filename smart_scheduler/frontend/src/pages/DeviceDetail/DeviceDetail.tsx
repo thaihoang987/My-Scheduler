@@ -79,7 +79,20 @@ export function DeviceDetail({
   const visual = visualFor(group.domain, group.title, group.singleEntity?.icon);
   const { time: nextRun, scheduleId } = nextRunOf(group);
   const nextSchedule = group.schedules.find((s) => s.id === scheduleId);
-  const rows = groupIntoRows(group.schedules);
+  const autoOffSchedules = allSchedules.filter((s) => s.trigger_type === "auto_off"
+    && s.target_entities.length === group.entityIds.length
+    && s.target_entities.every((id) => group.entityIds.includes(id)));
+  const detailSchedules = [...group.schedules, ...autoOffSchedules.filter((s) => !group.schedules.some((g) => g.id === s.id))];
+  const defaultRows = groupIntoRows(detailSchedules);
+  const savedOrder = settings.detail_row_order?.[group.key] ?? [];
+  // Existing rows follow the user's order; newly added auto-off rules start last.
+  const rows = [...defaultRows].sort((a, b) => {
+    const ai = savedOrder.indexOf(a.key), bi = savedOrder.indexOf(b.key);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return Number(a.primary.trigger_type === "auto_off") - Number(b.primary.trigger_type === "auto_off");
+  });
   const onWindow = activeOnWindow(group, activeTimers);
   const stateMap = new Map(entities.map((e) => [e.entity_id, e.state]));
   const liveKey = group.entityIds.map((id) => stateMap.get(id) ?? "").join("|");
@@ -91,18 +104,11 @@ export function DeviceDetail({
     reload();
   }
 
-  // Keo-tha doi thu tu Lich (phan hoi 2026-09-23 "cho thêm drag drop đổi vị
-  // trí Lịch trong config") - cung 1 quy uoc SortableJS voi DeviceGrid.tsx
-  // (forceFallback muot tren mobile, tay cam rieng .drag-handle, don ban sao
-  // noi o onChoose khong phai onStart - xem ghi chu chi tiet trong
-  // DeviceGrid.tsx). `sort_order` la 1 truc GLOBAL duy nhat cho MOI schedule
-  // (khong rieng theo thiet bi), nen phai giu nguyen vi tri tuong doi cua
-  // cac schedule KHONG thuoc thiet bi nay (`remaining`) o cuoi, giong het
-  // cach Home.tsx handleReorder() da lam.
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
-  const allSchedulesRef = useRef(allSchedules);
-  allSchedulesRef.current = allSchedules;
+  // Detail ordering is independent of the global order used by Home.
+  const detailOrderRef = useRef(settings.detail_row_order ?? {});
+  detailOrderRef.current = settings.detail_row_order ?? {};
+  const groupKeyRef = useRef(group.key);
+  groupKeyRef.current = group.key;
 
   useEffect(() => {
     const el = rowListRef.current;
@@ -123,16 +129,7 @@ export function DeviceDetail({
       onEnd: async () => {
         try {
           const orderedRowKeys = Array.from(el.children).map((child) => (child as HTMLElement).dataset.key!).filter(Boolean);
-          const byKey = new Map(rowsRef.current.map((r) => [r.key, r]));
-          const orderedIds: string[] = [];
-          for (const key of orderedRowKeys) {
-            const row = byKey.get(key);
-            if (!row) continue;
-            orderedIds.push(row.primary.id);
-            if (row.secondary) orderedIds.push(row.secondary.id);
-          }
-          const remaining = allSchedulesRef.current.filter((s) => !orderedIds.includes(s.id)).map((s) => s.id);
-          await api.reorderSchedules([...orderedIds, ...remaining]);
+          await api.updateSettings({ detail_row_order: { ...detailOrderRef.current, [groupKeyRef.current]: orderedRowKeys } });
           reload();
         } finally {
           removeStaleFallbackClones();
@@ -150,7 +147,7 @@ export function DeviceDetail({
   // trang thay vi phai mo sheet Sua lich moi doi duoc. Ap dung target_entities
   // moi cho TAT CA dong (ca cap Bat/Tat neu la Khung gio) de giu dong bo.
   async function changeDevices(ids: string[]) {
-    await Promise.all(group.schedules.map((s) => api.updateSchedule(s.id, { ...s, target_entities: ids })));
+    await Promise.all(detailSchedules.map((s) => api.updateSchedule(s.id, { ...s, target_entities: ids })));
     setDevicePickerOpen(false);
     reload();
   }
@@ -237,7 +234,7 @@ export function DeviceDetail({
             timeFormat={settings.time_format}
             running={isRangeRowRunning(item, group.isOn, nowMs)}
             onOpen={() => {
-              if (item.isRange) {
+              if (item.isRange || item.primary.trigger_type === "auto_off") {
                 setEditing(item.primary);
                 setEditorOpen(true);
               } else {
@@ -308,8 +305,8 @@ export function DeviceDetail({
         }}
         onSave={handleSave}
         onDelete={async (id) => {
-          const s = group.schedules.find((x) => x.id === id);
-          if (s) await deleteScheduleWithSibling(s, group.schedules);
+          const s = detailSchedules.find((x) => x.id === id);
+          if (s) await deleteScheduleWithSibling(s, detailSchedules);
           setEditorOpen(false);
           setEditing(null);
           reload();

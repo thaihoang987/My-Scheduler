@@ -50,6 +50,10 @@ class ScheduleIn(BaseModel):
     # trigger_type khac "time".
     trigger_type: str = "time"  # "time" | "sunrise" | "sunset"
     offset_minutes: int = 0
+    # Khung gio (cap Bat/Tat cung group_id, luu tren ca 2 dong): moc Tat roi vao
+    # cung ngay (0) hay ngay hom sau (1) cua moc Bat; None = theo kieu gio
+    # (scheduler_engine.range_day_offset) - v0.5.79.
+    range_day_offset: Optional[int] = Field(default=None, ge=0, le=1)
     conditions: list[ScheduleCondition] = Field(default_factory=list)
     # Cong tac tong cua card (xem crud.set_group_enabled). None = khong gui,
     # giu nguyen gia tri cu khi sua lich; tao moi thi mac dinh bat.
@@ -212,6 +216,7 @@ class SettingsIn(BaseModel):
     # gui lai lenh 1 lan va canh bao neu van sai (v0.5.35, mac dinh tat).
     verify_state: Optional[bool] = None
     auto_off_section_index: Optional[int] = None
+    detail_row_order: Optional[dict[str, list[str]]] = None
 
 
 class HistoryEntry(BaseModel):

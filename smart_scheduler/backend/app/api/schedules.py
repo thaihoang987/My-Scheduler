@@ -3,28 +3,38 @@ from fastapi import APIRouter, HTTPException
 from app import crud
 from app import homeassistant
 from app.models import ScheduleGroupToggle, ScheduleIds, ScheduleIn, ScheduleOut, ScheduleReorder
-from app.scheduler_engine import compute_next_run, normalize_range_days, run_schedule_now, turn_off_running
+from app.scheduler_engine import compute_next_run, normalize_range_days, one_shot_only, run_schedule_now, turn_off_running
 from app.ws import manager
 from app.i18n import tr
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 
 
-def _with_next_run(schedule: dict) -> dict:
+def _with_next_run(schedule: dict, schedules: list[dict] | None = None) -> dict:
     schedule = dict(schedule)
-    schedule["next_run"] = compute_next_run(schedule)
+    schedule["next_run"] = compute_next_run(schedule, schedules=schedules if schedules is not None else crud.list_schedules())
     return schedule
+
+
+def _check_one_shot(data: dict) -> None:
+    """Scene/script chi kich hoat 1 lan: khong co Tat/Dao/Tu tat (v0.5.79)."""
+    if one_shot_only(data.get("target_entities") or []) and (
+            data.get("trigger_type") == "auto_off" or data["action"].get("service") in ("turn_off", "toggle")):
+        raise HTTPException(400, tr("Scene/script chỉ chạy một lần - không có Tắt, Đảo trạng thái hay Tự tắt.",
+                                    "Scenes/scripts only run once - no off, toggle or auto-off."))
 
 
 @router.get("", response_model=list[ScheduleOut])
 async def list_schedules():
-    return [_with_next_run(s) for s in crud.list_schedules()]
+    schedules = crud.list_schedules()
+    return [_with_next_run(s, schedules) for s in schedules]
 
 
 @router.post("", response_model=ScheduleOut)
 async def create_schedule(payload: ScheduleIn):
     data = payload.model_dump()
     data["action"] = payload.action.model_dump()
+    _check_one_shot(data)
     created = crud.create_schedule(data)
     if created.get("group_id") and normalize_range_days({created["group_id"]}):
         created = crud.get_schedule(created["id"])
@@ -44,6 +54,7 @@ async def get_schedule(schedule_id: str):
 async def update_schedule(schedule_id: str, payload: ScheduleIn):
     data = payload.model_dump()
     data["action"] = payload.action.model_dump()
+    _check_one_shot(data)
     updated = crud.update_schedule(schedule_id, data)
     if not updated:
         raise HTTPException(404, "Schedule not found")

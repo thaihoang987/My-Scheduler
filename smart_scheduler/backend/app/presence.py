@@ -183,6 +183,8 @@ def _release(eid: str, now: datetime, cfg: dict) -> None:
 
 
 async def _command(service: str, eid: str, now: datetime, cfg: dict, state: dict | None = None) -> list[dict] | None:
+    if eid in _failures and not await homeassistant.ensure_stable():
+        return None  # lan truoc loi: chi thu lai khi ket noi HA on dinh (v0.5.79)
     try:
         data, domain = {}, "homeassistant"
         if service == "turn_on" and eid.startswith("light.") and state and set((state.get("attributes") or {}).get("supported_color_modes") or []) - {"onoff"}:

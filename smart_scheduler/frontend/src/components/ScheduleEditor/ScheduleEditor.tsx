@@ -7,6 +7,7 @@ import {
   mergeCoverAttrs,
   mergeFanAttrs,
   mergeLightAttrs,
+  rangeDayOffset,
   validateScheduleDraft,
   type ScheduleDraft,
 } from "../../utils/scheduleRange";
@@ -23,7 +24,8 @@ import { api } from "../../services/api";
 import { defaultConditionState } from "../../utils/conditionStates";
 import { ConditionList } from "../ConditionList/ConditionList";
 import { tr } from "../../i18n";
-import { fmtTime, todayInZone } from "../../utils/appTime";
+import { fmtTime, secondsOfDayInZone, todayInZone } from "../../utils/appTime";
+import { actionChipLabel, domainProfile, type ActionService } from "../../utils/domainProfile";
 
 const DOMAIN_ACTION_SERVICE = { climate: "climate_set", light: "light_set", cover: "cover_set", fan: "fan_set" } as const;
 
@@ -144,37 +146,77 @@ export function ScheduleEditor({
   const isAutoOff = draft.trigger_type === "auto_off";
   const leaveAutoOff = (d: ScheduleDraft): Partial<ScheduleDraft> =>
     d.trigger_type === "auto_off" ? { trigger_type: "time", time: EMPTY_DRAFT.time, action_service: "turn_on" } : {};
-  const allDomain = (domain: string) =>
-    draft.target_entities.length > 0 && draft.target_entities.every((id) => entities.find((e) => e.entity_id === id)?.domain === domain);
-  const allClimate = allDomain("climate");
-  const allLight = allDomain("light");
-  const allCover = allDomain("cover");
-  const allFan = allDomain("fan");
-  const hasSpecificAction = allClimate || allLight || allCover || allFan;
   const climateInfo = useMemo(() => mergeClimateAttrs(draft.target_entities, entities), [draft.target_entities, entities]);
   const lightInfo = useMemo(() => mergeLightAttrs(draft.target_entities, entities), [draft.target_entities, entities]);
   const coverInfo = useMemo(() => mergeCoverAttrs(draft.target_entities, entities), [draft.target_entities, entities]);
   const fanInfo = useMemo(() => mergeFanAttrs(draft.target_entities, entities), [draft.target_entities, entities]);
 
-  // Tu dong chon hanh dong rieng theo domain khi thiet bi khop 1 domain co
-  // action rieng (climate/light/cover/fan) va dang o "Bat"/"Dao trang thai"
-  // (2 chip nay vua bi an di o duoi) - tranh ket UI o 1 hanh dong khong con
-  // hien chip de doi.
+  const profile = useMemo(
+    () => domainProfile(draft.target_entities.map((id) => entities.find((e) => e.entity_id === id)?.domain ?? id.split(".", 1)[0]), Boolean(coverInfo?.supports_position)),
+    [draft.target_entities, entities, coverInfo],
+  );
+  const onWord = profile?.onWord ?? tr("Bật", "On");
+  const offWord = profile?.offWord ?? tr("Tắt", "Off");
+  const defaultClimateMode = () => (climateInfo?.hvac_modes.includes("cool") ? "cool" : climateInfo?.hvac_modes[0]) ?? "cool";
+  /** Chon 1 hanh dong + gia tri mac dinh cua no (che do may lanh, 100%...). */
+  const withAction = (d: ScheduleDraft, action_service: ActionService): ScheduleDraft => ({
+    ...d,
+    action_service,
+    ...(action_service === "climate_set" ? { climate_hvac_mode: d.climate_hvac_mode ?? defaultClimateMode() } : {}),
+    ...(action_service === "light_set" ? { light_brightness_pct: d.light_brightness_pct ?? 100 } : {}),
+    ...(action_service === "cover_set" ? { cover_position: d.cover_position ?? 100 } : {}),
+    ...(action_service === "fan_set" ? { fan_percentage: d.fan_percentage ?? 50 } : {}),
+  });
+
+  // Doi thiet bi / kieu lich ma lua chon hien tai khong con hop voi loai thiet
+  // bi (vd scene khong co khung gio, rem khong co "Bat") -> ve lua chon dau
+  // tien hop le, tranh ket o 1 chip khong con hien de bam doi (v0.5.79).
   useEffect(() => {
-    if (draft.action_service !== "turn_on" && draft.action_service !== "toggle") return;
-    if (allClimate) setDraft((d) => ({ ...d, action_service: "climate_set", climate_hvac_mode: d.climate_hvac_mode ?? (climateInfo?.hvac_modes.includes("cool") ? "cool" : climateInfo?.hvac_modes[0]) ?? "cool" }));
-    else if (allLight) setDraft((d) => ({ ...d, action_service: "light_set", light_brightness_pct: d.light_brightness_pct ?? 100 }));
-    else if (allCover) setDraft((d) => ({ ...d, action_service: "cover_set", cover_position: d.cover_position ?? 100 }));
-    else if (allFan) setDraft((d) => ({ ...d, action_service: "fan_set", fan_percentage: d.fan_percentage ?? 50 }));
-  }, [allClimate, allLight, allCover, allFan]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!profile) return;
+    setDraft((d) => {
+      let next = d;
+      if (next.trigger_type === "auto_off" && !profile.autoOff) next = { ...next, ...leaveAutoOff(next) };
+      if (next.end_time !== null && !profile.range) next = { ...next, end_time: null };
+      if (next.end_time === null && next.trigger_type !== "auto_off" && !profile.actions.includes(next.action_service)) {
+        next = withAction(next, profile.actions[0]);
+      }
+      return next === d ? d : next;
+    });
+  }, [profile?.key, isRange, isAutoOff]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const validationError = useMemo(() => validateScheduleDraft(draft), [draft]);
   const showError = validationError && (saveAttempted || draft.target_entities.length > 0);
 
+  // Khung gio co moc mat troi (v0.5.79): chon ket thuc trong ngay / hom sau.
+  // 2 gio co dinh thi tu suy theo gio (null). Tron gio co dinh + mat troi chua
+  // chon -> doan theo gio mat troi hom nay roi luu gia tri chon tay.
+  const hasSun = isRange && (draft.trigger_type !== "time" || draft.end_trigger_type !== "time");
+  const mixedSun = isRange && (draft.trigger_type === "time") !== (draft.end_trigger_type === "time");
+  const clockOf = (trigger: string, offset: number, time: string): number | null => {
+    if (trigger === "time") {
+      const [h = 0, m = 0, s = 0] = time.split(":").map(Number);
+      return h * 3600 + m * 60 + s;
+    }
+    const iso = trigger === "sunrise" ? sunTimes.sunrise : sunTimes.sunset;
+    return iso ? secondsOfDayInZone(iso) + offset * 60 : null;
+  };
+  const guessedOffset = (): 0 | 1 => {
+    const on = clockOf(draft.trigger_type, draft.offset_minutes, draft.time);
+    const off = clockOf(draft.end_trigger_type, draft.end_offset_minutes, draft.end_time ?? draft.time);
+    return on !== null && off !== null && off <= on ? 1 : 0;
+  };
+  const effectiveDayOffset: 0 | 1 = draft.range_day_offset ?? (mixedSun
+    ? guessedOffset()
+    : rangeDayOffset(
+        { trigger_type: draft.trigger_type, time: draft.time, offset_minutes: draft.offset_minutes, range_day_offset: null },
+        { trigger_type: draft.end_trigger_type, time: draft.end_time ?? draft.time, offset_minutes: draft.end_offset_minutes, range_day_offset: null },
+      ));
+
   function save() {
     setSaveAttempted(true);
     if (validationError) return;
-    onSave(draft, schedule?.id);
+    const range_day_offset = !hasSun ? null : mixedSun ? effectiveDayOffset : draft.range_day_offset;
+    onSave({ ...draft, range_day_offset }, schedule?.id);
   }
 
   function defaultEndTime(time: string): string {
@@ -228,11 +270,11 @@ export function ScheduleEditor({
           </button>
         )}
 
-        <div className="chip-row">
+        {(!profile || profile.range || profile.autoOff) && <div className="chip-row">
           <button className={!isRange && !isAutoOff ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, end_time: null, ...leaveAutoOff(d) }))}>
             {tr("Mốc thời gian", "Time point")}
           </button>
-          <button
+          {(!profile || profile.range) && <button
             className={isRange ? "chip chip--active" : "chip"}
             onClick={() =>
               setDraft((d) => {
@@ -241,9 +283,9 @@ export function ScheduleEditor({
               })
             }
           >
-            {tr("Khung giờ (bật → tắt)", "Time range (on → off)")}
-          </button>
-          <button
+            {tr("Khung giờ", "Time range")} ({onWord} → {offWord})
+          </button>}
+          {(!profile || profile.autoOff) && <button
             className={isAutoOff ? "chip chip--active" : "chip"}
             onClick={() =>
               setDraft((d) => ({
@@ -258,8 +300,8 @@ export function ScheduleEditor({
             }
           >
             ⏱ {tr("Tự tắt sau khi bật", "Auto-off after on")}
-          </button>
-        </div>
+          </button>}
+        </div>}
 
         {/* Lich 1 moc: chon kieu gio o day. Khung gio: moi moc Bat/Tat co hang
             chip rieng ben duoi (v0.5.51). */}
@@ -298,9 +340,10 @@ export function ScheduleEditor({
             </p>
           </>
         ) : isRange ? (
+          <>
           <div className="range-wheels">
             <div className="range-wheel">
-              <div className="field-label field-label--inline">{tr("Bật lúc", "Turn on at")}</div>
+              <div className="field-label field-label--inline">{onWord} {tr("lúc", "at")}</div>
               <PointEditor
                 trigger={draft.trigger_type === "auto_off" ? "time" : draft.trigger_type}
                 offset={draft.offset_minutes}
@@ -329,11 +372,11 @@ export function ScheduleEditor({
               aria-label={tr("Đổi chỗ Bật và Tắt", "Swap on and off")}
               title={tr("Đổi chỗ Bật và Tắt", "Swap on and off")}
             >
-              ⇅ {tr("Đổi Bật/Tắt", "Swap on/off")}
+              ⇅ {tr("Đổi", "Swap")} {onWord}/{offWord}
             </button>
             </div>
             <div className="range-wheel">
-              <div className="field-label field-label--inline">{tr("Tắt lúc", "Turn off at")}</div>
+              <div className="field-label field-label--inline">{offWord} {tr("lúc", "at")}</div>
               <PointEditor
                 trigger={draft.end_trigger_type}
                 offset={draft.end_offset_minutes}
@@ -343,6 +386,56 @@ export function ScheduleEditor({
               />
             </div>
           </div>
+            {hasSun && (
+              <>
+                <label className="field-label">{offWord} {tr("vào", "on")}</label>
+                <div className="chip-row">
+                  <button className={effectiveDayOffset === 0 ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, range_day_offset: 0 }))}>
+                    {tr("Trong ngày", "Same day")}
+                  </button>
+                  <button className={effectiveDayOffset === 1 ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, range_day_offset: 1 }))}>
+                    🌙 {tr("Sáng hôm sau", "Next day")}
+                  </button>
+                </div>
+                <p className="settings-hint">
+                  {tr(
+                    "Hôm nào giờ mặt trời làm giờ kết thúc đến trước giờ bắt đầu (khung trong ngày) thì khung hôm đó được bỏ qua.",
+                    "On days when sun times put the end before the start (same-day range), that day's range is skipped.",
+                  )}
+                </p>
+              </>
+            )}
+            {profile?.rangeLight && (
+              <>
+                <label className="field-label">{tr("Khi bật", "When turning on")}</label>
+                <div className="chip-row">
+                  <button
+                    className={!(draft.light_brightness_pct != null || draft.light_color_temp_kelvin != null || draft.light_rgb_color != null) ? "chip chip--active" : "chip"}
+                    onClick={() => setDraft((d) => ({ ...d, light_brightness_pct: null, light_color_temp_kelvin: null, light_rgb_color: null }))}
+                  >
+                    {tr("Như lần trước", "As last time")}
+                  </button>
+                  <button
+                    className={draft.light_brightness_pct != null || draft.light_color_temp_kelvin != null || draft.light_rgb_color != null ? "chip chip--active" : "chip"}
+                    onClick={() => setDraft((d) => ({ ...d, light_brightness_pct: d.light_brightness_pct ?? 100 }))}
+                  >
+                    💡 {tr("Đặt độ sáng/màu", "Set brightness/color")}
+                  </button>
+                </div>
+                {(draft.light_brightness_pct != null || draft.light_color_temp_kelvin != null || draft.light_rgb_color != null) && (
+                  <LightActionEditor
+                    light={lightInfo}
+                    brightnessPct={draft.light_brightness_pct}
+                    colorTempKelvin={draft.light_color_temp_kelvin}
+                    rgbColor={draft.light_rgb_color}
+                    onChange={(light_brightness_pct, light_color_temp_kelvin, light_rgb_color) =>
+                      setDraft((d) => ({ ...d, light_brightness_pct, light_color_temp_kelvin, light_rgb_color }))
+                    }
+                  />
+                )}
+              </>
+            )}
+          </>
         ) : draft.trigger_type === "time" ? (
           <TimeWheelPicker value={draft.time} onChange={(time) => setDraft((d) => ({ ...d, time }))} />
         ) : (
@@ -357,77 +450,21 @@ export function ScheduleEditor({
         {!isRange && !isAutoOff && (
           <>
             <label className="field-label">{tr("Hành động", "Action")}</label>
-            <div className="chip-row">
-              {/* "Bat"/"Dao trang thai" chi co y nghia cho cong tac/den don gian
-                  (khong dat che do/do sang/vi tri/toc do) - an di khi thiet bi
-                  co hanh dong rieng theo domain (climate/light/cover/fan) de
-                  do roi mat, "Tat" van giu vi van huu ich (vd tat den luc 23h
-                  khong can dat do sang) - phan hoi 2026-09-23. */}
-              {!hasSpecificAction && (
-                <button
-                  className={draft.action_service === "turn_on" ? "chip chip--active" : "chip"}
-                  onClick={() => setDraft((d) => ({ ...d, action_service: "turn_on" }))}
-                >
-                  {tr("Bật", "Turn on")}
-                </button>
-              )}
-              <button
-                className={draft.action_service === "turn_off" ? "chip chip--active" : "chip"}
-                onClick={() => setDraft((d) => ({ ...d, action_service: "turn_off" }))}
-              >
-                {tr("Tắt", "Turn off")}
-              </button>
-              {!hasSpecificAction && (
-                <button
-                  className={draft.action_service === "toggle" ? "chip chip--active" : "chip"}
-                  onClick={() => setDraft((d) => ({ ...d, action_service: "toggle" }))}
-                >
-                  {tr("Đảo trạng thái", "Toggle")}
-                </button>
-              )}
-              {allClimate && (
-                <button
-                  className={draft.action_service === "climate_set" ? "chip chip--active" : "chip"}
-                  onClick={() =>
-                    setDraft((d) => ({
-                      ...d,
-                      action_service: "climate_set",
-                      // Uu tien mac dinh "cool" (nhu cau pho bien nhat: bat may
-                      // lanh lam mat) neu thiet bi ho tro, khong thi lay mode
-                      // dau tien - tranh mac dinh nham thanh "off" chi vi no
-                      // dung dau mang hvac_modes cua nhieu thiet bi thuc te.
-                      climate_hvac_mode: d.climate_hvac_mode ?? (climateInfo?.hvac_modes.includes("cool") ? "cool" : climateInfo?.hvac_modes[0]) ?? "cool",
-                    }))
-                  }
-                >
-                  ❄️ {tr("Đặt chế độ", "Set mode")}
-                </button>
-              )}
-              {allLight && (
-                <button
-                  className={draft.action_service === "light_set" ? "chip chip--active" : "chip"}
-                  onClick={() => setDraft((d) => ({ ...d, action_service: "light_set", light_brightness_pct: d.light_brightness_pct ?? 100 }))}
-                >
-                  💡 {tr("Đặt độ sáng/màu", "Set brightness/color")}
-                </button>
-              )}
-              {allCover && (
-                <button
-                  className={draft.action_service === "cover_set" ? "chip chip--active" : "chip"}
-                  onClick={() => setDraft((d) => ({ ...d, action_service: "cover_set", cover_position: d.cover_position ?? 100 }))}
-                >
-                  🪟 {tr("Đặt vị trí", "Set position")}
-                </button>
-              )}
-              {allFan && (
-                <button
-                  className={draft.action_service === "fan_set" ? "chip chip--active" : "chip"}
-                  onClick={() => setDraft((d) => ({ ...d, action_service: "fan_set", fan_percentage: d.fan_percentage ?? 50 }))}
-                >
-                  🌀 {tr("Đặt tốc độ", "Set speed")}
-                </button>
-              )}
-            </div>
+            {profile ? (
+              <div className="chip-row">
+                {profile.actions.map((service) => (
+                  <button
+                    key={service}
+                    className={draft.action_service === service ? "chip chip--active" : "chip"}
+                    onClick={() => setDraft((d) => withAction(d, service))}
+                  >
+                    {actionChipLabel(service, profile.domain)}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="settings-hint">{tr("Chọn thiết bị để hiện các hành động của loại đó.", "Select devices to see their actions.")}</p>
+            )}
             {draft.action_service === "climate_set" && (
               <ClimateActionEditor
                 climate={climateInfo}

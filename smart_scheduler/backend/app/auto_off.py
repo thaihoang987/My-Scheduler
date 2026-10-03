@@ -79,6 +79,8 @@ def rules(schedules: list[dict] | None = None) -> dict[str, tuple[int, dict]]:
         if secs <= 0:
             continue
         for eid in s.get("target_entities") or []:
+            if eid.split(".", 1)[0] in ("scene", "script"):
+                continue  # chay 1 lan, khong co "dang bat" de tu tat (v0.5.79)
             if eid not in out or secs < out[eid][0]:
                 out[eid] = (secs, s)
     return out
@@ -159,6 +161,8 @@ async def check_once(now: datetime | None = None) -> list[str]:
         sent = _last_sent.get(eid)
         if sent and (now - sent).total_seconds() < RETRY_SECONDS:
             continue
+        if sent and not await homeassistant.ensure_stable():
+            continue  # gui lai chi khi ket noi HA on dinh (v0.5.79)
         _last_sent[eid] = now
         dur = format_duration(secs)
         try:

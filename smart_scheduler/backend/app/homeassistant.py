@@ -35,6 +35,73 @@ class HAError(RuntimeError):
     pass
 
 
+# ---- Suc khoe ket noi HA (v0.5.79) ----
+# Lenh GUI LAI (thu lai tat cua hen tay, tu tat, gia lap co nguoi, kiem tra
+# trang thai, tat bu sau restart) chi duoc gui khi ket noi da ON DINH: khong co
+# loi trong STABLE_SECONDS va da co 1 lan doc thanh cong SAU loi cuoi. Tranh
+# ban lenh lien tuc luc HA/mang chap chon. Lenh theo lich binh thuong (lan dau)
+# van gui ngay - khong bi chan.
+STABLE_SECONDS = 60
+_last_failure: float | None = None
+_last_success: float | None = None
+
+
+def _mark_ok() -> None:
+    global _last_success
+    _last_success = time.monotonic()
+
+
+def _mark_failure() -> None:
+    global _last_failure
+    _last_failure = time.monotonic()
+
+
+def connection_stable() -> bool:
+    if _last_failure is None:
+        return True
+    return (_last_success is not None and _last_success > _last_failure
+            and time.monotonic() - _last_failure >= STABLE_SECONDS)
+
+
+async def ensure_stable() -> bool:
+    """True khi duoc phep gui lai lenh. Loi cu hon STABLE_SECONDS ma chua co lan
+    doc nao sau do -> doc thu 1 lan (GET, khong doi gi tren HA) de xac nhan."""
+    if connection_stable():
+        return True
+    if _last_failure is not None and time.monotonic() - _last_failure < STABLE_SECONDS:
+        return False
+    try:
+        await ping()
+    except Exception as exc:  # noqa: BLE001
+        log.info("HA van chua on dinh, hoan gui lai lenh: %s", exc)
+        return False
+    return connection_stable()
+
+
+def _connection_error(exc: BaseException) -> bool:
+    """Loi ket noi/HA dang khoi dong (khong phai loi du lieu 4xx cua 1 lenh)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return isinstance(exc, (httpx.TransportError, OSError))
+
+
+# Thu tu lenh theo thiet bi: moi lan gui lenh toi 1 entity tang so nay. Kiem tra
+# trang thai so lai truoc khi gui lai - co lenh MOI hon (hen tay, tu tat, lich
+# khac...) thi khong gui lai lenh cu de lat nguoc thiet bi.
+_command_counter = itertools.count(1)
+_command_seq: dict[str, int] = {}
+
+
+def note_command(entity_ids: list[str]) -> None:
+    seq = next(_command_counter)
+    for eid in entity_ids:
+        _command_seq[eid] = seq
+
+
+def command_seq(entity_id: str) -> int:
+    return _command_seq.get(entity_id, 0)
+
+
 def _effective_token() -> str:
     return SUPERVISOR_TOKEN or HA_TOKEN
 
@@ -86,21 +153,34 @@ def _client(timeout: float) -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=timeout, verify=_ssl_context)
 
 
+async def _get(path: str, timeout: float = 10, **kwargs):
+    try:
+        async with _client(timeout) as client:
+            resp = await client.get(f"{_effective_api_base()}{path}", headers=_headers(), **kwargs)
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as exc:
+        if _connection_error(exc):
+            _mark_failure()
+        raise
+    _mark_ok()
+    return data
+
+
+async def ping() -> None:
+    """GET /api/ - kiem tra HA dang tra loi (khong doc ca danh sach states)."""
+    await _get("/")
+
+
 async def get_states() -> list[dict]:
-    async with _client(10) as client:
-        resp = await client.get(f"{_effective_api_base()}/states", headers=_headers())
-        resp.raise_for_status()
-        return resp.json()
+    return await _get("/states")
 
 
 async def get_core_config() -> dict:
     """GET /config - lay latitude/longitude/elevation cua HA (Settings ->
     System -> General) de tinh gio moc troi/lan (sunrise/sunset trigger,
     muc "Kieu hen gio" moi)."""
-    async with _client(10) as client:
-        resp = await client.get(f"{_effective_api_base()}/config", headers=_headers())
-        resp.raise_for_status()
-        return resp.json()
+    return await _get("/config")
 
 
 async def get_state_history(entity_ids: list[str], start: str, end: str) -> dict[str, list[dict]]:
@@ -114,10 +194,7 @@ async def get_state_history(entity_ids: list[str], start: str, end: str) -> dict
         "minimal_response": "1",
         "no_attributes": "1",
     }
-    async with _client(20) as client:
-        resp = await client.get(f"{_effective_api_base()}/history/period/{quote(start, safe='')}", headers=_headers(), params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    data = await _get(f"/history/period/{quote(start, safe='')}", timeout=20, params=params)
     out: dict[str, list[dict]] = {eid: [] for eid in entity_ids}
     for series in data:
         if not series:
@@ -132,18 +209,29 @@ async def get_state_history(entity_ids: list[str], start: str, end: str) -> dict
 
 async def call_service(domain: str, service: str, entity_ids: list[str], service_data: dict) -> list[dict]:
     log.info("HA command service=%s.%s targets=%s", domain, service, entity_ids)
+    note_command(entity_ids)
     payload = dict(service_data or {})
     payload["entity_id"] = entity_ids
-    async with _client(15) as client:
-        resp = await client.post(
-            f"{_effective_api_base()}/services/{domain}/{service}",
-            headers=_headers(),
-            content=json.dumps(payload),
-        )
-        if resp.status_code >= 400:
-            raise HAError(f"HA service call failed ({resp.status_code}): {resp.text}")
-        data = resp.json()
-        return data if isinstance(data, list) else []
+    try:
+        async with _client(15) as client:
+            resp = await client.post(
+                f"{_effective_api_base()}/services/{domain}/{service}",
+                headers=_headers(),
+                content=json.dumps(payload),
+            )
+    except Exception as exc:
+        # Timeout: HA CO THE da thuc hien lenh - noi goi khong duoc tu phat lai
+        # lenh khong idempotent (scene/script/toggle).
+        if _connection_error(exc):
+            _mark_failure()
+        raise
+    if resp.status_code >= 500:
+        _mark_failure()
+    if resp.status_code >= 400:
+        raise HAError(f"HA service call failed ({resp.status_code}): {resp.text}")
+    _mark_ok()
+    data = resp.json()
+    return data if isinstance(data, list) else []
 
 
 _id_counter = itertools.count(1)

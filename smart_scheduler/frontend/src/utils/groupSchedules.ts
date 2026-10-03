@@ -39,7 +39,7 @@ export function groupSchedules(schedules: Schedule[], entities: EntitySummary[])
         singleEntity: isSingle ? entity ?? null : null,
         schedules: [],
         favorite: isSingle ? Boolean(entity?.favorite) : schedule.favorite,
-        isOn: entity?.state === "on",
+        isOn: entity?.state === "on" || entity?.state === "open",
         missingIds: [],
         minSortOrder: schedule.sort_order,
       };
@@ -52,7 +52,7 @@ export function groupSchedules(schedules: Schedule[], entities: EntitySummary[])
         group.entityIds.push(id);
         if (entityMap.get(id)?.missing) group.missingIds.push(id);
       }
-      if (entityMap.get(id)?.state === "on") group.isOn = true;
+      if (entityMap.get(id)?.state === "on" || entityMap.get(id)?.state === "open") group.isOn = true;
     }
   }
 

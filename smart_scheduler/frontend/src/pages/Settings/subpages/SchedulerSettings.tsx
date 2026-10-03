@@ -102,6 +102,12 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
           <input type="checkbox" checked={settings.verify_state} onChange={(e) => update({ verify_state: e.target.checked })} />
         </label>
         <p className="settings-hint">
+          {tr(
+            "Tùy chọn chung cho mọi lịch, mặc định tắt. Relay xung (bấm 1 lần là đổi trạng thái) thì nên để tắt, vì gửi lại có thể đảo thêm 1 lần - add-on không tự nhận biết loại relay. Không gửi lại khi lịch đã sửa/tắt, hết khung giờ, đang tạm dừng, thiết bị đã nhận lệnh mới hơn hoặc kết nối Home Assistant chưa ổn định. Scene và script không bao giờ được kiểm tra lại.",
+            "A single option for all schedules, off by default. Keep it off for pulse relays (one press toggles), since a retry could toggle again - the add-on cannot detect relay types. No retry when the schedule was edited/disabled, the range ended, schedules are paused, the device received a newer command or the Home Assistant connection is not stable. Scenes and scripts are never verified.",
+          )}
+        </p>
+        <p className="settings-hint">
           {tr("30 giây sau khi lịch bật/tắt, đọc trạng thái THẬT từ Home Assistant. Thiết bị nào chưa đúng (mất lệnh Zigbee/WiFi, thiết bị chập chờn) sẽ được gửi lại lệnh 1 lần; 30 giây sau vẫn sai thì ghi cảnh báo vào Nhật ký.", "Thirty seconds after an on/off schedule, read the actual state from Home Assistant. A device with the wrong state receives one retry; if it is still wrong 30 seconds later, a warning is written to the log.")}
         </p>
       </div>

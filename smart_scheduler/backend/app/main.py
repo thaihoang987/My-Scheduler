@@ -14,7 +14,7 @@ from app.api import backup, entities, groups, history, manual, presence as prese
 from app.db import init_db
 from app.homeassistant import connection_mode
 from app.i18n import tr
-from app.scheduler_engine import normalize_range_days, scheduler_loop
+from app.scheduler_engine import normalize_range_days, scheduler_loop, seed_active_ranges
 from app.ws import manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -23,6 +23,7 @@ log = logging.getLogger("ha_smart_scheduler")
 _scheduler_task: asyncio.Task | None = None
 _presence_task: asyncio.Task | None = None
 _auto_off_task: asyncio.Task | None = None
+TIMEZONE_RETRY_SECONDS = 30
 
 
 async def _reset_devices_on_startup() -> None:
@@ -67,19 +68,22 @@ async def _reset_devices_on_startup() -> None:
         log.warning("Tat thiet bi luc khoi dong that bai (HA co the chua san sang): %s", exc)
 
 
-async def _load_ha_timezone() -> None:
+async def _load_ha_timezone() -> bool:
     """Lay mui gio tu cau hinh HA (Settings -> System -> General) - moi tinh toan
     gio cua add-on theo DUNG mui nay (v0.5.54 bo o chon mui gio rieng). Loi (HA
-    chua san sang) -> giu TZ do Supervisor truyen vao (cung = mui gio HA)."""
+    chua san sang) -> giu mui gio du phong va bao cho lifespan thu lai nen."""
     from zoneinfo import ZoneInfo
 
     from app import config
+    loaded = False
     try:
         tz = (await homeassistant.get_core_config()).get("time_zone")
-        if tz:
-            ZoneInfo(tz)
-            config.HA_TIMEZONE = tz
-            log.info("Mui gio Home Assistant: %s", tz)
+        if not tz:
+            raise ValueError("Home Assistant config has no time_zone")
+        ZoneInfo(tz)
+        config.HA_TIMEZONE = tz
+        loaded = True
+        log.info("Mui gio Home Assistant: %s", tz)
     except Exception as exc:  # noqa: BLE001
         log.warning("Chua doc duoc mui gio tu Home Assistant (dung TZ=%s): %s", config.DEFAULT_TIMEZONE, exc)
     # Ban cu tung chon mui gio rieng trong Cai dat -> bo, tu nay theo HA (v0.5.54).
@@ -91,6 +95,20 @@ async def _load_ha_timezone() -> None:
                          tr(f"Bỏ múi giờ riêng {old}, từ nay theo Home Assistant ({now_tz}).",
                             f"Dropped the add-on's own time zone {old}; now following Home Assistant ({now_tz})."),
                          manual=True)
+    return loaded
+
+
+async def _retry_ha_timezone() -> None:
+    """Retry startup synchronization without blocking the scheduler or UI.
+
+    Stop after the first valid HA timezone; lifespan cancels this task on shutdown.
+    """
+    while True:
+        await asyncio.sleep(TIMEZONE_RETRY_SECONDS)
+        if await _load_ha_timezone():
+            normalize_range_days()
+            await manager.broadcast("schedule_updated", {"timezone_synced": True})
+            return
 
 
 @contextlib.asynccontextmanager
@@ -98,10 +116,13 @@ async def lifespan(app: FastAPI):
     global _scheduler_task, _presence_task, _auto_off_task
     init_db()
     log.info("Database ready")
-    await _load_ha_timezone()
+    timezone_loaded = await _load_ha_timezone()
     fixed = normalize_range_days()
     if fixed:
         log.info("Moved repeat days of %d overnight range end(s) to the next day", fixed)
+    seeded = seed_active_ranges()
+    if seeded:
+        log.info("Tracking %d open time range(s) from before the restart (catch-up off)", seeded)
     await _reset_devices_on_startup()
     await manual_timer.restore_active()
     frontend_version_file = Path(os.environ.get("STATIC_DIR", "/app/static")) / "build-version.txt"
@@ -111,10 +132,14 @@ async def lifespan(app: FastAPI):
     _scheduler_task = asyncio.create_task(scheduler_loop())
     _presence_task = asyncio.create_task(presence.presence_loop())
     _auto_off_task = asyncio.create_task(auto_off.auto_off_loop())
-    yield
-    for task in (_scheduler_task, _presence_task, _auto_off_task):
-        if task:
+    timezone_task = None if timezone_loaded else asyncio.create_task(_retry_ha_timezone())
+    try:
+        yield
+    finally:
+        tasks = [task for task in (_scheduler_task, _presence_task, _auto_off_task, timezone_task) if task]
+        for task in tasks:
             task.cancel()
+        for task in tasks:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
