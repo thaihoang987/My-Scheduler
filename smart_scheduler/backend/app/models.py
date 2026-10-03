@@ -33,9 +33,12 @@ class ScheduleIn(BaseModel):
     days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4, 5, 6])
     time: str  # "HH:MM:SS"; lich cu "HH:MM" van duoc ho tro nhu :00
     timezone: Optional[str] = None
-    sort_order: int = 0
+    # None = client khong gui -> tao moi: xep cuoi; sua: GIU vi tri/yeu thich cu.
+    # Truoc mac dinh 0/False nen moi lan Sua lich deu reset sort_order=0 (lich
+    # nhay len dau) va bo Yeu thich (phan hoi 2026-10-03).
+    sort_order: Optional[int] = None
     group_id: Optional[str] = None
-    favorite: bool = False
+    favorite: Optional[bool] = None
     # Khoang ngay ap dung (tuy chon, "YYYY-MM-DD") - rong = luon ap dung,
     # khong gioi han. Phan hoi thuc te 2026-09-22: muon "hen gio kieu keo tu
     # ngay toi ngay" (vd lich tuoi cay chi chay trong mua he).
@@ -62,6 +65,8 @@ class ScheduleIn(BaseModel):
 
 class ScheduleOut(ScheduleIn):
     id: str
+    sort_order: int = 0
+    favorite: bool = False
     card_enabled: bool = True
     timezone: str
     skip_once: bool = False

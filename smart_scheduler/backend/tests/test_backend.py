@@ -886,3 +886,52 @@ def test_auto_off_not_part_of_group():
     crud.set_group_state(g["id"], enabled=False)
     s = make_auto_off()
     assert crud.get_schedule(s["id"])["group_paused"] is False
+
+
+# ---- sua lich khong duoc doi vi tri (sort_order/favorite) ----
+
+def _api_payload(**over):
+    from app.models import ScheduleIn
+    data = {"name": "T", "target_entities": ["switch.a"], "time": "06:00:00",
+            "action": {"domain": "switch", "service": "turn_on", "service_data": {}}}
+    data.update(over)
+    return ScheduleIn(**data)
+
+
+def test_api_create_appends_and_edit_keeps_position():
+    from app.api import schedules as schedules_api
+    a = run(schedules_api.create_schedule(_api_payload(time="06:00:00")))
+    b = run(schedules_api.create_schedule(_api_payload(time="07:00:00")))
+    c = run(schedules_api.create_schedule(_api_payload(time="08:00:00")))
+    crud.reorder_schedules([c["id"], a["id"], b["id"]])
+    crud.set_favorite(b["id"], True)
+    run(schedules_api.update_schedule(b["id"], _api_payload(time="05:00:00")))
+    order = [s["id"] for s in crud.list_schedules()]
+    assert order == [c["id"], a["id"], b["id"]]
+    assert crud.get_schedule(b["id"])["favorite"] is True
+    d = run(schedules_api.create_schedule(_api_payload(time="04:00:00")))
+    assert [s["id"] for s in crud.list_schedules()][-1] == d["id"]
+
+
+# ---- kieu xem rieng tung tai khoan HA (v0.5.87) ----
+
+def _req(uid=None):
+    from starlette.requests import Request
+    headers = [(b"x-remote-user-id", uid.encode())] if uid else []
+    return Request({"type": "http", "headers": headers})
+
+
+def test_display_mode_per_ha_user():
+    from app.api import settings as settings_api
+    from app.models import SettingsIn
+    run(settings_api.update_settings(SettingsIn(display_mode="list"), _req("u1")))
+    run(settings_api.update_settings(SettingsIn(display_mode="timeline"), _req("u2")))
+    assert run(settings_api.get_settings(_req("u1")))["display_mode"] == "list"
+    assert run(settings_api.get_settings(_req("u2")))["display_mode"] == "timeline"
+    # tai khoan chua chon / mo khong qua Ingress -> kieu dung chung
+    assert run(settings_api.get_settings(_req("admin")))["display_mode"] == "compact"
+    assert run(settings_api.get_settings(_req()))["display_mode"] == "compact"
+    assert "user_display_modes" not in run(settings_api.get_settings(_req("u1")))
+    run(settings_api.update_settings(SettingsIn(display_mode="agenda"), _req()))
+    assert run(settings_api.get_settings(_req("admin")))["display_mode"] == "agenda"
+    assert run(settings_api.get_settings(_req("u1")))["display_mode"] == "list"

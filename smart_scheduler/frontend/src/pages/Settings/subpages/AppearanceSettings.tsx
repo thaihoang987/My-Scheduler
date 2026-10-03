@@ -62,6 +62,7 @@ export function AppearanceSettings({ settings, reload, onBack }: { settings: Set
             </button>
           ))}
         </div>
+        <p className="settings-hint">{tr("Mỗi tài khoản Home Assistant có kiểu xem riêng.", "Each Home Assistant user has their own view.")}</p>
       </div>
 
       <div className="settings-section">
