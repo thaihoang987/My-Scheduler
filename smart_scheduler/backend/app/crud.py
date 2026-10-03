@@ -672,9 +672,13 @@ def import_all(data: dict) -> dict:
         if "groups" in data:
             c.execute("DELETE FROM groups")
             for g in data.get("groups") or []:
+                # Trang thai nhom (v0.5.85): cong tac nhom + "Bo qua toi <moc ngay gio>".
+                # Khoi phuc: moc con hieu luc -> bo qua tiep toi dung moc do; da qua
+                # -> xoa (khong luu lai moc cu).
                 c.execute(
-                    "INSERT INTO groups (id, name, enabled, sort_order) VALUES (?,?,?,?)",
-                    (g["id"], g["name"], g.get("enabled", 1), g.get("sort_order", 0)),
+                    "INSERT INTO groups (id, name, enabled, sort_order, skip_until) VALUES (?,?,?,?,?)",
+                    (g["id"], g["name"], 0 if g.get("enabled", 1) in (0, False) else 1,
+                     g.get("sort_order", 0), _skip_active(g.get("skip_until"))),
                 )
         for s in data.get("schedules", []):
             c.execute(

@@ -1,3 +1,4 @@
+import json
 import asyncio
 import sqlite3
 from datetime import datetime, timedelta
@@ -935,3 +936,36 @@ def test_display_mode_per_ha_user():
     run(settings_api.update_settings(SettingsIn(display_mode="agenda"), _req()))
     assert run(settings_api.get_settings(_req("admin")))["display_mode"] == "agenda"
     assert run(settings_api.get_settings(_req("u1")))["display_mode"] == "list"
+
+
+def test_backup_roundtrip_keeps_group_state():
+    off = crud.create_group("Lights")
+    rain = crud.create_group("Garden")
+    crud.set_group_state(off["id"], enabled=False)
+    until = (datetime.now(TZ) + timedelta(days=1)).isoformat()
+    crud.set_group_state(rain["id"], skip_until=until)
+    crud.upsert_alias("switch.a", "switch", {"category_id": rain["id"], "added": True})
+    s = make_schedule()
+    data = json.loads(json.dumps(crud.export_all()))
+    crud.import_all({"version": 3, "schedules": [], "entity_aliases": [], "groups": [], "settings": {}})
+    assert crud.list_groups() == []
+    crud.import_all(data)
+    got = {g["name"]: g for g in crud.list_groups()}
+    assert got["Lights"]["enabled"] is False and got["Lights"]["skip_until"] is None
+    assert got["Garden"]["enabled"] is True and got["Garden"]["skip_until"] == until
+    assert crud.get_schedule(s["id"])["group_skip_until"] == until
+
+
+def test_backup_import_old_file_without_group_state():
+    crud.import_all({"version": 2, "schedules": [], "entity_aliases": [],
+                     "groups": [{"id": "g1", "name": "Old", "sort_order": 0}], "settings": {}})
+    g = crud.list_groups()[0]
+    assert g["enabled"] is True and g["skip_until"] is None
+
+
+def test_backup_import_drops_expired_group_skip():
+    past = (datetime.now(TZ) - timedelta(hours=1)).isoformat()
+    crud.import_all({"version": 3, "schedules": [], "entity_aliases": [], "settings": {},
+                     "groups": [{"id": "g1", "name": "Garden", "enabled": 1, "sort_order": 0, "skip_until": past}]})
+    raw = db.get_conn().execute("SELECT skip_until FROM groups WHERE id='g1'").fetchone()[0]
+    assert raw is None
