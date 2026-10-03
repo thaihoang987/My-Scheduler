@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.91
+
+- Docs: link to the community forum thread for questions and feedback.
+
 ## 0.5.90
 
 - Collapsed/expanded groups on Home are now saved per Home Assistant user on the server instead of in each browser, and are included in backups. Your previous browser setting is moved over automatically.
