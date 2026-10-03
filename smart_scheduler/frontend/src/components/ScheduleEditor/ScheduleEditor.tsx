@@ -93,6 +93,7 @@ export function ScheduleEditor({
   entities,
   presetEntities,
   lockEntities,
+  mode,
   onClose,
   onSave,
   onDelete,
@@ -114,6 +115,10 @@ export function ScheduleEditor({
    * tranh 2 duong doi thiet bi khac nhau de gay lech du lieu. Sheet nay van
    * cho chon thiet bi binh thuong khi tao lich HOAN TOAN MOI tu trang Nha. */
   lockEntities?: boolean;
+  /** Device Detail tach "Tu tat sau khi bat" thanh khuc rieng (khong thuoc
+   * cong tac Hen gio cua card): "schedule" an chip Tu tat, "auto_off" chi sua
+   * Tu tat (an ca hang chip kieu lich). Bo trong = du 3 kieu (trang Nha). */
+  mode?: "schedule" | "auto_off";
   onClose: () => void;
   onSave: (draft: ScheduleDraft, id?: string) => void;
   onDelete?: (id: string) => void;
@@ -128,7 +133,10 @@ export function ScheduleEditor({
     if (schedule) {
       setDraft(draftFromSchedule(schedule, allSchedules));
     } else if (open) {
-      setDraft({ ...EMPTY_DRAFT, target_entities: presetEntities ?? [] });
+      const fresh = { ...EMPTY_DRAFT, target_entities: presetEntities ?? [] };
+      setDraft(mode === "auto_off"
+        ? { ...fresh, trigger_type: "auto_off", action_service: "turn_off", time: lastAutoOffDuration(allSchedules) }
+        : fresh);
     }
   }, [schedule, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -184,7 +192,13 @@ export function ScheduleEditor({
     });
   }, [profile?.key, isRange, isAutoOff]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const validationError = useMemo(() => validateScheduleDraft(draft), [draft]);
+  // Moi thiet bi chi 1 lich Tu tat: 2 lich thi backend chi lay thoi gian ngan
+  // nhat, lich kia vo nghia (backend cung chan, xem _check_auto_off_unique).
+  const autoOffTaken = useMemo(() => isAutoOff && allSchedules.some((s) => s.id !== schedule?.id
+    && s.trigger_type === "auto_off" && s.target_entities.some((id) => draft.target_entities.includes(id))), [isAutoOff, allSchedules, schedule?.id, draft.target_entities]);
+  const validationError = useMemo(() => validateScheduleDraft(draft)
+    ?? (autoOffTaken ? tr("Thiết bị này đã có lịch Tự tắt sau khi bật - sửa lịch đó thay vì tạo thêm.", "This device already has an auto-off rule - edit it instead of adding another.") : null),
+  [draft, autoOffTaken]);
   const showError = validationError && (saveAttempted || draft.target_entities.length > 0);
 
   // Khung gio co moc mat troi (v0.5.79): chon ket thuc trong ngay / hom sau.
@@ -242,7 +256,7 @@ export function ScheduleEditor({
     <>
       <BottomSheet
         open={open}
-        title={schedule ? tr("Sửa lịch", "Edit schedule") : tr("Thêm lịch", "Add schedule")}
+        title={mode === "auto_off" ? `⏱ ${tr("Tự tắt sau khi bật", "Auto-off after on")}` : schedule ? tr("Sửa lịch", "Edit schedule") : tr("Thêm lịch", "Add schedule")}
         onClose={onClose}
         footer={
           <div className="sheet__actions">
@@ -270,7 +284,7 @@ export function ScheduleEditor({
           </button>
         )}
 
-        {(!profile || profile.range || profile.autoOff) && <div className="chip-row">
+        {mode !== "auto_off" && (!profile || profile.range || profile.autoOff) && <div className="chip-row">
           <button className={!isRange && !isAutoOff ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, end_time: null, ...leaveAutoOff(d) }))}>
             {tr("Mốc thời gian", "Time point")}
           </button>
@@ -285,7 +299,7 @@ export function ScheduleEditor({
           >
             {tr("Khung giờ", "Time range")} ({onWord} → {offWord})
           </button>}
-          {(!profile || profile.autoOff) && <button
+          {mode !== "schedule" && (!profile || profile.autoOff) && <button
             className={isAutoOff ? "chip chip--active" : "chip"}
             onClick={() =>
               setDraft((d) => ({

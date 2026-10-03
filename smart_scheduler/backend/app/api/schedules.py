@@ -24,6 +24,18 @@ def _check_one_shot(data: dict) -> None:
                                     "Scenes/scripts only run once - no off, toggle or auto-off."))
 
 
+def _check_auto_off_unique(data: dict, schedule_id: str | None = None) -> None:
+    """Moi thiet bi chi 1 lich "Tu tat sau khi bat": co 2 lich thi auto_off.rules()
+    chi lay thoi gian ngan nhat, lich con lai vo nghia ma van hien nhu dang chay."""
+    if data.get("trigger_type") != "auto_off":
+        return
+    targets = set(data.get("target_entities") or [])
+    for s in crud.list_schedules():
+        if s["id"] != schedule_id and s.get("trigger_type") == "auto_off" and targets & set(s.get("target_entities") or []):
+            raise HTTPException(400, tr("Thiết bị này đã có lịch Tự tắt sau khi bật - sửa lịch đó thay vì tạo thêm.",
+                                        "This device already has an auto-off rule - edit it instead of adding another."))
+
+
 @router.get("", response_model=list[ScheduleOut])
 async def list_schedules():
     schedules = crud.list_schedules()
@@ -35,6 +47,7 @@ async def create_schedule(payload: ScheduleIn):
     data = payload.model_dump()
     data["action"] = payload.action.model_dump()
     _check_one_shot(data)
+    _check_auto_off_unique(data)
     created = crud.create_schedule(data)
     if created.get("group_id") and normalize_range_days({created["group_id"]}):
         created = crud.get_schedule(created["id"])
@@ -55,6 +68,7 @@ async def update_schedule(schedule_id: str, payload: ScheduleIn):
     data = payload.model_dump()
     data["action"] = payload.action.model_dump()
     _check_one_shot(data)
+    _check_auto_off_unique(data, schedule_id)
     updated = crud.update_schedule(schedule_id, data)
     if not updated:
         raise HTTPException(404, "Schedule not found")

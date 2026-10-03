@@ -821,3 +821,16 @@ def test_missing_flag_only_for_entities_absent_from_ha(fake_ha, monkeypatch):
     assert out["switch.gone"].missing is True
     assert not out["switch.offline"].missing
     assert "switch.not_added" not in out
+
+
+def test_auto_off_one_rule_per_device(fake_ha):
+    import pytest
+    from fastapi import HTTPException
+    from app.api import schedules as schedules_api
+    first = make_auto_off("00:05:00", entity="switch.tuoi")
+    data = {"trigger_type": "auto_off", "target_entities": ["switch.tuoi"]}
+    with pytest.raises(HTTPException):
+        schedules_api._check_auto_off_unique(data)
+    schedules_api._check_auto_off_unique(data, first["id"])  # sua chinh no thi duoc
+    schedules_api._check_auto_off_unique({**data, "target_entities": ["switch.khac"]})
+    schedules_api._check_auto_off_unique({**data, "trigger_type": "time"})

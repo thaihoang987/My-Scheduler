@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.80
+
+- Device detail: auto-off now has its own section below the schedule list instead of being mixed into it. It is not affected by the card's Scheduling switch and has its own on/off toggle and countdown.
+- Only one auto-off rule per device: the editor and the API reject a second one (previously only the shortest one took effect). Devices that already have several show a warning so the extras can be deleted.
+
 ## 0.5.79
 
 - Add auto-off rules to device detail, with saved drag-and-drop ordering independent of Home. Changing devices also updates matching auto-off rules; the auto-off toggle remains on Home.
