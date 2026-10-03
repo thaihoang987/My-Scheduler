@@ -158,6 +158,8 @@ export interface Settings {
   show_last_run: boolean;
   show_next_run: boolean;
   display_mode: DisplayMode;
+  /** Nhom dang thu gon tren trang Nha - rieng tung tai khoan HA (v0.5.90). */
+  collapsed_sections?: string[];
   theme: "light" | "dark" | "auto";
   time_format: "24h" | "12h";
   sort_mode: "auto" | "manual";

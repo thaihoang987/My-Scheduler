@@ -52,7 +52,7 @@ export function Home({
   /** Lich "Tu tat sau khi bat" dang sua (bam 1 dong trong AutoOffList). */
   const [editingRule, setEditingRule] = useState<Schedule | null>(null);
   const autoOffRules = useMemo(() => schedules.filter((s) => s.trigger_type === "auto_off"), [schedules]);
-  const [collapsed, toggleCollapsed] = useCollapsedSections();
+  const [collapsed, toggleCollapsed] = useCollapsedSections(settings.collapsed_sections, reload);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
   const [savingTheme, setSavingTheme] = useState(false);
   const [themeError, setThemeError] = useState(false);
