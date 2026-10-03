@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.84
+
+- Device detail (wide screens): fix large gaps between "Schedules", the schedule list and "Add time" when the page content is shorter than the screen.
+
 ## 0.5.83
 
 - Home 24h day view: the 0 / 6 / 12 / 18 / 24 hour marks are larger, bolder and brighter so they are easy to see on desktop and phones.
