@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.89
+
+- Backup/restore keeps each group's state: the group switch and an active "Skip until" date and time. When you restore, a skip that has not ended yet continues until that exact time, and a skip that has already ended is removed. Previously the skip was lost on restore.
+
 ## 0.5.88
 
 - Docs: new "Getting started" steps. Add devices in **Settings → Devices** first (the admin picks devices and gives them friendly names for family members); only devices added there can be used on the Home page.
