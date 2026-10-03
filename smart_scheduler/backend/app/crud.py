@@ -1,6 +1,7 @@
 """Truy van SQLite cho schedules/aliases/history/settings/groups. Tra ve
 dict thuan (khong ORM) de FastAPI/Pydantic serialize truc tiep."""
 import json
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app import config
@@ -32,7 +33,37 @@ def default_timezone() -> str:
     return config.HA_TIMEZONE or DEFAULT_TIMEZONE
 
 
-def _row_to_schedule(row, tz: Optional[str] = None) -> dict[str, Any]:
+def _skip_active(raw: Optional[str], now: Optional[datetime] = None) -> Optional[str]:
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return raw if dt > (now or datetime.now(timezone.utc)) else None
+
+
+def _category_state() -> tuple[dict[str, str], dict[str, dict]]:
+    """entity -> nhom (category_id) va nhom -> {enabled, skip_until} cho
+    cong tac/nut Bo qua cua NHOM tren trang Nha (v0.5.85)."""
+    conn = get_conn()
+    cat_of = {r["entity_id"]: r["category_id"] for r in conn.execute(
+        "SELECT entity_id, category_id FROM entity_aliases WHERE category_id IS NOT NULL AND category_id != ''")}
+    groups = {r["id"]: {"enabled": bool(r["enabled"]), "skip_until": _skip_active(r["skip_until"])}
+              for r in conn.execute("SELECT id, enabled, skip_until FROM groups")}
+    return cat_of, groups
+
+
+def card_on(schedule: dict) -> bool:
+    """Cong tac Hen gio cua card VA nhom chua tat. Nhom tat KHONG doi
+    card_enabled - toggle tung card giu nguyen de nguoi dung biet trang thai
+    rieng, chi bi nhom khong che (phan hoi 2026-10-03)."""
+    return schedule.get("card_enabled", True) and not schedule.get("group_paused", False)
+
+
+def _row_to_schedule(row, tz: Optional[str] = None, cats: Optional[tuple] = None) -> dict[str, Any]:
     d = dict(row)
     d["timezone"] = tz or settings_timezone()
     d["enabled"] = bool(d["enabled"])
@@ -44,6 +75,15 @@ def _row_to_schedule(row, tz: Optional[str] = None) -> dict[str, Any]:
     d["days"] = json.loads(d.pop("days"))
     d["conditions"] = json.loads(d.pop("conditions", None) or "[]")
     d["last_scheduled_for"] = d.pop("last_scheduled_for", None)
+    # Nhom cua card = nhom cua thiet bi DAU TIEN co nhom (giong categoryOf o
+    # frontend). "Tu tat sau khi bat" khong thuoc nhom nao.
+    d["group_paused"], d["group_skip_until"] = False, None
+    if d.get("trigger_type") != "auto_off":
+        cat_of, groups = cats if cats is not None else _category_state()
+        gid = next((cat_of[e] for e in d["target_entities"] if e in cat_of), None)
+        g = groups.get(gid) if gid else None
+        if g:
+            d["group_paused"], d["group_skip_until"] = not g["enabled"], g["skip_until"]
     return d
 
 
@@ -51,7 +91,8 @@ def list_schedules() -> list[dict]:
     conn = get_conn()
     rows = conn.execute("SELECT * FROM schedules ORDER BY sort_order ASC, time ASC").fetchall()
     tz = settings_timezone()
-    return [_row_to_schedule(r, tz) for r in rows]
+    cats = _category_state()
+    return [_row_to_schedule(r, tz, cats) for r in rows]
 
 
 def get_schedule(schedule_id: str) -> Optional[dict]:
@@ -367,7 +408,7 @@ def replace_entity(old_id: str, new_id: str, new_domain: str) -> dict:
 def list_groups() -> list[dict]:
     conn = get_conn()
     rows = conn.execute("SELECT * FROM groups ORDER BY sort_order ASC").fetchall()
-    return [dict(r) for r in rows]
+    return [{**dict(r), "enabled": bool(r["enabled"]), "skip_until": _skip_active(r["skip_until"])} for r in rows]
 
 
 def create_group(name: str) -> dict:
@@ -376,7 +417,7 @@ def create_group(name: str) -> dict:
     max_order = conn.execute("SELECT COALESCE(MAX(sort_order), 0) FROM groups").fetchone()[0]
     with tx() as c:
         c.execute("INSERT INTO groups (id, name, sort_order) VALUES (?,?,?)", (gid, name, max_order + 10))
-    return {"id": gid, "name": name, "enabled": True, "sort_order": max_order + 10}
+    return {"id": gid, "name": name, "enabled": True, "skip_until": None, "sort_order": max_order + 10}
 
 
 def rename_group(group_id: str, name: str) -> Optional[dict]:
@@ -394,6 +435,30 @@ def delete_group(group_id: str) -> bool:
         c.execute("UPDATE entity_aliases SET category_id=NULL WHERE category_id=?", (group_id,))
         cur = c.execute("DELETE FROM groups WHERE id=?", (group_id,))
     return cur.rowcount > 0
+
+
+def group_schedule_ids(group_id: str) -> list[str]:
+    """Lich (khong tinh Tu tat) dang thuoc nhom nay theo quy tac o _row_to_schedule."""
+    cat_of, _ = _category_state()
+    return [s["id"] for s in list_schedules() if s.get("trigger_type") != "auto_off"
+            and next((cat_of[e] for e in s["target_entities"] if e in cat_of), None) == group_id]
+
+
+def set_group_state(group_id: str, *, enabled: Optional[bool] = None, skip_until: Any = ...) -> Optional[dict]:
+    """Cong tac nhom / Bo qua cua nhom. Bat lai nhom thi cap nhat updated_at
+    cua lich trong nhom (giong bat cong tac card) de khe gio da qua trong luc
+    nhom tat khong bi coi la "lo gio" roi chay bu."""
+    ids = group_schedule_ids(group_id) if enabled else []
+    with tx() as c:
+        if not c.execute("SELECT 1 FROM groups WHERE id=?", (group_id,)).fetchone():
+            return None
+        if enabled is not None:
+            c.execute("UPDATE groups SET enabled=? WHERE id=?", (1 if enabled else 0, group_id))
+        if skip_until is not ...:
+            c.execute("UPDATE groups SET skip_until=? WHERE id=?", (skip_until, group_id))
+        if ids:
+            c.execute(f"UPDATE schedules SET updated_at=? WHERE id IN ({','.join('?' for _ in ids)})", (now_iso(), *ids))
+    return next((g for g in list_groups() if g["id"] == group_id), None)
 
 
 def reorder_groups(ordered_ids: list[str]) -> None:

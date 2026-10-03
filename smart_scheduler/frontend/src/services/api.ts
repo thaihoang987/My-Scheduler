@@ -98,6 +98,11 @@ export const api = {
   listGroups: () => request<Group[]>("/groups"),
   createGroup: (name: string) => request<Group>("/groups", { method: "POST", body: JSON.stringify({ name }) }),
   renameGroup: (id: string, name: string) => request<Group>(`/groups/${id}`, { method: "PUT", body: JSON.stringify({ name }) }),
+  setGroupEnabled: (id: string, enabled: boolean) =>
+    request<Group>(`/groups/${id}/enabled`, { method: "POST", body: JSON.stringify({ enabled }) }),
+  /** days: 0 = het hom nay, 1 = het ngay mai, 2 = 3 ngay; null = huy bo qua. */
+  setGroupSkip: (id: string, days: number | null) =>
+    request<Group>(`/groups/${id}/skip`, { method: "POST", body: JSON.stringify({ days }) }),
   deleteGroup: (id: string) => request<{ ok: boolean }>(`/groups/${id}`, { method: "DELETE" }),
   reorderGroups: (orderedIds: string[]) =>
     request<{ ok: boolean }>("/groups/reorder", { method: "POST", body: JSON.stringify({ ordered_ids: orderedIds }) }),

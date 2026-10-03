@@ -423,6 +423,24 @@ body {
 
 /* ---- Section theo Nhom (GroupedDeviceGrid.tsx) ---- */
 .device-section { margin-bottom: 20px; }
+/* Nhom tat / dang Bo qua (v0.5.85): card mo di, toggle rieng van giu nguyen. */
+.device-section--blocked .device-grid > .device-card { opacity: 0.45; }
+.group-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-left: auto; }
+.group-controls__skip {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 28px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.group-controls__skip:disabled { opacity: 0.4; cursor: default; }
+.group-controls__skip--active { border-color: var(--star); color: var(--star); background: color-mix(in srgb, var(--star) 14%, transparent); }
+.group-controls__options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.group-controls__current { margin-bottom: 10px; font-weight: 600; color: var(--star); }
+.timeline__section-state { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--star); }
+@media (max-width: 420px) {
+  .group-controls__skip:not(.group-controls__skip--active) .group-controls__skip-text { display: none; }
+  .group-controls__skip { padding: 0 8px; }
+}
 .device-section__title {
   font-size: 15px; font-weight: 700; color: var(--text);
   margin: 0 0 4px; display: flex; align-items: baseline; gap: 6px;

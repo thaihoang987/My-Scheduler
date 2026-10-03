@@ -66,6 +66,8 @@ class ScheduleOut(ScheduleIn):
     timezone: str
     skip_once: bool = False
     skip_until: Optional[str] = None
+    group_paused: bool = False
+    group_skip_until: Optional[str] = None
     next_run: Optional[str] = None
     last_run: Optional[str] = None
     last_status: Optional[str] = None
@@ -129,6 +131,17 @@ class GroupIn(BaseModel):
 class GroupOut(GroupIn):
     id: str
     sort_order: int
+    enabled: bool = True
+    skip_until: Optional[str] = None
+
+
+class GroupEnabled(BaseModel):
+    enabled: bool
+
+
+class GroupSkip(BaseModel):
+    # 0 = het hom nay, 1 = het ngay mai, 2 = 3 ngay; None = huy bo qua.
+    days: Optional[int] = Field(default=None, ge=0, le=6)
 
 
 class GroupReorder(BaseModel):

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.85
+
+- Home groups get two controls on their header:
+  - **Group switch**: turning a group off stops every card in it without changing each card's own switch (cards keep their state and are shown dimmed). Turning it off during a running time range turns the device off, like a card switch.
+  - **⏭ Skip** (e.g. after heavy rain): skip the group's ON actions for the rest of today, through tomorrow, or for 3 days. OFF actions still run, and schedules resume automatically. The header shows "Until end of <day>"; tap it to cancel.
+- The 24h day view shows when a group is off or skipping and leaves its schedules out.
+- Auto-off rules are not part of any group.
+
 ## 0.5.84
 
 - Device detail (wide screens): fix large gaps between "Schedules", the schedule list and "Add time" when the page content is shorter than the screen.

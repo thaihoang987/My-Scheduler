@@ -153,7 +153,7 @@ def _conflicts(now: datetime) -> set[str]:
     paused = scheduler_engine.paused_until()
     blocked = set()
     for s in crud.list_schedules():
-        if s.get("enabled", True) and s.get("card_enabled", True):
+        if s.get("enabled", True) and crud.card_on(s):
             if s.get("trigger_type") == "auto_off" or not (paused and paused > now):
                 blocked.update(s.get("target_entities") or [])
     for timer in crud.list_manual_timers():
