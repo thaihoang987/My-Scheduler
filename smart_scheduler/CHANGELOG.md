@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.92
+
+- Docs: desktop and mobile screenshots in the repository README.
+
 ## 0.5.91
 
 - Docs: link to the community forum thread for questions and feedback.
