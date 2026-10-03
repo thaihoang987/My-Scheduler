@@ -8,7 +8,8 @@ import { visualFor } from "../../utils/deviceVisuals";
 import { useMdiIcons } from "../../utils/mdiIcons";
 import { Icon } from "../Icon/Icon";
 import { MissingMark } from "../DeviceCard/DeviceCard";
-import { UNGROUPED } from "../GroupedDeviceGrid/GroupedDeviceGrid";
+import { categoryOf, UNGROUPED } from "../GroupedDeviceGrid/GroupedDeviceGrid";
+import { skipLabel } from "../GroupControls/GroupControls";
 import { appLocale, tr } from "../../i18n";
 
 /** 2 kieu xem "theo ngay" tren Nha (v0.5.64), khac han luoi/danh sach card:
@@ -181,7 +182,7 @@ export function TimelineView({
 
   // Chia muc theo Nhom giong luoi card (thu tu nhom, "Chua phan nhom" cuoi).
   const sections = useMemo(() => {
-    const catOf = (g: DeviceGroup) => entities.find((e) => e.entity_id === g.entityIds[0])?.category_id || UNGROUPED;
+    const catOf = (g: DeviceGroup) => categoryOf(g, entities);
     const ids = [...categoryGroups.map((c) => c.id), UNGROUPED];
     return ids
       .map((id) => ({
@@ -233,6 +234,13 @@ export function TimelineView({
           {sec.name && (
             <div className="timeline__section-title">
               {sec.name} <span className="timeline__section-count">{sec.groups.length}</span>
+              {(() => {
+                const cat = categoryGroups.find((c) => c.id === sec.id);
+                if (!cat) return null;
+                if (!cat.enabled) return <span className="timeline__section-state">{tr("Nhóm đang tắt", "Group off")}</span>;
+                if (cat.skip_until) return <span className="timeline__section-state">⏭ {tr(`Bỏ qua tới hết ${skipLabel(cat.skip_until)}`, `Skipping until end of ${skipLabel(cat.skip_until)}`)}</span>;
+                return null;
+              })()}
             </div>
           )}
           {sec.groups.map((g) => {

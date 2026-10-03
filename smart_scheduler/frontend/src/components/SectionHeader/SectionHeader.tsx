@@ -12,7 +12,10 @@ export function SectionHeader({
   onToggle,
   onMoveUp,
   onMoveDown,
+  actions,
 }: {
+  /** Nut ben phai tieu de (cong tac nhom + Bo qua, v0.5.85). */
+  actions?: ReactNode;
   title: ReactNode;
   count: number;
   collapsed: boolean;
@@ -27,6 +30,7 @@ export function SectionHeader({
         <span>{title}</span>
         <span className="device-section__count">{count}</span>
       </button>
+      {actions}
       {(onMoveUp !== undefined || onMoveDown !== undefined) && (
         <span className="section-header__move">
           <button onClick={onMoveUp ?? undefined} disabled={!onMoveUp} aria-label={tr("Dời nhóm lên", "Move group up")} title={tr("Dời nhóm lên", "Move group up")}>

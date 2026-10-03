@@ -248,8 +248,12 @@ def compute_next_run(schedule: dict, now: datetime | None = None, pause=_UNSET,
     pause_end = paused_until() if pause is _UNSET else pause
     if pause_end is not None and pause_end > now:
         now = pause_end.astimezone(tz)
+    # Nhom dang "Bo qua" (v0.5.85): lenh Bat tinh tu luc het bo qua, lenh Tat van chay.
+    group_skip = _group_skip_end(schedule)
+    if group_skip is not None and group_skip > now:
+        now = group_skip.astimezone(tz)
     days = set(schedule.get("days") or [0, 1, 2, 3, 4, 5, 6])
-    if not schedule.get("enabled", True) or not schedule.get("card_enabled", True) or not days:
+    if not schedule.get("enabled", True) or not crud.card_on(schedule) or not days:
         return None
     if schedule.get("trigger_type") == "auto_off":
         return None  # khong chay theo gio - xem auto_off.py
@@ -321,6 +325,19 @@ def _execution_action(schedule: dict) -> dict:
     return action
 
 
+def _group_skip_end(schedule: dict) -> datetime | None:
+    """Moc het "Bo qua" cua nhom - chi ap dung cho lenh khong phai Tat (Tat
+    van chay de van tuoi dang mo do van dong dung gio)."""
+    raw = schedule.get("group_skip_until")
+    if not raw or schedule["action"].get("service") == "turn_off":
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=ZoneInfo("UTC"))
+
+
 def _armed_at(schedule: dict) -> datetime:
     """Moc lich bat dau co hieu luc voi cau hinh hien tai = updated_at (moi
     lan tao/sua/bat/tat card deu cap nhat cot nay, chuoi UTC isoformat)."""
@@ -353,7 +370,7 @@ async def _process_schedule(schedule: dict, missed_policy: str, expires_at: date
                             pause_end: datetime | None = None, schedules: list[dict] | None = None) -> None:
     tz = _tz(schedule.get("timezone") or DEFAULT_TIMEZONE)
     now = datetime.now(tz)
-    if not schedule.get("enabled", True) or not schedule.get("card_enabled", True):
+    if not schedule.get("enabled", True) or not crud.card_on(schedule):
         return
     if schedule.get("trigger_type") == "auto_off":
         return  # auto_off.py xu ly theo trang thai that, khong theo gio
@@ -393,6 +410,14 @@ async def _run_slot(schedule: dict, missed_policy: str, expires_at: datetime | N
         crud.mark_executed(schedule["id"], slot, "skipped_paused")
         _close_if_off(schedule, slot)
         await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": "skipped_paused"})
+        return
+
+    group_skip = _group_skip_end(schedule)
+    if group_skip is not None and scheduled_dt < group_skip:
+        crud.mark_executed(schedule["id"], slot, "skipped_group", consume_skip_once=False)
+        crud.add_history(schedule["id"], schedule["name"], slot, "skipped_group",
+                         tr("Bỏ qua vì nhóm đang tạm bỏ qua (ví dụ trời mưa)", "Skipped because its group is skipping (e.g. rain)"))
+        await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": "skipped_group"})
         return
 
     # Khung trong ngay bi dao thu tu hom nay -> bo qua ca Bat lan Tat (v0.5.79).
@@ -505,7 +530,7 @@ def _eligible_retry_targets(schedule: dict, targets: list[str], seq: dict[str, i
     if not crud.get_settings().get("verify_state"):
         return []
     fresh = crud.get_schedule(schedule["id"])
-    if (fresh is None or not fresh.get("enabled", True) or not fresh.get("card_enabled", True)
+    if (fresh is None or not fresh.get("enabled", True) or not crud.card_on(fresh)
             or _revision(fresh) != _revision(schedule)):
         return []
     tz = _tz(schedule.get("timezone") or DEFAULT_TIMEZONE)
@@ -645,7 +670,7 @@ def _window_end(on: dict, start: datetime, schedules: list[dict], require_enable
     """Moc Tat dong khung gio bat dau luc `start` cua lich Bat `on` (cung
     group_id, cung thiet bi); ngay cua moc Tat theo range_day_offset."""
     for other in schedules:
-        if require_enabled and not (other.get("enabled", True) and other.get("card_enabled", True)):
+        if require_enabled and not (other.get("enabled", True) and crud.card_on(other)):
             continue
         if (other.get("group_id") == on["group_id"]
                 and other["action"]["service"] == "turn_off"
@@ -677,7 +702,7 @@ def running_window_end(on: dict, schedules: list[dict], now: datetime | None = N
     VA lan Bat cua khung do da thuc su chay thanh cong (khong bi bo qua vi
     dieu kien/tam dung/lo gio). Tra ve moc Tat, None neu khong."""
     if (not on.get("group_id") or on["action"]["service"] != "turn_on"
-            or not on.get("enabled", True) or not on.get("card_enabled", True)):
+            or not on.get("enabled", True) or not crud.card_on(on)):
         return None
     tz = _tz(on.get("timezone") or DEFAULT_TIMEZONE)
     now = now.astimezone(tz) if now else datetime.now(tz)
@@ -727,6 +752,7 @@ async def turn_off_running(schedule_ids: list[str], reason: str) -> list[str]:
         "xoá lịch": "schedule deletion",
         "tắt công tắc tổng của card": "card switch being turned off",
         "tắt lịch": "schedule being disabled",
+        "tắt nhóm": "the group being turned off",
         "tạm dừng tất cả lịch": "all schedules being paused",
     }.get(reason, reason)
     status, message = "success", tr(f"Tắt ngay vì {reason} khi đang trong khung giờ bật", f"Turned off immediately due to {reason_en} during an active time range")
@@ -798,8 +824,8 @@ async def recover_ranges(now: datetime | None = None) -> list[str]:
         stale = (
             deadline is None or on is None or off is None
             or _revision(on) != row["on_rev"] or _revision(off) != row["off_rev"]
-            or not (on.get("enabled", True) and on.get("card_enabled", True))
-            or not (off.get("enabled", True) and off.get("card_enabled", True))
+            or not (on.get("enabled", True) and crud.card_on(on))
+            or not (off.get("enabled", True) and crud.card_on(off))
             or now - deadline > RECOVERY_MAX_AGE
             or (pause_end is not None and pause_end > now)
             or (off_last is not None and off_last > deadline)

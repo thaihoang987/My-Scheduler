@@ -145,6 +145,8 @@ _MIGRATIONS = [
     "ALTER TABLE schedules ADD COLUMN conditions TEXT NOT NULL DEFAULT '[]'",
     # Khung gio ket thuc trong ngay (0) / hom sau (1) / NULL = theo kieu gio (v0.5.79).
     "ALTER TABLE schedules ADD COLUMN range_day_offset INTEGER",
+    # Nhom tren trang Nha: bo qua lenh Bat cua ca nhom toi moc nay (v0.5.85, "mua thi khoi tuoi").
+    "ALTER TABLE groups ADD COLUMN skip_until TEXT",
 ]
 
 # Chuyen du lieu cu 1 LAN DUY NHAT, ngay sau khi cot card_enabled vua duoc

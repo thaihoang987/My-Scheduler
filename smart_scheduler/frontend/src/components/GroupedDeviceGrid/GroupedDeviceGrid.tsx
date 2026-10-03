@@ -4,6 +4,7 @@ import { api } from "../../services/api";
 import type { DeviceGroup, DisplayMode, EntitySummary, Group, ManualTimer, Settings } from "../../types";
 import { removeStaleFallbackClones } from "../../utils/sortableFallbackCleanup";
 import { DeviceCard } from "../DeviceCard/DeviceCard";
+import { GroupControls } from "../GroupControls/GroupControls";
 import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { tr } from "../../i18n";
 import { backdropProps } from "../../utils/backdrop";
@@ -23,11 +24,19 @@ interface Section {
   id: string;
   name: string;
   groups: DeviceGroup[];
+  /** Nhom nguoi dung tao (khong co voi "Chua phan nhom"). */
+  category?: Group;
 }
 
-function categoryOf(group: DeviceGroup, entities: EntitySummary[]): string {
-  const e = entities.find((x) => group.entityIds.includes(x.entity_id));
-  return e?.category_id || UNGROUPED;
+/** Nhom cua card = nhom cua thiet bi DAU TIEN (theo thu tu cua card) co nhom -
+ * cung quy tac voi backend crud._row_to_schedule (cong tac/Bo qua nhom). */
+export function categoryOf(group: DeviceGroup, entities: EntitySummary[]): string {
+  const map = new Map(entities.map((e) => [e.entity_id, e.category_id]));
+  for (const id of group.entityIds) {
+    const cat = map.get(id);
+    if (cat) return cat;
+  }
+  return UNGROUPED;
 }
 
 /** The o Home khi da co it nhat 1 "Nhom" nguoi dung tao (muc "phan nhom +
@@ -97,7 +106,7 @@ export function GroupedDeviceGrid({
       if (!byCategory.has(cat)) byCategory.set(cat, []);
       byCategory.get(cat)!.push(g);
     }
-    const ordered = categoryGroups.map((cg): Section => ({ id: cg.id, name: cg.name, groups: byCategory.get(cg.id) ?? [] }));
+    const ordered = categoryGroups.map((cg): Section => ({ id: cg.id, name: cg.name, groups: byCategory.get(cg.id) ?? [], category: cg }));
     ordered.push({ id: UNGROUPED, name: tr("Chưa phân nhóm", "Ungrouped"), groups: byCategory.get(UNGROUPED) ?? [] });
     return ordered;
   }, [groups, entities, categoryGroups]);
@@ -162,6 +171,7 @@ export function GroupedDeviceGrid({
           onDragEnd={handleDragEnd}
           setDragging={setDragging}
           editMode={editMode}
+          onGroupChanged={onCategoryChanged}
         />
         </Fragment>
       ))}
@@ -219,8 +229,10 @@ function SectionBlock({
   setDragging,
   editMode,
   controls,
+  onGroupChanged,
 }: {
   controls: SectionControls;
+  onGroupChanged: () => void;
   section: Section;
   view: DisplayMode;
   timeFormat: Settings["time_format"];
@@ -235,6 +247,8 @@ function SectionBlock({
   editMode: boolean;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
+  // Nhom tat / dang bo qua -> card mo di (toggle rieng cua card giu nguyen).
+  const blocked = Boolean(section.category && (!section.category.enabled || section.category.skip_until));
   const onDragEndRef = useRef(onDragEnd);
   onDragEndRef.current = onDragEnd;
   const setDraggingRef = useRef(setDragging);
@@ -305,8 +319,13 @@ function SectionBlock({
   }, []);
 
   return (
-    <div className="device-section">
-      <SectionHeader title={section.name} count={section.groups.length} {...controls} />
+    <div className={`device-section ${blocked ? "device-section--blocked" : ""}`}>
+      <SectionHeader
+        title={section.name}
+        count={section.groups.length}
+        {...controls}
+        actions={section.category && !editMode ? <GroupControls group={section.category} onChanged={onGroupChanged} /> : undefined}
+      />
       <div ref={listRef} data-section-list data-section-id={section.id} className={`device-grid device-grid--${view} ${controls.collapsed ? "is-collapsed" : ""}`}>
         {section.groups.map((g) => (
           <DeviceCard

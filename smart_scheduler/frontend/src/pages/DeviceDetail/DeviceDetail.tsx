@@ -213,7 +213,7 @@ export function DeviceDetail({
         </div>
       ) : (
         <div className="device-detail__hero device-detail__hero--empty">
-          {cardEnabled(group) ? tr("Chưa có lịch nào đang bật", "No enabled schedules") : tr("Hẹn giờ của thiết bị này đang tắt (bật lại bằng công tắc Hẹn giờ ở trên)", "Scheduling for this device is paused (turn it back on with the Scheduling switch above)")}
+          {group.schedules.some((s) => s.group_paused) ? tr("Nhóm của thiết bị này đang tắt (bật lại ở trang Nhà)", "This device's group is turned off (turn it back on from Home)") : cardEnabled(group) ? tr("Chưa có lịch nào đang bật", "No enabled schedules") : tr("Hẹn giờ của thiết bị này đang tắt (bật lại bằng công tắc Hẹn giờ ở trên)", "Scheduling for this device is paused (turn it back on with the Scheduling switch above)")}
         </div>
       )}
 

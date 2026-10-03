@@ -834,3 +834,55 @@ def test_auto_off_one_rule_per_device(fake_ha):
     schedules_api._check_auto_off_unique(data, first["id"])  # sua chinh no thi duoc
     schedules_api._check_auto_off_unique({**data, "target_entities": ["switch.khac"]})
     schedules_api._check_auto_off_unique({**data, "trigger_type": "time"})
+
+
+# ---- cong tac nhom + Bo qua cua nhom (v0.5.85) ----
+
+def _in_group(entity="switch.a"):
+    g = crud.create_group("Tuoi cay")
+    crud.upsert_alias(entity, "switch", {"category_id": g["id"]})
+    return g
+
+
+def test_group_off_blocks_without_touching_card_toggle(fake_ha):
+    now = datetime.now(TZ)
+    g = _in_group()
+    s = make_schedule(time=(now - timedelta(seconds=5)).strftime("%H:%M:%S"))
+    crud.set_group_state(g["id"], enabled=False)
+    fresh = crud.get_schedule(s["id"])
+    assert fresh["card_enabled"] is True and fresh["group_paused"] is True
+    assert compute_next_run(fresh) is None
+    run(scheduler_engine._process_schedule(fresh, "skip", None, None))
+    assert fake_ha.calls == []
+    crud.set_group_state(g["id"], enabled=True)
+    assert compute_next_run(crud.get_schedule(s["id"])) is not None
+
+
+def test_group_skip_blocks_on_but_runs_off(fake_ha):
+    now = datetime.now(TZ)
+    g = _in_group()
+    t = (now - timedelta(seconds=5)).strftime("%H:%M:%S")
+    on = make_schedule(time=t)
+    off = make_schedule(time=t, action={"domain": "switch", "service": "turn_off", "service_data": {}})
+    crud.set_group_state(g["id"], skip_until=(now + timedelta(hours=1)).isoformat())
+    run(scheduler_engine._process_schedule(crud.get_schedule(on["id"]), "skip", None, None))
+    assert fake_ha.calls == []
+    assert crud.get_schedule(on["id"])["last_status"] == "skipped_group"
+    run(scheduler_engine._process_schedule(crud.get_schedule(off["id"]), "skip", None, None))
+    assert fake_ha.calls and fake_ha.calls[0][1] == "turn_off"
+    nxt = datetime.fromisoformat(compute_next_run(crud.get_schedule(on["id"])))
+    assert nxt > now + timedelta(hours=1)
+
+
+def test_group_skip_expired_is_ignored():
+    g = _in_group()
+    crud.set_group_state(g["id"], skip_until=(datetime.now(TZ) - timedelta(minutes=1)).isoformat())
+    assert crud.list_groups()[0]["skip_until"] is None
+    assert crud.get_schedule(make_schedule()["id"])["group_skip_until"] is None
+
+
+def test_auto_off_not_part_of_group():
+    g = _in_group("light.ngu")
+    crud.set_group_state(g["id"], enabled=False)
+    s = make_auto_off()
+    assert crud.get_schedule(s["id"])["group_paused"] is False

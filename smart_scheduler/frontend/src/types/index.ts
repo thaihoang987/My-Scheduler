@@ -31,6 +31,9 @@ export interface Schedule {
   favorite: boolean;
   skip_once: boolean;
   skip_until: string | null;
+  /** Nhom (tren trang Nha) cua card dang tat / dang bo qua - backend tinh (v0.5.85). */
+  group_paused?: boolean;
+  group_skip_until?: string | null;
   start_date: string | null; // "YYYY-MM-DD", rong = khong gioi han
   end_date: string | null;
   // Kieu hen gio: "time" = gio co dinh (field `time` phia tren), "sunrise"/
@@ -114,6 +117,10 @@ export interface Group {
   id: string;
   name: string;
   sort_order: number;
+  /** Cong tac nhom (v0.5.85): tat = moi card trong nhom khong chay, toggle rieng tung card giu nguyen. */
+  enabled: boolean;
+  /** Dang "Bo qua" lenh Bat cua ca nhom toi moc nay (het han = null). */
+  skip_until: string | null;
 }
 
 /** "Bat cuong che" + tu tat sau X phut - KHONG phai Schedule. Hen co

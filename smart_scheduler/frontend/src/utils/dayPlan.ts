@@ -1,5 +1,5 @@
 import type { DeviceGroup, Schedule } from "../types";
-import { secondsOfDayInZone, todayInZone } from "./appTime";
+import { dateInZone, secondsOfDayInZone, todayInZone } from "./appTime";
 import { rangeDayOffset } from "./scheduleRange";
 
 /** Lich chay TRONG HOM NAY (theo mui gio add-on) - dung chung cho 2 kieu xem
@@ -26,7 +26,9 @@ export function weekdayOf(date: string): number {
 }
 
 function runsOn(s: Schedule, date: string): boolean {
-  if (!s.enabled || s.card_enabled === false || s.trigger_type === "auto_off") return false;
+  if (!s.enabled || s.card_enabled === false || s.group_paused || s.trigger_type === "auto_off") return false;
+  // Nhom dang "Bo qua": lenh Bat khong chay toi het ngay bo qua (lenh Tat van chay).
+  if (s.group_skip_until && s.action.service !== "turn_off" && date <= dateInZone(new Date(Date.parse(s.group_skip_until) - 1))) return false;
   if (!s.days.includes(weekdayOf(date))) return false;
   if (s.start_date && date < s.start_date) return false;
   if (s.end_date && date > s.end_date) return false;
