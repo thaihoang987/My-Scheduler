@@ -18,14 +18,20 @@ def _user_id(request: Request) -> str | None:
     return request.headers.get("x-remote-user-id") or None
 
 
+# Lua chon hien thi RIENG tung tai khoan HA -> khoa luu (dict uid -> gia tri).
+# display_mode: v0.5.87 (admin xem Thu gon, user 1 bang 24h, user 2 Danh sach).
+# collapsed_sections: v0.5.90 (nhom thu gon tren trang Nha, truoc o localStorage).
+PER_USER = {"display_mode": "user_display_modes", "collapsed_sections": "user_collapsed_sections"}
+
+
 def _for_user(settings: dict, uid: str | None) -> dict:
-    """Kieu xem trang Nha (display_mode) RIENG tung tai khoan HA (v0.5.87, phan
-    hoi 2026-10-03: admin xem Thu gon, user 1 xem bang 24h, user 2 xem Danh
-    sach). Chua chon thi theo kieu dung chung."""
+    """Thay cac lua chon PER_USER bang gia tri cua tai khoan dang mo; chua chon
+    thi theo gia tri dung chung."""
     out = dict(settings)
-    per_user = out.pop("user_display_modes", None) or {}
-    if uid and per_user.get(uid):
-        out["display_mode"] = per_user[uid]
+    for key, store_key in PER_USER.items():
+        per_user = out.pop(store_key, None) or {}
+        if uid and uid in per_user:
+            out[key] = per_user[uid]
     return out
 
 
@@ -38,10 +44,13 @@ async def get_settings(request: Request = None):  # type: ignore[assignment]
 async def update_settings(payload: SettingsIn, request: Request = None):  # type: ignore[assignment]
     data = {k: v for k, v in payload.model_dump().items() if v is not None}
     uid = _user_id(request)
-    if uid and "display_mode" in data:
-        per_user = dict(crud.get_settings().get("user_display_modes") or {})
-        per_user[uid] = data.pop("display_mode")
-        data["user_display_modes"] = per_user
+    if uid:
+        current = crud.get_settings()
+        for key, store_key in PER_USER.items():
+            if key in data:
+                per_user = dict(current.get(store_key) or {})
+                per_user[uid] = data.pop(key)
+                data[store_key] = per_user
     # Mui gio luon theo Home Assistant (v0.5.54) - client cu con gui thi bo qua.
     data.pop("timezone", None)
     if "language" in data and data["language"] not in ("vi", "en"):

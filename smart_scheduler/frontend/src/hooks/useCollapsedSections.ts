@@ -1,30 +1,51 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../services/api";
 
-const KEY = "smart-scheduler.collapsed-sections";
+const LEGACY_KEY = "smart-scheduler.collapsed-sections";
 
-function load(): Set<string> {
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
+/** Nhom dang thu gon tren trang Nha. Tu v0.5.90 luu o server (settings
+ * `collapsed_sections`), rieng tung tai khoan HA va nam trong file sao luu -
+ * truoc day o localStorage nen khoi phuc/doi may la mat. Lan dau mo ban moi:
+ * chuyen gia tri cu trong localStorage len server (neu server chua co gi). */
+export function useCollapsedSections(serverValue: string[] | undefined, reload: () => void): [Set<string>, (id: string) => void] {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(serverValue ?? []));
+  const pending = useRef(false);
 
-/** Trang thai thu gon tung nhom tren trang Nha - nho theo tung may (localStorage,
- * dien thoai va may tinh co the muon khac nhau). Loi storage thi chi mat nho. */
-export function useCollapsedSections(): [Set<string>, (id: string) => void] {
-  const [collapsed, setCollapsed] = useState<Set<string>>(load);
+  // Dong bo lai khi server doi (tab/may khac, khoi phuc sao luu) - tru luc
+  // vua bam xong chua luu kip, tranh nhay ve trang thai cu.
+  const serverKey = (serverValue ?? []).join("|");
+  useEffect(() => {
+    if (!pending.current) setCollapsed(new Set(serverValue ?? []));
+  }, [serverKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LEGACY_KEY);
+      if (!raw) return;
+      window.localStorage.removeItem(LEGACY_KEY);
+      const legacy = JSON.parse(raw) as string[];
+      if (legacy.length && !(serverValue ?? []).length) {
+        setCollapsed(new Set(legacy));
+        api.updateSettings({ collapsed_sections: legacy }).then(reload).catch(() => undefined);
+      }
+    } catch {
+      // storage bi chan - bo qua
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggle = useCallback((id: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      try {
-        window.localStorage.setItem(KEY, JSON.stringify([...next]));
-      } catch {
-        // bo qua - van thu gon duoc trong phien nay
-      }
+      pending.current = true;
+      // Khong reload ca app moi lan bam: trang thai tai cho da dung, lan tai sau
+      // server tra ve dung gia tri vua luu.
+      api.updateSettings({ collapsed_sections: [...next] })
+        .catch(() => undefined)
+        .finally(() => {
+          pending.current = false;
+        });
       return next;
     });
   }, []);

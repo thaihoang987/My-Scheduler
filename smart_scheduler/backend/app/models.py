@@ -235,6 +235,7 @@ class SettingsIn(BaseModel):
     verify_state: Optional[bool] = None
     auto_off_section_index: Optional[int] = None
     detail_row_order: Optional[dict[str, list[str]]] = None
+    collapsed_sections: Optional[list[str]] = None
 
 
 class HistoryEntry(BaseModel):

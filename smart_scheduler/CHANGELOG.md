@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.90
+
+- Collapsed/expanded groups on Home are now saved per Home Assistant user on the server instead of in each browser, and are included in backups. Your previous browser setting is moved over automatically.
+- Backups now include "Pause all schedules". On restore, a pause that has not ended yet continues until its original time, and one that has already ended is removed (same rule as group skip).
+
 ## 0.5.89
 
 - Backup/restore keeps each group's state: the group switch and an active "Skip until" date and time. When you restore, a skip that has not ended yet continues until that exact time, and a skip that has already ended is removed. Previously the skip was lost on restore.

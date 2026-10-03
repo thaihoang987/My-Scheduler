@@ -775,8 +775,9 @@ def test_backup_v3_skips_runtime_settings_and_replaces_settings():
     dump = crud.export_all()
     assert dump["version"] == crud.BACKUP_VERSION
     assert dump["settings"]["theme"] == "dark" and dump["settings"]["presence"] == {"enabled": True}
-    for k in ("presence_runtime", "pause_until", "timezone", "migrated_split_conditions"):
+    for k in ("presence_runtime", "timezone", "migrated_split_conditions"):
         assert k not in dump["settings"]
+    assert dump["settings"]["pause_until"] == "2099-01-01T00:00:00+07:00"  # v0.5.90: co sao luu
     crud.update_settings({"theme": "light", "time_format": "12h"})
     restored = crud.import_all(dump)
     st = crud.get_settings()
@@ -969,3 +970,45 @@ def test_backup_import_drops_expired_group_skip():
                      "groups": [{"id": "g1", "name": "Garden", "enabled": 1, "sort_order": 0, "skip_until": past}]})
     raw = db.get_conn().execute("SELECT skip_until FROM groups WHERE id='g1'").fetchone()[0]
     assert raw is None
+
+
+def test_backup_roundtrip_keeps_all_ordering():
+    a, b, c = make_schedule(time="06:00:00"), make_schedule(time="07:00:00"), make_schedule(time="08:00:00")
+    crud.reorder_schedules([c["id"], a["id"], b["id"]])
+    g1, g2 = crud.create_group("A"), crud.create_group("B")
+    crud.reorder_groups([g2["id"], g1["id"]])
+    crud.update_settings({"detail_row_order": {"entity:switch.a": [b["id"], c["id"], a["id"]]},
+                          "auto_off_section_index": 2})
+    data = json.loads(json.dumps(crud.export_all()))
+    crud.import_all({"version": 3, "schedules": [], "entity_aliases": [], "groups": [], "settings": {}})
+    crud.import_all(data)
+    assert [s["id"] for s in crud.list_schedules()] == [c["id"], a["id"], b["id"]]
+    assert [g["name"] for g in crud.list_groups()] == ["B", "A"]
+    st = crud.get_settings()
+    assert st["detail_row_order"] == {"entity:switch.a": [b["id"], c["id"], a["id"]]}
+    assert st["auto_off_section_index"] == 2
+
+
+def test_collapsed_sections_per_user_and_in_backup():
+    from app.api import settings as settings_api
+    from app.models import SettingsIn
+    run(settings_api.update_settings(SettingsIn(collapsed_sections=["g1", "__auto_off__"]), _req("u1")))
+    assert run(settings_api.get_settings(_req("u1")))["collapsed_sections"] == ["g1", "__auto_off__"]
+    assert run(settings_api.get_settings(_req("u2")))["collapsed_sections"] == []
+    data = json.loads(json.dumps(crud.export_all()))
+    crud.import_all({"version": 3, "schedules": [], "entity_aliases": [], "groups": [], "settings": {}})
+    assert run(settings_api.get_settings(_req("u1")))["collapsed_sections"] == []
+    crud.import_all(data)
+    assert run(settings_api.get_settings(_req("u1")))["collapsed_sections"] == ["g1", "__auto_off__"]
+
+
+def test_backup_pause_restored_only_if_still_active():
+    future = (datetime.now(TZ) + timedelta(days=2)).isoformat()
+    crud.update_settings({"pause_until": future})
+    data = json.loads(json.dumps(crud.export_all()))
+    assert data["settings"]["pause_until"] == future
+    crud.import_all(data)
+    assert crud.get_settings()["pause_until"] == future
+    data["settings"]["pause_until"] = (datetime.now(TZ) - timedelta(hours=1)).isoformat()
+    crud.import_all(data)
+    assert crud.get_settings()["pause_until"] == ""

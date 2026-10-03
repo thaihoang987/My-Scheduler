@@ -587,6 +587,9 @@ DEFAULT_SETTINGS = {
     "verify_state": False,
     # Vi tri khoi "Tu tat sau khi bat" tren trang Nha giua cac nhom (0 = tren cung).
     "auto_off_section_index": 0,
+    # Nhom dang thu gon tren trang Nha (v0.5.90): luu server, rieng tung tai khoan HA
+    # (xem api/settings.py PER_USER) - truoc o localStorage nen khong vao file sao luu.
+    "collapsed_sections": [],
 }
 
 
@@ -619,7 +622,9 @@ BACKUP_VERSION = 3
 # luc khac se sai: presence_runtime = thiet bi gia lap dang bat (cua phien cu),
 # pause_until = dang tam dung (het han/khong mong muon), migrated_* = co da
 # chuyen du lieu (khoi phuc len DB moi thi bo qua migration), mui gio theo HA.
-_BACKUP_SKIP_SETTINGS = {"timezone", "ha_timezone", "presence_runtime", "pause_until"}
+# pause_until DUOC sao luu tu v0.5.90 (giong "Bo qua" cua nhom): khoi phuc ma moc
+# con o tuong lai thi tam dung tiep toi dung moc do, da qua thi bo.
+_BACKUP_SKIP_SETTINGS = {"timezone", "ha_timezone", "presence_runtime"}
 
 
 def _is_backup_setting(key: str) -> bool:
@@ -712,6 +717,8 @@ def import_all(data: dict) -> dict:
         for k, v in (data.get("settings") or {}).items():
             if not _is_backup_setting(k):
                 continue  # mui gio theo HA, trang thai chay khong khoi phuc
+            if k == "pause_until":
+                v = _skip_active(v) or ""
             c.execute(
                 "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (k, json.dumps(v)),
