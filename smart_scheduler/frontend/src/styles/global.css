@@ -765,6 +765,9 @@ body {
       "header add-time";
     column-gap: 36px;
     align-items: start;
+    /* Trang cao bang man hinh (flex: 1): noi dung ngan thi KHONG gian cac hang
+       ra cho day (lo khoang trong giua Lich va Them gio, v0.5.84). */
+    align-content: start;
   }
   .device-detail__topbar { grid-area: topbar; position: static; }
   .device-detail__header {
