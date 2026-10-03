@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.82
+
+- State timeline (24h / 3 days / 7 days): larger, brighter hour labels on the time axis so they are readable on desktop and phones.
+
 ## 0.5.81
 
 - Auto-off is removed from the device detail page entirely: it is not controlled by the card's Scheduling switch, so it does not belong to the timer card. Create, edit and toggle auto-off rules only in the "Auto-off after on" section on Home. Changing a card's devices no longer changes auto-off rules.
