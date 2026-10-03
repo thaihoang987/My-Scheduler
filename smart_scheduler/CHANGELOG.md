@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.83
+
+- Home 24h day view: the 0 / 6 / 12 / 18 / 24 hour marks are larger, bolder and brighter so they are easy to see on desktop and phones.
+- Device detail state timeline: hour labels back to the previous size (the 0.5.82 change was meant for the 24h day view).
+
 ## 0.5.82
 
 - State timeline (24h / 3 days / 7 days): larger, brighter hour labels on the time axis so they are readable on desktop and phones.

@@ -835,13 +835,8 @@ body {
 .state-timeline__seg--selected { outline: 2px solid var(--accent); outline-offset: -2px; }
 .state-timeline__grid { position: absolute; top: 0; bottom: 4px; width: 1px; background: color-mix(in srgb, var(--text-muted) 25%, transparent); pointer-events: none; }
 .state-timeline__nowline { position: absolute; top: -3px; bottom: 1px; width: 2px; margin-left: -1px; background: var(--danger); border-radius: 1px; pointer-events: none; }
-/* Truc gio to + sang hon (phan hoi 2026-10-03: 11px mau mo kho doc ca web lan dien thoai). */
-.state-timeline__axis { position: relative; height: 22px; margin-left: 104px; margin-top: 4px; }
-.state-timeline__tick {
-  position: absolute; transform: translateX(-50%); white-space: nowrap;
-  font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--text) 80%, transparent);
-}
+.state-timeline__axis { position: relative; height: 18px; margin-left: 104px; margin-top: 2px; }
+.state-timeline__tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .state-timeline__tick--day { color: var(--text); font-weight: 700; }
 /* Tooltip kieu history graph cua HA: noi phia TREN hang vua cham. */
 .state-timeline__tip {
@@ -859,7 +854,6 @@ body {
 @media (max-width: 420px) {
   .state-timeline__labels { width: 72px; }
   .state-timeline__axis { margin-left: 80px; }
-  .state-timeline__tick { font-size: 12.5px; }
 }
 
 /* ================= Schedule detail sheet ================= */
@@ -1488,8 +1482,13 @@ body {
   /* --surface-2 o giao dien sang TRUNG mau nen trang (#f2f2f7) nen thanh bien
      mat (v0.5.71) - dung bien rieng theo giao dien, xem :root. */
 }
-.timeline__track--axis { background: none; height: 14px; }
-.timeline__hour { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Moc 0/6/12/18/24 to + sang hon (phan hoi 2026-10-03: 10px mau mo kho thay ca web lan dien thoai). */
+.timeline__track--axis { background: none; height: 20px; }
+.timeline__hour {
+  position: absolute; top: 0; transform: translateX(-50%); font-variant-numeric: tabular-nums;
+  font-size: 14px; font-weight: 700; line-height: 20px;
+  color: color-mix(in srgb, var(--text) 85%, transparent);
+}
 .timeline__hour:first-child { transform: none; }
 .timeline__hour:last-child { transform: translateX(-100%); }
 .timeline__section { margin-top: 18px; }
