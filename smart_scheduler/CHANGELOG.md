@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.87
+
+- Fix: editing a schedule no longer moves it to the top (the edit reset its order to 0) and no longer clears Favorite. New schedules are added at the end. Device detail keeps your drag-and-drop order after edits.
+- Home view (Compact / List / By time / 24h chart) is now saved per Home Assistant user, so each user can pick their own view. Users who have not picked one use the shared default.
+
 ## 0.5.86
 
 - While a group is skipping, "Next run" on cards and in device detail shows the first real ON after the skip ends (it no longer shows a time-range OFF that only runs for safety). Device detail also shows "Group is skipping until the end of <day>".

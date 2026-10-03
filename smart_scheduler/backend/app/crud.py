@@ -122,7 +122,7 @@ def create_schedule(data: dict) -> dict:
                 json.dumps(data.get("days", [0, 1, 2, 3, 4, 5, 6])),
                 data["time"],
                 data.get("timezone") or DEFAULT_TIMEZONE,
-                data.get("sort_order", max_order + 10),
+                data["sort_order"] if data.get("sort_order") is not None else max_order + 10,
                 data.get("group_id"),
                 1 if data.get("favorite") else 0,
                 data.get("start_date"),
@@ -144,7 +144,8 @@ def update_schedule(schedule_id: str, data: dict) -> Optional[dict]:
     if not existing:
         return None
     # card_enabled=None = client khong gui -> giu nguyen cong tac tong cua card.
-    merged = {**existing, **{k: v for k, v in data.items() if not (k == "card_enabled" and v is None)}}
+    # sort_order/favorite=None cung vay: sua lich khong doi vi tri/yeu thich.
+    merged = {**existing, **{k: v for k, v in data.items() if not (k in ("card_enabled", "sort_order", "favorite") and v is None)}}
     with tx() as c:
         c.execute(
             """UPDATE schedules SET name=?, enabled=?, target_entities=?, action=?, days=?, time=?,
