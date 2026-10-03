@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.88
+
+- Docs: new "Getting started" steps. Add devices in **Settings → Devices** first (the admin picks devices and gives them friendly names for family members); only devices added there can be used on the Home page.
+
 ## 0.5.87
 
 - Fix: editing a schedule no longer moves it to the top (the edit reset its order to 0) and no longer clears Favorite. New schedules are added at the end. Device detail keeps your drag-and-drop order after edits.

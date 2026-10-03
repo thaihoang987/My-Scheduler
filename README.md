@@ -30,6 +30,16 @@ then install **My Scheduler** (formerly Smart Scheduler), start it and open it f
 Updates are prebuilt images (amd64 / aarch64), so updating only downloads — nothing is compiled on
 your Home Assistant machine.
 
+## Getting started
+
+1. Open **My Scheduler** from the sidebar.
+2. Go to **Settings → Devices** and add the devices you want to schedule. This step is for the
+   person who manages the add-on: pick devices from Home Assistant and give them friendly names so
+   family members can easily find and use them. **Only devices added here can be added to the
+   Home page.**
+3. Tap **+** on the Home page, pick a device and create a schedule: a single time, or an on → off
+   time range.
+
 ## Add-ons in this repository
 
 ### [My Scheduler](smart_scheduler/README.md)
