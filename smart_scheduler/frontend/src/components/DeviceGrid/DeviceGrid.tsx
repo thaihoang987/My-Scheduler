@@ -8,11 +8,11 @@ import { tr } from "../../i18n";
 /** Grid card thiet bi tren Home (muc 5/32 SPEC_UI.md) - keo tha ca CARD,
  * khong phai tung dong schedule nhu ban thiet ke cu.
  *
- * Dung SortableJS (thu vien addon PZEM Energy Log da vendor va dung on dinh
- * tren dien thoai that - xem tools/gen_deploy.py/sortable.min.js cua addon
+ * Dung SortableJS (thu vien app PZEM Energy Log da vendor va dung on dinh
+ * tren dien thoai that - xem tools/gen_deploy.py/sortable.min.js cua app
  * do) thay vi dnd-kit tu ban dau - phan hoi 2026-09-23 "kéo thả quá khó
  * khăn ... trên điện thoại không thể nắm kéo được ... lấy github kéo thả
- * giống addon pzem". Khac voi dnd-kit (hook rieng tung item, ca card la
+ * giống app pzem". Khac voi dnd-kit (hook rieng tung item, ca card la
  * vung keo, de nham voi tap-de-mo), SortableJS thao tac truc tiep tren DOM
  * cua 1 container cha qua `Sortable.create()`, chi khoi dong keo tu 1 tay
  * cam rieng (`handle: '.drag-handle'`, xem DeviceCard.tsx) - phan con lai

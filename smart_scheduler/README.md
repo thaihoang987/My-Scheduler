@@ -14,7 +14,7 @@ created by hand for each device. Pick a device, pick a time, done.
 - Forced-on with auto-off, presence simulation while away, pause all schedules
 - Auto-off after on: a device that stays on longer than N (from any source) is turned off, survives restarts
 - Missed-run catch-up, device state verification, history log, backup/restore
-- Schedules run in the add-on backend — they keep working with the browser closed
+- Schedules run in the app backend — they keep working with the browser closed
 - Interface language (English / Vietnamese): **Settings → Appearance → Language**
 
 💬 Questions, feedback and screenshots: [community forum thread](https://community.home-assistant.io/t/my-scheduler-iphone-style-timer-scheduler-add-on-for-any-device-no-yaml-no-helpers/1027265)
@@ -23,13 +23,13 @@ created by hand for each device. Pick a device, pick a time, done.
 
 1. Open **My Scheduler** from the sidebar.
 2. Go to **Settings → Devices** and add the devices you want to schedule. This step is for the
-   person who manages the add-on: pick devices from Home Assistant and give them friendly names so
+   person who manages the app: pick devices from Home Assistant and give them friendly names so
    family members can easily find and use them. **Only devices added here can be added to the
    Home page.**
 3. Tap **+** on the Home page, pick a device and create a schedule: a single time, or an on → off
    time range.
 
 All times follow the Home Assistant time zone (Settings → System → General). Missed-run handling is
-set in the app under **Settings → Scheduler**. The add-on Configuration tab can normally be left blank.
+set in the app under **Settings → Scheduler**. The app Configuration tab can normally be left blank.
 
 > **Personal project.** Feature requests will be considered when reasonable and time allows.

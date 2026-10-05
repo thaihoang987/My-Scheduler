@@ -2,7 +2,7 @@ import type { DeviceGroup, Schedule } from "../types";
 import { dateInZone, secondsOfDayInZone, todayInZone } from "./appTime";
 import { rangeDayOffset } from "./scheduleRange";
 
-/** Lich chay TRONG HOM NAY (theo mui gio add-on) - dung chung cho 2 kieu xem
+/** Lich chay TRONG HOM NAY (theo mui gio app) - dung chung cho 2 kieu xem
  * "Theo gio" va "Bang 24h" tren Nha (v0.5.64). Tinh hoan toan phia client tu
  * du lieu lich da co, khong goi them API:
  * - Gio co dinh: lay `time`.

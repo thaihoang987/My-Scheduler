@@ -27,11 +27,11 @@ TIMEZONE_RETRY_SECONDS = 30
 
 
 async def _reset_devices_on_startup() -> None:
-    """Tuy chon Cai dat "Tat thiet bi co lich dang bat khi add-on khoi dong"
+    """Tuy chon Cai dat "Tat thiet bi co lich dang bat khi app khoi dong"
     (phan hoi 2026-09-23, sua lai lan 2: CHI tat thiet bi THUC SU dang bat -
     khong tat mu tat ca thiet bi co lich bat ke trang thai that) - mac dinh
     TAT, chi chay khi nguoi dung chu dong bat. An toan sau 1 lan restart
-    giua chung 1 khung gio dang bat: add-on mat dau vet thiet bi nao dang
+    giua chung 1 khung gio dang bat: app mat dau vet thiet bi nao dang
     bat do CHINH schedule cua no (khong tu dong nho lai "dang trong khung
     gio bat" sau restart), co the de thiet bi bat vinh vien neu lich tat
     tuong ung bi lo. Doc TRANG THAI THAT tu HA (khong doan qua schedule) de
@@ -40,7 +40,7 @@ async def _reset_devices_on_startup() -> None:
     (xem duoi) de hen "bat cuong che" con hop le van duoc khoi phuc dung sau
     do, khong bi lenh tat nay de len tren. Chi thu 1 LAN (khong retry) - day
     la tinh nang an toan, khong phai schedule; retry lap lai se lam cham
-    khoi dong ca add-on neu HA chua san sang."""
+    khoi dong ca app neu HA chua san sang."""
     if not crud.get_settings().get("reset_devices_on_startup"):
         return
     scheduled_entity_ids = {eid for s in crud.list_schedules() for eid in (s.get("target_entities") or [])}
@@ -59,18 +59,18 @@ async def _reset_devices_on_startup() -> None:
         if state_by_entity.get(eid, "off") not in ("off", "unavailable", "unknown")
     )
     if not on_entities:
-        log.info("Khong co thiet bi nao co lich dang bat luc add-on khoi dong - bo qua")
+        log.info("Khong co thiet bi nao co lich dang bat luc app khoi dong - bo qua")
         return
     try:
         await homeassistant.call_service("homeassistant", "turn_off", on_entities, {})
-        log.info("Da gui lenh tat cho %d thiet bi co lich dang bat luc add-on khoi dong: %s", len(on_entities), on_entities)
+        log.info("Da gui lenh tat cho %d thiet bi co lich dang bat luc app khoi dong: %s", len(on_entities), on_entities)
     except Exception as exc:  # noqa: BLE001
         log.warning("Tat thiet bi luc khoi dong that bai (HA co the chua san sang): %s", exc)
 
 
 async def _load_ha_timezone() -> bool:
     """Lay mui gio tu cau hinh HA (Settings -> System -> General) - moi tinh toan
-    gio cua add-on theo DUNG mui nay (v0.5.54 bo o chon mui gio rieng). Loi (HA
+    gio cua app theo DUNG mui nay (v0.5.54 bo o chon mui gio rieng). Loi (HA
     chua san sang) -> giu mui gio du phong va bao cho lifespan thu lai nen."""
     from zoneinfo import ZoneInfo
 
@@ -90,10 +90,10 @@ async def _load_ha_timezone() -> bool:
     old = crud.clear_legacy_timezone()
     now_tz = crud.settings_timezone()
     if old and old != now_tz:
-        log.warning("Bo mui gio rieng cua add-on (%s) - tu nay theo Home Assistant (%s)", old, now_tz)
+        log.warning("Bo mui gio rieng cua app (%s) - tu nay theo Home Assistant (%s)", old, now_tz)
         crud.add_history(None, tr("Múi giờ", "Time zone"), None, "warning",
                          tr(f"Bỏ múi giờ riêng {old}, từ nay theo Home Assistant ({now_tz}).",
-                            f"Dropped the add-on's own time zone {old}; now following Home Assistant ({now_tz})."),
+                            f"Dropped the app's own time zone {old}; now following Home Assistant ({now_tz})."),
                          manual=True)
     return loaded
 

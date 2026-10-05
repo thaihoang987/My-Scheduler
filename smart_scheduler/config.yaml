@@ -1,7 +1,7 @@
 name: "My Scheduler"
 description: "Support: buymeacoffee.com/leon_bell · ko-fi.com/leonbell · paypal.me/leonbell95 | An iOS-style device timer and scheduler for Home Assistant. No YAML or manually created Helpers required."
-version: "0.5.92"
-url: "https://github.com/thaihoang987/My-addon-Scheduler"
+version: "0.5.93"
+url: "https://github.com/thaihoang987/My-Scheduler"
 slug: "smart_scheduler"
 init: false
 arch:

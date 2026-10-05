@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.93
+
+- Use Home Assistant App terminology throughout documentation, UI, logs and release metadata.
+- Public project links now point to My-Scheduler; existing installation repository addresses,
+  app slugs and container image names stay unchanged for compatibility.
+
 ## 0.5.92
 
 - Docs: desktop and mobile screenshots in the repository README.
@@ -182,7 +188,7 @@
 ## 0.5.60
 
 - Smaller phones: device cards, editing controls, auto-off lists and form fields now fit narrow screens.
-- Keep navigation inside the add-on frame and scroll long device details and schedule sheets within it.
+- Keep navigation inside the app frame and scroll long device details and schedule sheets within it.
 
 ## 0.5.59
 
@@ -191,13 +197,13 @@
 
 ## 0.5.58
 
-- The add-on and the repository now show the new name **My Scheduler** in Home Assistant as well
-  (0.5.57 still showed the old name in the add-on store).
+- The app and the repository now show the new name **My Scheduler** in Home Assistant as well
+  (0.5.57 still showed the old name in the app store).
 
 ## 0.5.57
 
 - Smart Scheduler is now called **My Scheduler**. The repository moved to
-  https://github.com/thaihoang987/My-addon-Scheduler – the old link keeps working, nothing to
+  https://github.com/thaihoang987/My-Scheduler – the old link keeps working, nothing to
   reinstall: your schedules, devices and settings stay as they are.
 
 ## 0.5.56
@@ -318,7 +324,7 @@
 
 ## 0.5.42
 
-- Added Ko-fi and PayPal support links (About page, README, add-on description).
+- Added Ko-fi and PayPal support links (About page, README, app description).
 
 ## 0.5.41
 

@@ -1,8 +1,8 @@
 # ============================================================
 # Multi-stage: stage 1 build frontend (Node, khong ton tai trong image
 # cuoi), stage 2 base HA + Python phuc vu API va static file da build.
-# Ly do khac Dockerfile cua PZEM (khong co stage Node): addon do la 1 file
-# .py thuan, addon nay co 1 project React/TS/Vite that su can buoc build.
+# Ly do khac Dockerfile cua PZEM (khong co stage Node): app do la 1 file
+# .py thuan, app nay co 1 project React/TS/Vite that su can buoc build.
 # Xem SPEC.md muc "Quyet dinh lech spec" #2.
 # ============================================================
 # ARG dung cho FROM phai khai bao TRUOC FROM DAU TIEN trong ca file de co

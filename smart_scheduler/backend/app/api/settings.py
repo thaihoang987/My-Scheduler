@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 def _user_id(request: Request) -> str | None:
-    """Tai khoan HA dang mo add-on - Supervisor Ingress gui kem header nay.
+    """Tai khoan HA dang mo app - Supervisor Ingress gui kem header nay.
     Mo thang qua cong (khong qua Ingress) thi khong co -> dung chung."""
     if request is None:
         return None

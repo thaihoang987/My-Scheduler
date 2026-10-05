@@ -69,7 +69,7 @@ jobs:
             BUILD_VERSION=${{ steps.v.outputs.version }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=My Scheduler Home Assistant add-on
+            org.opencontainers.image.description=My Scheduler Home Assistant app
 
       - name: Commit to main, tag and create the release (image is ready)
         if: steps.v.outputs.skip != 'true'

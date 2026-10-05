@@ -344,8 +344,8 @@ export function ScheduleEditor({
             <TimeWheelPicker value={draft.time} onChange={(time) => setDraft((d) => ({ ...d, time }))} />
             <p className="settings-hint">
               {tr(
-                "Mỗi lần thiết bị bật (từ Lovelace, công tắc tay, automation hay lịch khác) sẽ tự tắt sau khoảng này. Mốc bật được lưu lại, Home Assistant/add-on khởi động lại vẫn tính tiếp; quá hạn trong lúc tắt máy thì tắt ngay khi chạy lại.",
-                "Whenever the device turns on (dashboard, wall switch, automation or another schedule) it is turned off after this duration. The on-time is stored, so restarts keep counting; if it expired while offline it turns off as soon as the add-on is back.",
+                "Mỗi lần thiết bị bật (từ Lovelace, công tắc tay, automation hay lịch khác) sẽ tự tắt sau khoảng này. Mốc bật được lưu lại, Home Assistant/app khởi động lại vẫn tính tiếp; quá hạn trong lúc tắt máy thì tắt ngay khi chạy lại.",
+                "Whenever the device turns on (dashboard, wall switch, automation or another schedule) it is turned off after this duration. The on-time is stored, so restarts keep counting; if it expired while offline it turns off as soon as the app is back.",
               )}
             </p>
           </>

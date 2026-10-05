@@ -23,8 +23,8 @@ def _validate(payload: dict) -> None:
         bad("File không phải bản sao lưu My Scheduler (thiếu danh sách lịch).", "Not a My Scheduler backup file (no schedule list).")
     version = payload.get("version") or 1
     if not isinstance(version, int) or version > crud.BACKUP_VERSION:
-        bad(f"Bản sao lưu từ phiên bản mới hơn (định dạng {version}) - hãy cập nhật add-on trước.",
-            f"Backup comes from a newer version (format {version}) - update the add-on first.")
+        bad(f"Bản sao lưu từ phiên bản mới hơn (định dạng {version}) - hãy cập nhật app trước.",
+            f"Backup comes from a newer version (format {version}) - update the app first.")
     for s in payload["schedules"]:
         if not isinstance(s, dict) or not s.get("id") or not s.get("name") or not s.get("time"):
             bad("Có lịch thiếu id/tên/giờ - file bị hỏng.", "A schedule is missing id/name/time - the file is damaged.")

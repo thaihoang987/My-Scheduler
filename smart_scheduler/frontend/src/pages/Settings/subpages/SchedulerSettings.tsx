@@ -70,7 +70,7 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
       </div>
 
       <div className="settings-section">
-        <div className="settings-section__title">{tr("Lịch bị lỡ (khi Add-on tắt lâu)", "Missed schedules (after a long add-on outage)")}</div>
+        <div className="settings-section__title">{tr("Lịch bị lỡ (khi App tắt lâu)", "Missed schedules (after a long app outage)")}</div>
         <div className="chip-row">
           {(["skip", "run_once"] as const).map((p) => (
             <button
@@ -103,8 +103,8 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
         </label>
         <p className="settings-hint">
           {tr(
-            "Tùy chọn chung cho mọi lịch, mặc định tắt. Relay xung (bấm 1 lần là đổi trạng thái) thì nên để tắt, vì gửi lại có thể đảo thêm 1 lần - add-on không tự nhận biết loại relay. Không gửi lại khi lịch đã sửa/tắt, hết khung giờ, đang tạm dừng, thiết bị đã nhận lệnh mới hơn hoặc kết nối Home Assistant chưa ổn định. Scene và script không bao giờ được kiểm tra lại.",
-            "A single option for all schedules, off by default. Keep it off for pulse relays (one press toggles), since a retry could toggle again - the add-on cannot detect relay types. No retry when the schedule was edited/disabled, the range ended, schedules are paused, the device received a newer command or the Home Assistant connection is not stable. Scenes and scripts are never verified.",
+            "Tùy chọn chung cho mọi lịch, mặc định tắt. Relay xung (bấm 1 lần là đổi trạng thái) thì nên để tắt, vì gửi lại có thể đảo thêm 1 lần - app không tự nhận biết loại relay. Không gửi lại khi lịch đã sửa/tắt, hết khung giờ, đang tạm dừng, thiết bị đã nhận lệnh mới hơn hoặc kết nối Home Assistant chưa ổn định. Scene và script không bao giờ được kiểm tra lại.",
+            "A single option for all schedules, off by default. Keep it off for pulse relays (one press toggles), since a retry could toggle again - the app cannot detect relay types. No retry when the schedule was edited/disabled, the range ended, schedules are paused, the device received a newer command or the Home Assistant connection is not stable. Scenes and scripts are never verified.",
           )}
         </p>
         <p className="settings-hint">
@@ -115,7 +115,7 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
       <div className="settings-section">
         <div className="settings-section__title">{tr("An toàn khi khởi động", "Startup safety")}</div>
         <label className="settings-row">
-          <span>{tr("Tắt thiết bị có lịch đang bật khi Add-on khởi động", "Turn off scheduled devices when the add-on starts")}</span>
+          <span>{tr("Tắt thiết bị có lịch đang bật khi App khởi động", "Turn off scheduled devices when the app starts")}</span>
           <input
             type="checkbox"
             checked={settings.reset_devices_on_startup}
@@ -123,7 +123,7 @@ export function SchedulerSettings({ settings, reload, onBack }: { settings: Sett
           />
         </label>
         <p className="settings-hint">
-          {tr("Đề phòng Add-on restart đúng lúc giữa 1 khung giờ đang bật mà lịch Tắt tương ứng bị lỡ. Khi bật, mỗi lần Add-on khởi động lại, thiết bị có ít nhất một lịch và đang thực sự bật sẽ được gửi lệnh tắt ngay. Hẹn Bật cưỡng chế còn hạn vẫn được khôi phục bình thường.", "Protects against an add-on restart during an active time range that could miss its matching off event. When enabled, each startup immediately turns off devices that have schedules and are actually on. Active forced-on timers are then restored normally.")}
+          {tr("Đề phòng App restart đúng lúc giữa 1 khung giờ đang bật mà lịch Tắt tương ứng bị lỡ. Khi bật, mỗi lần App khởi động lại, thiết bị có ít nhất một lịch và đang thực sự bật sẽ được gửi lệnh tắt ngay. Hẹn Bật cưỡng chế còn hạn vẫn được khôi phục bình thường.", "Protects against an app restart during an active time range that could miss its matching off event. When enabled, each startup immediately turns off devices that have schedules and are actually on. Active forced-on timers are then restored normally.")}
         </p>
       </div>
     </div>

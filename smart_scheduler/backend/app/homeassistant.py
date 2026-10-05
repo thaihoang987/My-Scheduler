@@ -134,7 +134,7 @@ def _headers() -> dict:
     if not token:
         raise HAError(
             "Khong nhan duoc SUPERVISOR_TOKEN va chua co ha_token du phong. "
-            "Hay rebuild/restart add-on de ap dung run.sh with-contenv; chi khi van loi moi can "
+            "Hay rebuild/restart app de ap dung run.sh with-contenv; chi khi van loi moi can "
             "dien Long-Lived Access Token vao ha_token."
         )
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}

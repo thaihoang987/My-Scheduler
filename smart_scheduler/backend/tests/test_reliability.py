@@ -229,7 +229,7 @@ def test_recover_overnight_range_after_restart_once(fake_ha):
     on, off = make_pair("23:59:00", "00:01:00", gid="g1")
     start = datetime(2026, 10, 1, 23, 59, tzinfo=TZ)
     ran_on(on, start)
-    now = datetime(2026, 10, 2, 0, 30, tzinfo=TZ)  # add-on tat luc 00:01
+    now = datetime(2026, 10, 2, 0, 30, tzinfo=TZ)  # app tat luc 00:01
     assert run(scheduler_engine.recover_ranges(now)) == [on["id"]]
     assert fake_ha.calls == [("homeassistant", "turn_off", ["switch.a"])]
     got = crud.get_schedule(off["id"])
@@ -310,7 +310,7 @@ def test_normal_off_closes_range_and_is_not_duplicated(fake_ha):
 
 
 def test_missed_off_is_caught_up_once(fake_ha):
-    """Add-on khoi dong lai sau moc Tat (policy skip): vong lich ghi skipped_missed,
+    """App khoi dong lai sau moc Tat (policy skip): vong lich ghi skipped_missed,
     tat bu gui 1 lan, vong lich sau khong gui lai."""
     now = datetime.now(TZ).replace(microsecond=0)
     on_t, off_t = now - timedelta(hours=2), now - timedelta(minutes=30)

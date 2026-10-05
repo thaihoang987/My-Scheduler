@@ -27,7 +27,9 @@ export function storedText(value: string | null): string | null {
     "Bật cưỡng chế": "Forced on",
     "Giả lập có người": "Presence simulation",
     "Tự tắt theo hẹn giờ thủ công": "Automatically turned off by manual timer",
-    "Lỡ giờ chạy (Add-on tắt hoặc bận)": "Missed run (add-on was stopped or busy)",
+    "Lỡ giờ chạy (App tắt hoặc bận)": "Missed run (app was stopped or busy)",
+    // Compatibility with history entries saved by older versions.
+    "Lỡ giờ chạy (Add-on tắt hoặc bận)": "Missed run (app was stopped or busy)",
     "Điều kiện chưa thoả": "Conditions were not met",
     "Kiểm tra lại: đã gửi lại lệnh, thiết bị đã đúng trạng thái": "Verification: command retried and device state is now correct",
     "Tắt thiết bị vì xoá card hẹn giờ": "Turned off device because its schedule card was deleted",
