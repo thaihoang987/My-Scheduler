@@ -70,7 +70,7 @@ export function DeviceCard({
    * useSortable() rieng tung the nhu truoc - phan hoi 2026-09-23 "kéo thả
    * quá khó khăn ... trên điện thoại không thể nắm kéo được": dnd-kit keo ca
    * card (trung voi vung bam mo Device Detail, kho phan biet tap/keo tren
-   * dien thoai). Doi sang SortableJS (cung thu vien addon PZEM da dung on
+   * dien thoai). Doi sang SortableJS (cung thu vien app PZEM da dung on
    * dinh) VOI 1 TAY CAM RIENG (`.drag-handle`, xem duoi) - chi vung tay cam
    * moi bat dau keo, phan con lai cua card van bam mo binh thuong, khong
    * con nham lan. */

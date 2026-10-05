@@ -150,18 +150,18 @@ body {
 }
 
 /* Phan hoi 2026-09-23: vung an toan cu chi Home o duoi cung (34px tren
-   iPhone Face ID) nam NGOAI khung Ingress cua add-on - do chinh app HA
-   Companion tu ve, add-on khong ve len duoc (da xac nhan qua so lieu
+   iPhone Face ID) nam NGOAI khung Ingress cua app - do chinh app HA
+   Companion tu ve, app khong ve len duoc (da xac nhan qua so lieu
    window.innerHeight/screen.height that tren may that). Doan dau doan mau
    vung do la den thuan (--bg, #000000) nhung nguoi dung phan hoi "cam giac
    no mau xam xam" - do PIXEL THAT tu anh chup man hinh nguoi dung gui (kiem
    tra bang PIL) xac nhan dung: vung do la #111111 (17,17,17), KHONG PHAI
    den thuan - trung voi mau nen mac dinh cua theme toi Home Assistant
    (--primary-background-color #111111 cua chinh frontend HA), khong phai
-   mau cua add-on. Doi tabbar sang dung --ha-app-bg (#111111 dark /#fafafa
+   mau cua app. Doi tabbar sang dung --ha-app-bg (#111111 dark /#fafafa
    light - mau nen mac dinh 2 theme cua HA, chua do PIL rieng ban sang) CHI
    khi dang nhung trong Ingress, de khop dung mau thay vi doan --bg cua
-   chinh add-on. Mo doc lap ngoai trinh duyet (khong bi ve chan nao) van giu
+   chinh app. Mo doc lap ngoai trinh duyet (khong bi ve chan nao) van giu
    --surface nhu cu cho dep. */
 :root {
   --ha-app-bg: #fafafa;
@@ -505,7 +505,7 @@ body {
 
 /* Tay cam keo-tha rieng (SortableJS, khong keo ca card nua) - phan hoi
    2026-09-23 "kéo thả quá khó khăn ... trên điện thoại không thể nắm kéo
-   được". `touch-action:none` BAT BUOC (giong addon PZEM dang dung on dinh)
+   được". `touch-action:none` BAT BUOC (giong app PZEM dang dung on dinh)
    - thieu no thi trinh duyet mobile se danh cu chi cham giu tai day cho
    cuon trang truoc khi SortableJS kip nhan duoc, lam "keo khong an". */
 .drag-handle {

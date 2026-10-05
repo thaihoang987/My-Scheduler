@@ -2,7 +2,7 @@ import { mdiBeer, mdiCoffee, mdiHandHeart } from "@mdi/js";
 
 /** Link GitHub + donate dung chung cho Cai dat -> Ve ung dung va nut (i) canh
  * so phien ban tren dau trang (v0.5.66). */
-export const GITHUB_URL = "https://github.com/thaihoang987/My-addon-Scheduler";
+export const GITHUB_URL = "https://github.com/thaihoang987/My-Scheduler";
 
 export const DONATE_LINKS = [
   { href: "https://buymeacoffee.com/leon_bell", icon: mdiBeer, modifier: "beer", vi: "Mời mình 1 ly bia", en: "Buy me a beer" },

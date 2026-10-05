@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Switch the add-on between the stable and test channel.
+"""Switch the app between the stable and test channel.
 
   set_channel.py version              -> print the base version (without -test.N)
   set_channel.py apply test <version> -> test channel (own slug/name/image, so it
@@ -22,7 +22,7 @@ CHANNELS = {
         "slug": "smart_scheduler",
         "panel_title": "My Scheduler",
         "image": f"ghcr.io/{OWNER}/smart-scheduler",
-        "repo_name": "My Scheduler - Home Assistant (Hass.io) Add-on",
+        "repo_name": "My Scheduler - Home Assistant App",
         "desc_prefix": "",
     },
     "test": {
@@ -35,7 +35,7 @@ CHANNELS = {
     },
 }
 TEST_BANNER = (
-    "> ⚠️ **TEST channel** — pre-release builds for testing. Use the `main` branch for the stable add-on.\n\n"
+    "> ⚠️ **TEST channel** — pre-release builds for testing. Use the `main` branch for the stable app.\n\n"
 )
 
 

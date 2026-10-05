@@ -1,6 +1,6 @@
 """'Bat cuong che' + tu tat sau X phut - KHONG phai Schedule: bat NGAY
 lap tuc qua HA, tuy chon hen 1 lan tu tat sau bao lau. Hen co moc tu tat
-duoc luu rieng trong SQLite de khoi phuc qua restart Add-on, khong ghi vao
+duoc luu rieng trong SQLite de khoi phuc qua restart App, khong ghi vao
 bang `schedules`. Dung service `homeassistant.turn_on`/
 `turn_off` (umbrella service cua HA, hoat dong dung cho hau het domain -
 light/switch/fan/climate/cover/media_player...) thay vi service rieng tung

@@ -491,7 +491,7 @@ def test_auto_off_survives_backup_restart(fake_ha):
     run(auto_off.check_once(_utc(0, 59, day=2)))
     assert fake_ha.calls == []
 
-    # VM tat: add-on khong chay. Len lai: HA chua san sang -> get_states loi
+    # VM tat: app khong chay. Len lai: HA chua san sang -> get_states loi
     async def boom():
         raise RuntimeError("HA starting")
     fake_ha_get = fake_ha.get_states

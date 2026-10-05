@@ -1,5 +1,5 @@
 """SQLite DAL - 1 file ket noi dung chung, khong ORM (giu nhe giong quy uoc
-cac add-on Local khac trong repo). Schema theo dung muc 8 cua SPEC.md, tach
+cac app Local khac trong repo). Schema theo dung muc 8 cua SPEC.md, tach
 entity_aliases/execution_history/settings rieng nhu de xuat."""
 import sqlite3
 import threading
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS manual_timers (
     off_at TEXT NOT NULL
 );
 
--- Khung gio da BAT thanh cong ma chua TAT (v0.5.79): de tat bu sau khi add-on
+-- Khung gio da BAT thanh cong ma chua TAT (v0.5.79): de tat bu sau khi app
 -- khoi dong lai/HA mat ket noi luc toi gio Tat. on_rev/off_rev = dau van tay
 -- cau hinh 2 moc luc bat - lich bi sua thi bo, khong tat bu theo cau hinh cu.
 CREATE TABLE IF NOT EXISTS active_ranges (

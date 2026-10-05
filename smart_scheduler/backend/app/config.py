@@ -1,5 +1,5 @@
-"""Doc option cua add-on (/data/options.json, do Supervisor tu ghi tu config.yaml
-schema/options) + bien moi truong chuan cua HA add-on (SUPERVISOR_TOKEN)."""
+"""Doc option cua app (/data/options.json, do Supervisor tu ghi tu config.yaml
+schema/options) + bien moi truong chuan cua HA app (SUPERVISOR_TOKEN)."""
 import json
 import os
 from pathlib import Path
@@ -39,6 +39,6 @@ HA_TOKEN = (OPTIONS.get("ha_token") or "").strip()
 HA_BASE_URL_OVERRIDE = (OPTIONS.get("ha_base_url") or "").strip().rstrip("/")
 
 # Mui gio doc truc tiep tu cau hinh Home Assistant (GET /api/config -> time_zone)
-# luc add-on khoi dong (main.py, v0.5.53) - nguon DUY NHAT cho mac dinh; TZ o tren
+# luc app khoi dong (main.py, v0.5.53) - nguon DUY NHAT cho mac dinh; TZ o tren
 # chi con la du phong khi chua doc duoc HA.
 HA_TIMEZONE: str | None = None

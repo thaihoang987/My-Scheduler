@@ -11,7 +11,7 @@ from app.i18n import tr
 
 
 def settings_timezone() -> str:
-    """Mui gio DUY NHAT cua add-on = mui gio Home Assistant (v0.5.54, phan hoi
+    """Mui gio DUY NHAT cua app = mui gio Home Assistant (v0.5.54, phan hoi
     2026-10-01 "theo han mui gio hassio"): da bo o chon mui gio trong Cai dat - 2 noi
     chon mui gio chi gay lech. Moi lich/binh minh/tam dung/gia lap co nguoi tinh theo
     mui nay. Cot `schedules.timezone` chi con de tuong thich."""
@@ -335,7 +335,7 @@ class ReplaceEntityError(ValueError):
 def replace_entity(old_id: str, new_id: str, new_domain: str) -> dict:
     """Doi 1 thiet bi sang entity KHAC ma giu nguyen moi thu (phan hoi
     2026-09-24 "sửa thiết bị thành entities khác trực tiếp search từ
-    hassio"): add-on noi moi du lieu bang entity_id tho, nen thay cong tac/
+    hassio"): app noi moi du lieu bang entity_id tho, nen thay cong tac/
     tich hop moi lam lich goi vao entity khong con ton tai. Chuyen trong 1
     transaction: dong entity_aliases (ten rieng/icon/nhom/yeu thich - ghi de
     dong cua entity moi neu co), target_entities + conditions cua MOI lich,
@@ -577,7 +577,7 @@ DEFAULT_SETTINGS = {
     "sort_mode": "auto",
     "language": "en",
     # Phan hoi 2026-09-23: "khi app khởi động gửi lệnh tắt tới tất cả thiết
-    # bị có timer" - an toan khi add-on restart giua chung 1 khung gio dang
+    # bị có timer" - an toan khi app restart giua chung 1 khung gio dang
     # bat (mat dau vet thiet bi nao dang thuc su bat), mac dinh TAT vi day la
     # hanh vi thay doi hanh vi thiet bi that, chi bat khi nguoi dung chu
     # dong chon (xem main.py lifespan()).

@@ -17,7 +17,7 @@ from app.i18n import tr
 
 # Bitmask cover.SUPPORT_SET_POSITION / SUPPORT_SET_TILT_POSITION (hang so on
 # dinh cua HA core, khong doi qua cac ban - xem homeassistant/components/
-# cover/__init__.py). Khong the import truc tiep tu HA core (add-on khong
+# cover/__init__.py). Khong the import truc tiep tu HA core (app khong
 # co dependency homeassistant), nen khai bao lai gia tri so nguyen.
 COVER_SUPPORT_SET_POSITION = 4
 COVER_SUPPORT_SET_TILT_POSITION = 64

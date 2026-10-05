@@ -13,7 +13,7 @@ const DURATION_PRESETS: { vi: string; en: string; minutes: number | null }[] = [
 ];
 
 /** "Bat cuong che" + tu tat sau X phut (muc 2026-09-23) - nut THU CONG rieng
- * biet voi Schedule. Hen tu tat duoc luu ben vung qua restart Add-on.
+ * biet voi Schedule. Hen tu tat duoc luu ben vung qua restart App.
  * Bat NGAY qua `homeassistant.turn_on` (khong dat
  * che do/nhiet do/do sang gi - muon chi tiet thi dung "Chay ngay" cua 1
  * Schedule "Dat che do/den/vi tri/toc do" thay vi nut nay). */

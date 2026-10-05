@@ -102,7 +102,7 @@ export interface EntitySummary {
   // cap bat/tat cua 1 "Khung gio", xem utils/scheduleRange.ts). null = chua
   // phan nhom.
   category_id: string | null;
-  /** Da them trong add-on nhung entity khong con trong HA (v0.5.27). */
+  /** Da them trong app nhung entity khong con trong HA (v0.5.27). */
   missing?: boolean;
   climate: ClimateAttrs | null;
   light: LightAttrs | null;
@@ -124,7 +124,7 @@ export interface Group {
 }
 
 /** "Bat cuong che" + tu tat sau X phut - KHONG phai Schedule. Hen co
- * `off_at` duoc luu SQLite va khoi phuc qua restart Add-on. */
+ * `off_at` duoc luu SQLite va khoi phuc qua restart App. */
 export interface ManualTimer {
   id: string | null;
   entity_ids: string[];

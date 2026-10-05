@@ -10,7 +10,7 @@ khi khoi dong tu nhien phat hien cac khe da qua han (`last_scheduled_for`
 chua khop) va xu ly theo `missed_execution_policy`:
   - qua han trong vong GRACE_SECONDS  -> van chay binh thuong (tick binh
     thuong, khong tinh la "missed").
-  - qua han lau hon (vd Add-on tat vai gio) -> ap dung policy:
+  - qua han lau hon (vd App tat vai gio) -> ap dung policy:
       skip      -> khong chay, chi danh dau da xu ly khe do (mac dinh).
       run_once  -> chay bu dung 1 lan roi thoi.
 """
@@ -229,7 +229,7 @@ def _revision(schedule: dict) -> str:
 def paused_until(settings: dict | None = None) -> datetime | None:
     """Moc ket thuc "Tam dung tat ca lich" (che do di vang, Cai dat ->
     Scheduler) - None neu khong tam dung. Chuoi khong co mui gio duoc hieu
-    theo mui gio mac dinh cua add-on."""
+    theo mui gio mac dinh cua app."""
     raw = (settings if settings is not None else crud.get_settings()).get("pause_until") or ""
     if not raw:
         return None
@@ -440,7 +440,7 @@ async def _run_slot(schedule: dict, missed_policy: str, expires_at: datetime | N
     is_missed = (now - scheduled_dt).total_seconds() > GRACE_SECONDS
     if is_missed and missed_policy == "skip":
         crud.mark_executed(schedule["id"], slot, "skipped_missed")
-        crud.add_history(schedule["id"], schedule["name"], slot, "skipped_missed", tr("Lỡ giờ chạy (Add-on tắt hoặc bận)", "Missed run (add-on was stopped or busy)"))
+        crud.add_history(schedule["id"], schedule["name"], slot, "skipped_missed", tr("Lỡ giờ chạy (App tắt hoặc bận)", "Missed run (app was stopped or busy)"))
         await manager.broadcast("schedule_executed", {"id": schedule["id"], "status": "skipped_missed"})
         return
 
@@ -562,7 +562,7 @@ async def verify_state(schedule: dict, action: dict, targets: list[str], delay: 
     30s sau khi lich Bat/Tat chay, doc trang thai THAT tu HA. Thiet bi nao chua
     dung thi gui lai lenh 1 lan (chi khi _retry_targets cho phep), doi them 30s
     kiem lai; van sai -> ghi Nhat ky "verify_failed". Relay xung (bam 1 lan doi
-    trang thai): nguoi dung tu tat tuy chon - add-on khong tu nhan dien. Scene/
+    trang thai): nguoi dung tu tat tuy chon - app khong tu nhan dien. Scene/
     script khong bao gio kiem tra (chay xong tu ve "off" -> se bi chay lai)."""
     targets = [e for e in targets if not _is_one_shot(e)]
     if not targets:
@@ -804,7 +804,7 @@ def seed_active_ranges() -> int:
 
 
 async def recover_ranges(now: datetime | None = None) -> list[str]:
-    """Tat bu (v0.5.79): khung gio da BAT thanh cong ma qua moc Tat chua tat (add-on
+    """Tat bu (v0.5.79): khung gio da BAT thanh cong ma qua moc Tat chua tat (app
     tat/khoi dong lai, HA mat ket noi luc toi gio Tat), ke ca khung bat tu hom
     truoc. Chi tat bu khi: 2 moc con nguyen cau hinh (dau van tay), lich + card
     con bat, khong tam dung, khong qua RECOVERY_MAX_AGE, moc Tat chua chay khe
@@ -859,7 +859,7 @@ async def recover_ranges(now: datetime | None = None) -> list[str]:
                 continue
             crud.mark_executed(off["id"], row["deadline"], "success")
             crud.add_history(off["id"], off["name"], row["deadline"], "success",
-                             tr("Tắt bù: quá giờ Tắt khi Add-on/Home Assistant không chạy", "Catch-up off: the end time passed while the add-on/Home Assistant was down"))
+                             tr("Tắt bù: quá giờ Tắt khi App/Home Assistant không chạy", "Catch-up off: the end time passed while the app/Home Assistant was down"))
             crud.close_range(row["on_id"])
             await manager.broadcast("schedule_executed", {"id": off["id"], "status": "success"})
             done.append(row["on_id"])

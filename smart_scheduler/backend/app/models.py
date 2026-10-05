@@ -201,7 +201,7 @@ class EntitySummary(BaseModel):
     favorite: bool = False
     added: bool = False
     category_id: Optional[str] = None
-    # True = da them trong add-on nhung entity khong con ton tai trong HA.
+    # True = da them trong app nhung entity khong con ton tai trong HA.
     missing: bool = False
     climate: Optional[ClimateAttrs] = None
     light: Optional[LightAttrs] = None

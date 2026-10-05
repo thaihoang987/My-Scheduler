@@ -4,7 +4,7 @@ import { DONATE_LINKS, GITHUB_URL } from "../../utils/aboutLinks";
 import { tr } from "../../i18n";
 
 /** Bang gioi thieu ngan mo tu nut (i) canh so phien ban (v0.5.66): mo ta
- * add-on, link GitHub, cac nut donate. Ban day du van o Cai dat -> Ve ung dung. */
+ * app, link GitHub, cac nut donate. Ban day du van o Cai dat -> Ve ung dung. */
 export function AboutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <BottomSheet open={open} title="My Scheduler" onClose={onClose}>
