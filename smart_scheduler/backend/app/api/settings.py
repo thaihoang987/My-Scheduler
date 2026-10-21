@@ -55,6 +55,8 @@ async def update_settings(payload: SettingsIn, request: Request = None):  # type
     data.pop("timezone", None)
     if "language" in data and data["language"] not in ("vi", "en"):
         raise HTTPException(400, tr(f"Ngôn ngữ không hợp lệ: {data['language']}", f"Invalid language: {data['language']}"))
+    if "manual_durations" in data:
+        data["manual_durations"] = sorted({m for m in data["manual_durations"] if 1 <= m <= 10080})[:12]
     before = paused_until()
     was_paused = before is not None and before > datetime.now(before.tzinfo)
     updated = crud.update_settings(data)

@@ -1116,6 +1116,11 @@ body {
 }
 .force-on__status { font-weight: 700; color: var(--text); margin-bottom: 6px; }
 .force-on__countdown { color: var(--text-muted); margin-bottom: 10px; }
+.chip--icon { padding: 8px 12px; color: var(--text-muted); }
+.chip--editing { border-style: dashed; color: var(--text-muted); }
+.force-on__edit { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 10px; }
+.force-on__edit-input { width: 80px; }
+.force-on__edit-unit { width: auto; }
 
 /* Dai highlight quanh gia tri dang chon - khung nen + vien tren/duoi kieu
    iOS (giong "── 07 ──" trong mockup goc), thay vi khong co dau hieu gi

@@ -198,7 +198,7 @@ export function DeviceDetail({
 
       <div className="device-detail__manual">
         <div className="device-detail__section-title">{tr("Điều khiển thủ công", "Manual control")}</div>
-        <ForceOnControl entityIds={group.entityIds} activeTimers={activeTimers} reloadTimers={reloadTimers} />
+        <ForceOnControl entityIds={group.entityIds} activeTimers={activeTimers} reloadTimers={reloadTimers} durations={settings.manual_durations} reloadSettings={reload} />
       </div>
 
       {nextRun && nextSchedule ? (

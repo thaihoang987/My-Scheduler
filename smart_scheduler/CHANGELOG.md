@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.94
+
+- Manual control: the auto-off presets (5 min, 10 min, 30 min, 1 h, 2 h) are now editable. Tap the pencil to remove presets, add your own (minutes or hours) or reset to defaults. Saved on the server and included in backups.
+
 ## 0.5.93
 
 - Use Home Assistant App terminology throughout documentation, UI, logs and release metadata.

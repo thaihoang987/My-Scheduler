@@ -234,6 +234,8 @@ class SettingsIn(BaseModel):
     # gui lai lenh 1 lan va canh bao neu van sai (v0.5.35, mac dinh tat).
     verify_state: Optional[bool] = None
     auto_off_section_index: Optional[int] = None
+    # Cac moc "tu tat sau" (phut) o Dieu khien thu cong, nguoi dung them/bot/sua.
+    manual_durations: Optional[list[int]] = None
     detail_row_order: Optional[dict[str, list[str]]] = None
     collapsed_sections: Optional[list[str]] = None
 
