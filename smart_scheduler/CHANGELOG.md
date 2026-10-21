@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.95
+
+- Manual control presets: clearer edit mode (solid confirm button, labelled "Add a new preset" box) and a confirmation prompt before restoring the default presets.
+
 ## 0.5.94
 
 - Manual control: the auto-off presets (5 min, 10 min, 30 min, 1 h, 2 h) are now editable. Tap the pencil to remove presets, add your own (minutes or hours) or reset to defaults. Saved on the server and included in backups.

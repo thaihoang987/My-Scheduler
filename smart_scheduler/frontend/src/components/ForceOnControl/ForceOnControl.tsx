@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { mdiCheck, mdiClose, mdiPlus } from "@mdi/js";
+import { Icon } from "../Icon/Icon";
 import { api } from "../../services/api";
 import type { ManualTimer } from "../../types";
 import { OnTimeProgress } from "../OnTimeProgress/OnTimeProgress";
@@ -32,6 +34,11 @@ export function ForceOnControl({ entityIds, activeTimers, reloadTimers, duration
   async function saveDurations(next: number[]) {
     await api.updateSettings({ manual_durations: next });
     reloadSettings();
+  }
+
+  async function resetDurations() {
+    if (!window.confirm(tr("Khôi phục về các mốc mặc định (5, 10, 30 phút, 1 giờ, 2 giờ)? Các mốc bạn đã thêm sẽ bị xoá.", "Restore the default presets (5, 10, 30 min, 1 h, 2 h)? Presets you added will be removed."))) return;
+    await saveDurations(DEFAULT_DURATIONS);
   }
 
   async function removeDuration(min: number) {
@@ -95,7 +102,8 @@ export function ForceOnControl({ entityIds, activeTimers, reloadTimers, duration
         {durations.map((m) =>
           editing ? (
             <button key={m} className="chip chip--editing" onClick={() => removeDuration(m)} title={tr("Xoá mốc này", "Remove this preset")}>
-              {durationLabel(m)} ✕
+              {durationLabel(m)}
+              <Icon path={mdiClose} size={14} />
             </button>
           ) : (
             <button key={m} className={selectedMinutes === m ? "chip chip--active" : "chip"} onClick={() => setSelectedMinutes(m)}>
@@ -104,21 +112,24 @@ export function ForceOnControl({ entityIds, activeTimers, reloadTimers, duration
           ),
         )}
         <button className={editing ? "chip chip--icon chip--active" : "chip chip--icon"} onClick={() => setEditing(!editing)} aria-label={tr("Sửa các mốc thời gian", "Edit presets")} title={tr("Sửa các mốc thời gian", "Edit presets")}>
-          {editing ? "✓" : "✎"}
+          {editing ? <Icon path={mdiCheck} size={18} /> : "✎"}
         </button>
       </div>
       {editing && (
         <div className="force-on__edit">
-          <input className="input force-on__edit-input" type="number" inputMode="numeric" min={1} placeholder={tr("Số", "Value")} value={newValue} onChange={(e) => setNewValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addDuration()} />
-          <select className="input force-on__edit-unit" value={newUnit} onChange={(e) => setNewUnit(Number(e.target.value) as 1 | 60)}>
-            <option value={1}>{tr("phút", "min")}</option>
-            <option value={60}>{tr("giờ", "hours")}</option>
-          </select>
-          <button className="btn btn--ghost" onClick={addDuration} disabled={!newValue}>
-            + {tr("Thêm", "Add")}
-          </button>
-          <button className="btn btn--ghost" onClick={() => saveDurations(DEFAULT_DURATIONS)}>
-            {tr("Mặc định", "Reset")}
+          <div className="force-on__edit-title">{tr("Thêm mốc mới", "Add a new preset")}</div>
+          <div className="force-on__edit-row">
+            <input className="input force-on__edit-input" type="number" inputMode="numeric" min={1} placeholder={tr("Số", "Value")} value={newValue} onChange={(e) => setNewValue(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addDuration()} />
+            <select className="input force-on__edit-unit" value={newUnit} onChange={(e) => setNewUnit(Number(e.target.value) as 1 | 60)}>
+              <option value={1}>{tr("phút", "min")}</option>
+              <option value={60}>{tr("giờ", "hours")}</option>
+            </select>
+            <button className="btn btn--primary" onClick={addDuration} disabled={!newValue}>
+              <Icon path={mdiPlus} size={16} /> {tr("Thêm", "Add")}
+            </button>
+          </div>
+          <button className="force-on__reset" onClick={resetDurations}>
+            {tr("Khôi phục mốc mặc định", "Restore default presets")}
           </button>
         </div>
       )}
