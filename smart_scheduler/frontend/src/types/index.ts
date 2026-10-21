@@ -171,6 +171,8 @@ export interface Settings {
   verify_state: boolean;
   /** Vi tri khoi "Tu tat sau khi bat" giua cac nhom tren Nha (0 = tren cung). */
   auto_off_section_index: number;
+  /** Cac moc "tu tat sau" (phut) cua Dieu khien thu cong. */
+  manual_durations: number[];
   detail_row_order?: Record<string, string[]>;
   /** Mui gio doc tu cau hinh Home Assistant (chi doc), null neu chua doc duoc. */
   ha_timezone?: string | null;

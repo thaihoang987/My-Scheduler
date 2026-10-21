@@ -587,6 +587,7 @@ DEFAULT_SETTINGS = {
     "verify_state": False,
     # Vi tri khoi "Tu tat sau khi bat" tren trang Nha giua cac nhom (0 = tren cung).
     "auto_off_section_index": 0,
+    "manual_durations": [5, 10, 30, 60, 120],
     # Nhom dang thu gon tren trang Nha (v0.5.90): luu server, rieng tung tai khoan HA
     # (xem api/settings.py PER_USER) - truoc o localStorage nen khong vao file sao luu.
     "collapsed_sections": [],

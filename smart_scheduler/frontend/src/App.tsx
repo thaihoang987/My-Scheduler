@@ -36,6 +36,7 @@ const DEFAULT_SETTINGS: SettingsType = {
   pause_until: "",
   verify_state: false,
   auto_off_section_index: 0,
+  manual_durations: [5, 10, 30, 60, 120],
 };
 
 export function App() {
