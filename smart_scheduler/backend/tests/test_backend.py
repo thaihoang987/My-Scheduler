@@ -438,19 +438,21 @@ def test_replace_entity_dedupes_when_target_already_listed():
     assert crud.get_schedule(s["id"])["target_entities"] == ["switch.new"]
 
 
-# ---- tu tat sau khi bat (auto_off) ----
+# ---- tu tat sau khi bat (auto_off, theo su kien HA) ----
 
 from app import auto_off  # noqa: E402
 
 UTC = ZoneInfo("UTC")
 
 
-def _utc(h, m=0, day=1):
-    return datetime(2026, 10, day, h, m, tzinfo=UTC)
+def _utc(h, m=0, day=1, s=0):
+    return datetime(2026, 10, day, h, m, s, tzinfo=UTC)
 
 
 def make_auto_off(duration="03:00:00", entity="light.ngu", **over):
-    auto_off._last_sent.clear()
+    for name in ("_states", "_changed", "_tasks"):
+        getattr(auto_off, name).clear()
+    auto_off._sent.clear()
     s = make_schedule(
         target_entities=[entity], time=duration, trigger_type="auto_off",
         action={"domain": "homeassistant", "service": "turn_off", "service_data": {}}, **over,
@@ -461,8 +463,17 @@ def make_auto_off(duration="03:00:00", entity="light.ngu", **over):
     return s
 
 
-def _state(fake_ha, state, last_changed, entity="light.ngu"):
-    fake_ha.states = [{"entity_id": entity, "state": state, "last_changed": last_changed.isoformat()}]
+def _st(state, changed, entity="light.ngu"):
+    return {"entity_id": entity, "state": state, "last_changed": changed.isoformat()}
+
+
+def _connect(state, changed, now, entity="light.ngu"):
+    """HA (re)connect: snapshot states 1 lan."""
+    return run(auto_off.sync(now, [_st(state, changed, entity)]))
+
+
+def _event(old, new, now, entity="light.ngu"):
+    return run(auto_off.on_change(entity, _st(old, now, entity) if old else None, _st(new, now, entity), now))
 
 
 def test_auto_off_not_scheduled_by_engine(fake_ha):
@@ -472,83 +483,128 @@ def test_auto_off_not_scheduled_by_engine(fake_ha):
     assert fake_ha.calls == []
 
 
-def test_auto_off_turns_off_after_duration(fake_ha):
+def test_auto_off_turns_off_once_after_duration(fake_ha):
     make_auto_off("00:30:00")
-    _state(fake_ha, "on", _utc(10))
-    assert run(auto_off.check_once(_utc(10, 5))) == []
-    assert run(auto_off.check_once(_utc(10, 29))) == []
-    assert run(auto_off.check_once(_utc(10, 30))) == ["light.ngu"]
+    assert _connect("on", _utc(10), _utc(10, 5)) == []
+    assert run(auto_off.sync(_utc(10, 29))) == []
+    assert run(auto_off.sync(_utc(10, 30))) == ["light.ngu"]
     assert fake_ha.calls == [("homeassistant", "turn_off", ["light.ngu"])]
     assert crud.list_history(10)[0]["status"] == "success"
+    assert run(auto_off.sync(_utc(10, 31))) == []  # khong gui lai
+    assert len(fake_ha.calls) == 1
 
 
 def test_auto_off_survives_backup_restart(fake_ha):
     """Den ngu bat 23:00, tat sau 3h. 01:00 VM tat de backup, 01:30 bat lai:
     HA bao last_changed=01:30 nhung moc 23:00 da luu -> van tat luc 02:00."""
     make_auto_off("03:00:00")
-    _state(fake_ha, "on", _utc(23, 0, day=1))
-    run(auto_off.check_once(_utc(23, 0, day=1)))
-    run(auto_off.check_once(_utc(0, 59, day=2)))
+    _connect("on", _utc(23, 0, day=1), _utc(23, 0, day=1))
     assert fake_ha.calls == []
-
-    # VM tat: app khong chay. Len lai: HA chua san sang -> get_states loi
-    async def boom():
-        raise RuntimeError("HA starting")
-    fake_ha_get = fake_ha.get_states
-    from app import homeassistant
-    homeassistant.get_states = boom
-    run(auto_off.check_once(_utc(1, 30, day=2)))
-    homeassistant.get_states = fake_ha_get
-    # entity dang khoi dong: unavailable -> giu moc
-    _state(fake_ha, "unavailable", _utc(1, 31, day=2))
-    run(auto_off.check_once(_utc(1, 31, day=2)))
+    # may len lai: entity dang khoi dong (unavailable) -> giu moc
+    _connect("unavailable", _utc(1, 31, day=2), _utc(1, 31, day=2))
     # restore lai "on", last_changed moi
-    _state(fake_ha, "on", _utc(1, 32, day=2))
-    run(auto_off.check_once(_utc(1, 35, day=2)))
+    assert _event("unavailable", "on", _utc(1, 35, day=2)) == []
     assert fake_ha.calls == []
-    assert run(auto_off.check_once(_utc(2, 0, day=2))) == ["light.ngu"]
+    assert run(auto_off.sync(_utc(2, 0, day=2))) == ["light.ngu"]
 
 
-def test_auto_off_overdue_after_restart_turns_off_immediately(fake_ha):
+def test_auto_off_overdue_after_reconnect_turns_off_immediately(fake_ha):
     make_auto_off("03:00:00")
-    _state(fake_ha, "on", _utc(23, 0, day=1))
-    run(auto_off.check_once(_utc(23, 0, day=1)))
-    # may tat tu 01:00 toi 02:30 -> qua han 02:00, len lai la tat ngay
-    _state(fake_ha, "on", _utc(2, 29, day=2))
-    assert run(auto_off.check_once(_utc(2, 30, day=2))) == ["light.ngu"]
+    _connect("on", _utc(23, 0, day=1), _utc(23, 0, day=1))
+    # may tat tu 01:00 toi 02:30 -> qua han 02:00, ket noi lai thay van bat: tat ngay
+    assert _connect("on", _utc(2, 29, day=2), _utc(2, 30, day=2)) == ["light.ngu"]
 
 
-def test_auto_off_off_resets_and_new_rule_counts_from_creation(fake_ha):
-    s = make_auto_off("00:10:00")
-    _state(fake_ha, "on", _utc(8))
-    run(auto_off.check_once(_utc(8, 1)))
-    _state(fake_ha, "off", _utc(8, 2))
-    run(auto_off.check_once(_utc(8, 2)))
+def test_auto_off_overdue_but_already_off_sends_nothing(fake_ha):
+    make_auto_off("03:00:00")
+    _connect("on", _utc(23, 0, day=1), _utc(23, 0, day=1))
+    assert _connect("off", _utc(1, 0, day=2), _utc(2, 30, day=2)) == []
+    assert fake_ha.calls == [] and crud.list_auto_off_state() == {}
+
+
+def test_auto_off_quick_off_on_restarts_count(fake_ha):
+    """Tat roi bat lai trong vai giay (dashboard): dem lai tu luc bat moi."""
+    make_auto_off("00:10:00")
+    _connect("on", _utc(8), _utc(8, 1))
+    _event("on", "off", _utc(8, 5))
     assert crud.list_auto_off_state() == {}
+    _event("off", "on", _utc(8, 5, s=3))
+    assert run(auto_off.sync(_utc(8, 12))) == []  # moc cu 08:00 se het 08:10
+    assert run(auto_off.sync(_utc(8, 15, s=3))) == ["light.ngu"]
+
+
+def test_auto_off_unavailable_at_deadline_waits_for_device(fake_ha):
+    make_auto_off("00:30:00")
+    _connect("on", _utc(10), _utc(10, 1))
+    _event("on", "unavailable", _utc(10, 10))
+    assert run(auto_off.sync(_utc(10, 40))) == [] and fake_ha.calls == []
+    assert _event("unavailable", "on", _utc(10, 45)) == ["light.ngu"]  # co con, thiet bi bat -> tat 1 lan
+
+
+def test_auto_off_device_off_by_deadline_sends_nothing(fake_ha):
+    make_auto_off("00:30:00")
+    _connect("on", _utc(10), _utc(10, 1))
+    _event("on", "off", _utc(10, 20))
+    assert run(auto_off.sync(_utc(10, 40))) == [] and fake_ha.calls == []
+
+
+def test_auto_off_failed_send_not_repeated_until_reconnect(fake_ha, monkeypatch):
+    from app import homeassistant
+    make_auto_off("00:30:00")
+    calls = []
+
+    async def boom(domain, service, entity_ids, data):
+        calls.append(entity_ids)
+        raise RuntimeError("HA offline")
+
+    monkeypatch.setattr(homeassistant, "call_service", boom)
+    _connect("on", _utc(10), _utc(10, 1))
+    assert run(auto_off.sync(_utc(10, 31))) == []
+    assert run(auto_off.sync(_utc(10, 32))) == [] and len(calls) == 1
+    assert crud.list_history(10)[0]["status"] == "error"
+    # HA ket noi lai, thiet bi van bat, co con: thu lai 1 lan
+    _connect("on", _utc(10), _utc(10, 40))
+    assert len(calls) == 2
+
+
+def test_auto_off_new_rule_counts_from_creation(fake_ha):
+    s = make_auto_off("00:10:00")
     # dat lich luc 9:00 cho thiet bi da bat tu 7:00 -> dem tu 9:00
-    _state(fake_ha, "on", _utc(7))
     db.get_conn().execute("UPDATE schedules SET updated_at=? WHERE id=?", (_utc(9).isoformat(), s["id"]))
     db.get_conn().commit()
-    assert run(auto_off.check_once(_utc(9, 1))) == []
-    assert run(auto_off.check_once(_utc(9, 10))) == ["light.ngu"]
+    assert _connect("on", _utc(7), _utc(9, 1)) == []
+    assert run(auto_off.sync(_utc(9, 10))) == ["light.ngu"]
 
 
 def test_auto_off_disabled_card_clears_state(fake_ha):
     s = make_auto_off("00:10:00")
-    _state(fake_ha, "on", _utc(8))
-    run(auto_off.check_once(_utc(8, 1)))
+    _connect("on", _utc(8), _utc(8, 1))
     crud.set_group_enabled([s["id"]], False)
-    assert run(auto_off.check_once(_utc(9))) == []
+    assert run(auto_off.sync(_utc(9))) == []
     assert crud.list_auto_off_state() == {}
     assert fake_ha.calls == []
 
 
 def test_auto_off_active_list(fake_ha):
     make_auto_off("00:30:00")
-    _state(fake_ha, "on", _utc(10))
-    run(auto_off.check_once(_utc(10, 1)))
+    _connect("on", _utc(10), _utc(10, 1))
     [a] = auto_off.list_active()
     assert a["source"] == "auto_off" and a["off_at"] == _utc(10, 30).isoformat()
+
+
+def test_auto_off_timer_fires_by_itself_once(fake_ha):
+    """Khong co vong lap nao: hen 1 lan tu danh thuc dung moc."""
+    make_auto_off("00:00:01")
+    now = datetime.now(UTC)
+
+    async def scenario():
+        await auto_off.sync(now, [_st("on", now)])
+        assert fake_ha.calls == []
+        await asyncio.sleep(1.5)
+        assert fake_ha.calls == [("homeassistant", "turn_off", ["light.ngu"])]
+        await asyncio.sleep(0.5)
+        assert len(fake_ha.calls) == 1
+    run(scenario())
 
 
 # ---- khung gio binh minh/hoang hon ca 2 moc (v0.5.51) ----
@@ -684,13 +740,12 @@ def test_force_on_timer_cancel_and_restore(fake_ha, monkeypatch):
 def test_force_on_with_timer_overrides_auto_off(fake_ha):
     from app import manual_timer
     make_auto_off("00:00:10", entity="switch.m")
-    _state(fake_ha, "on", _utc(8), entity="switch.m")
     manual_timer._active["t"] = {"id": "t", "entity_ids": ["switch.m"], "started_at": _utc(8).isoformat(), "off_at": _utc(9).isoformat(), "task": None}
     try:
-        assert run(auto_off.check_once(_utc(8, 5))) == []
+        assert _connect("on", _utc(8), _utc(8, 5), entity="switch.m") == []
     finally:
         manual_timer._active.pop("t", None)
-    assert run(auto_off.check_once(_utc(8, 6))) == ["switch.m"]
+    assert run(auto_off.sync(_utc(8, 6))) == ["switch.m"]
 
 
 def test_reset_devices_on_startup_only_turns_off_on_devices(fake_ha):
@@ -701,14 +756,6 @@ def test_reset_devices_on_startup_only_turns_off_on_devices(fake_ha):
     fake_ha.states = [{"entity_id": "switch.on1", "state": "on"}, {"entity_id": "switch.off1", "state": "off"}]
     run(main._reset_devices_on_startup())
     assert fake_ha.calls == [("homeassistant", "turn_off", ["switch.on1"])]
-
-
-def test_auto_off_wakes_up_at_deadline(fake_ha):
-    make_auto_off("00:00:15")
-    _state(fake_ha, "on", _utc(10))
-    run(auto_off.check_once(_utc(10, 0)))
-    assert auto_off.next_sleep(_utc(10, 0) + timedelta(seconds=12)) == pytest.approx(3.05)
-    assert auto_off.next_sleep(_utc(10, 0) + timedelta(seconds=1)) == auto_off.POLL_SECONDS
 
 
 # ---- mui gio theo Home Assistant (v0.5.53) ----

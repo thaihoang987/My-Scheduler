@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.96
+
+- Auto-off after being on is now event-driven. The 5-second polling loop is gone: the app listens to Home Assistant `state_changed` events and sets a single timer per device. A device turning on (from the dashboard, a wall switch or an automation) starts a fresh count, so turning it off and on again quickly can no longer reuse an old start time.
+- Auto-off sends exactly one turn-off command at the deadline, and only if the device is still on. If Home Assistant is unreachable then, nothing is retried in a loop: once it reconnects, the device is turned off only if its timer is still pending and it is still on.
+- Catch-up off for missed time ranges no longer runs every 30 seconds. It runs once each time Home Assistant reconnects, and only turns off devices that are still on. A device that is already off just clears the pending flag.
+- Forced-on timer: when the turn-off command fails to reach Home Assistant, it is retried at most twice more, then the failure is written to the history log and the timer is dropped. Before every attempt the device state is read again, so a device that is already off (or was switched back on by hand) is left alone.
+- Scheduled turn-off now reads the device state first and sends nothing if the device is already off (the run is still recorded as done, with a note in the history).
+
 ## 0.5.95
 
 - Manual control presets: clearer edit mode (solid confirm button, labelled "Add a new preset" box) and a confirmation prompt before restoring the default presets.

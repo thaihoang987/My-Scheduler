@@ -14,7 +14,7 @@ from app.api import backup, entities, groups, history, manual, presence as prese
 from app.db import init_db
 from app.homeassistant import connection_mode
 from app.i18n import tr
-from app.scheduler_engine import normalize_range_days, scheduler_loop, seed_active_ranges
+from app.scheduler_engine import normalize_range_days, recover_ranges, scheduler_loop, seed_active_ranges
 from app.ws import manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -66,6 +66,12 @@ async def _reset_devices_on_startup() -> None:
         log.info("Da gui lenh tat cho %d thiet bi co lich dang bat luc app khoi dong: %s", len(on_entities), on_entities)
     except Exception as exc:  # noqa: BLE001
         log.warning("Tat thiet bi luc khoi dong that bai (HA co the chua san sang): %s", exc)
+
+
+async def _on_ha_ready(states: list[dict]) -> None:
+    """Moi lan HA (re)connect: tat bu 1 lan cho khung gio con co ma thiet bi van
+    bat (khong quet dinh ky)."""
+    await recover_ranges(states=states, trust_connection=True)
 
 
 async def _load_ha_timezone() -> bool:
@@ -131,6 +137,8 @@ async def lifespan(app: FastAPI):
     log.info("Home Assistant connection mode: %s", connection_mode())
     _scheduler_task = asyncio.create_task(scheduler_loop())
     _presence_task = asyncio.create_task(presence.presence_loop())
+    auto_off.set_ready_hook(_on_ha_ready)
+    manager.add_listener(auto_off.on_schedule_event)
     _auto_off_task = asyncio.create_task(auto_off.auto_off_loop())
     timezone_task = None if timezone_loaded else asyncio.create_task(_retry_ha_timezone())
     try:

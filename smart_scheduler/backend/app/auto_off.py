@@ -1,21 +1,27 @@
-"""Tu tat sau khi bat N thoi gian (v0.5.44, phan hoi 2026-09-30 "de dam bao
-tuoi cay khong qua lau") - khac Schedule thuong: khong chay theo gio, ma
-theo doi TRANG THAI THAT cua thiet bi. Thiet bi bat tu BAT KY dau (Lovelace,
-cong tac tay, automation, lich khac) -> dem tu luc bat, du N thi tat.
+"""Tu tat sau khi bat N thoi gian (v0.5.44, viet lai theo su kien o v0.5.93).
+
+Khac Schedule thuong: khong chay theo gio, ma theo TRANG THAI THAT cua thiet
+bi. Thiet bi bat tu BAT KY dau (Lovelace, cong tac tay, automation, lich khac)
+-> dem tu luc bat, du N thi tat DUNG 1 LAN.
+
+Khong con vong lap hoi trang thai. App giu 1 WebSocket toi HA (xem
+homeassistant.watch_states) va chi phan ung khi HA bao `state_changed`:
+- off -> bat: dat MOC moi (xoa moc cu neu con sot), hen 1 lan toi moc.
+- bat -> off: xoa moc, huy hen.
+- unavailable/unknown: giu nguyen moc va hen (mat ket noi khong phai tat).
+Het gio ma thiet bi van bat thi gui DUNG 1 lenh tat. Neu mat ket noi luc do,
+khong gui lai lien tuc: den khi HA ket noi lai, app doc trang thai 1 lan va
+chi tat khi CON moc (co) chua het VA thiet bi van dang bat.
 
 Luu bang 1 dong `schedules` voi trigger_type="auto_off", `time`="HH:MM:SS" la
 DO DAI (khong phai gio dong ho) - de card hien tren trang Nha, bat/tat/xoa/
 sap xep/sao luu dung chung co che cua lich thuong. scheduler_engine bo qua
-cac dong nay; vong lap o day moi xu ly.
+cac dong nay.
 
 Moc bat (`on_since`) luu SQLite (bang `auto_off_state`) de SONG QUA restart/
 backup: vd den bat 23:00, tat sau 3h, 01:00 Unraid tat VM Home Assistant de
-backup image, 01:30 bat lai. Neu chi dung `last_changed` cua HA thi sau
-restart moc bat bi reset ve 01:30 -> den sang toi 04:30. Voi moc luu san:
-- con bat sau khi len lai -> giu moc 23:00, tat dung 02:00;
-- da qua han trong luc may tat (vd len lai 02:30) -> tat NGAY lan doc dau.
-Chi xoa moc khi thay ro "off"/"closed"; unavailable/unknown (dang khoi dong,
-mat ket noi) giu nguyen moc.
+backup image, 01:30 bat lai. Moc 23:00 van con -> tat dung 02:00, hoac tat
+NGAY khi ket noi lai neu da qua han.
 """
 import asyncio
 import logging
@@ -27,12 +33,20 @@ from app.i18n import tr
 
 log = logging.getLogger("ha_smart_scheduler.auto_off")
 
-POLL_SECONDS = 5
-RETRY_SECONDS = 30
 OFF_STATES = ("off", "closed")
 NO_STATE = ("unavailable", "unknown", None)
 
-_last_sent: dict[str, datetime] = {}  # entity -> luc gui lenh tat gan nhat (chong spam khi HA cham)
+_states: dict[str, str | None] = {}  # entity dang theo doi -> state gan nhat
+_changed: dict[str, datetime | None] = {}  # entity -> last_changed gan nhat
+_tasks: dict[str, asyncio.Task] = {}  # entity -> hen tat 1 lan
+_sent: set[str] = set()  # da gui lenh tat trong lan ket noi nay (khong gui lai)
+_ready_hook = None
+
+
+def set_ready_hook(hook) -> None:
+    """Viec them can lam 1 lan moi khi (re)connect HA (vd tat bu khung gio)."""
+    global _ready_hook
+    _ready_hook = hook
 
 
 def _now() -> datetime:
@@ -47,6 +61,14 @@ def _parse(raw: str | None) -> datetime | None:
     except ValueError:
         return None
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _kind(state: str | None) -> str:
+    if state in OFF_STATES:
+        return "off"
+    if state in NO_STATE:
+        return "gone"
+    return "on"
 
 
 def duration_seconds(value: str) -> int:
@@ -114,94 +136,178 @@ def _manual_entities() -> set[str]:
     return {e for t in manual_timer.list_active() if t.get("off_at") for e in t["entity_ids"]}
 
 
-async def check_once(now: datetime | None = None) -> list[str]:
-    """1 vong kiem tra, tra ve danh sach entity vua gui lenh tat."""
-    now = now or _now()
-    rule_map = rules()
-    stored = crud.list_auto_off_state()
-    for eid in [e for e in stored if e not in rule_map]:
-        crud.delete_auto_off_state(eid)  # lich bi xoa/tat -> bo moc
-    if not rule_map:
-        return []
-    try:
-        states = {s["entity_id"]: s for s in await homeassistant.get_states()}
-    except Exception as exc:  # noqa: BLE001 - HA chua san sang (vd vua boot sau backup) -> thu lai vong sau, GIU moc
-        log.debug("Chua doc duoc trang thai HA: %s", exc)
-        return []
+def _cancel(eid: str) -> None:
+    task = _tasks.pop(eid, None)
+    if task and task is not asyncio.current_task():
+        task.cancel()
 
+
+def _drop_mark(eid: str) -> bool:
+    _cancel(eid)
+    _sent.discard(eid)
+    if eid in crud.list_auto_off_state():
+        crud.delete_auto_off_state(eid)
+        return True
+    return False
+
+
+def _first_mark(eid: str, schedule: dict, now: datetime) -> datetime:
+    """Lan dau thay dang bat ma chua co moc: moc = last_changed cua HA, nhung
+    khong som hon luc lich duoc tao/sua (vua dat lich cho thiet bi dang bat tu
+    2 tieng truoc thi dem tu bay gio, khong tat bat ngo)."""
+    on_since = min(now, _changed.get(eid) or now)
+    armed = _parse(schedule.get("updated_at"))
+    if armed and armed > on_since:
+        on_since = min(now, armed)
+    return on_since
+
+
+async def _settle(eid: str, now: datetime, rule_map: dict[str, tuple[int, dict]]) -> list[str]:
+    """Dat lai hen cho 1 entity theo moc dang luu. Da qua han thi tat ngay
+    (1 lan), chua thi hen toi dung moc. Tra ve [eid] neu vua gui lenh tat."""
+    _cancel(eid)
+    rule = rule_map.get(eid)
+    on_since = _parse(crud.list_auto_off_state().get(eid))
+    if rule is None or on_since is None:
+        return []
+    left = (on_since + timedelta(seconds=rule[0]) - now).total_seconds()
+    if left <= 0:
+        return [eid] if await _expire(eid, now, rule_map) else []
+    _tasks[eid] = asyncio.create_task(_wait_and_expire(eid, left))
+    return []
+
+
+async def _wait_and_expire(eid: str, delay: float) -> None:
+    try:
+        await asyncio.sleep(delay)
+    except asyncio.CancelledError:
+        return
+    _tasks.pop(eid, None)
+    try:
+        now = _now()
+        await _settle(eid, now, rules())  # kiem tra lai bang dong ho that (VM tam dung lam sleep lech)
+    except Exception:  # noqa: BLE001
+        log.exception("Loi khi tu tat %s", eid)
+
+
+async def _expire(eid: str, now: datetime, rule_map: dict[str, tuple[int, dict]]) -> bool:
+    """Het gio: gui DUNG 1 lenh tat neu thiet bi van bat. Tra ve True neu da gui."""
+    secs, schedule = rule_map[eid]
+    kind = _kind(_states.get(eid))
+    if kind == "off":
+        _drop_mark(eid)
+        return False
+    if kind == "gone":
+        return False  # giu moc, thiet bi tro lai thi su kien se xu ly
+    if eid in _manual_entities():
+        return False  # hen "Bat cuong che" co gio rieng quyet dinh
+    if eid in _sent:
+        return False  # da gui trong lan ket noi nay, khong gui lai
+    _sent.add(eid)
+    dur = format_duration(secs)
+    try:
+        await homeassistant.call_service("homeassistant", "turn_off", [eid], {})
+        status, message = "success", tr(f"Tự tắt sau khi bật {dur}", f"Auto-off after being on for {dur}")
+    except Exception as exc:  # noqa: BLE001
+        status, message = "error", tr(f"Tự tắt sau {dur} thất bại: {exc}", f"Auto-off after {dur} failed: {exc}")
+        log.warning("Auto-off %s that bai: %s", eid, exc)
+    crud.add_history(schedule["id"], schedule["name"], None, status, message)
+    await manager.broadcast("auto_off_updated", {})
+    return status == "success"
+
+
+async def sync(now: datetime | None = None, states: list[dict] | None = None) -> list[str]:
+    """Doi chieu 1 lan: lich vua doi, hoac vua (re)connect HA (kem snapshot
+    `states`). Tra ve cac entity vua gui lenh tat."""
+    now = now or _now()
+    reconnect = states is not None
+    rule_map = rules()
+    if reconnect:
+        _sent.clear()  # ket noi moi -> duoc phep gui 1 lan nua cho thiet bi con bat
+        snapshot = {s["entity_id"]: s for s in states}
+        for eid in rule_map:
+            st = snapshot.get(eid)
+            _states[eid] = st.get("state") if st else None
+            _changed[eid] = _parse(st.get("last_changed")) if st else None
     changed = False
-    turned_off: list[str] = []
-    manual = _manual_entities()
-    for eid, (secs, schedule) in rule_map.items():
-        st = states.get(eid)
-        state = st.get("state") if st else None
-        if state in NO_STATE:
-            continue
-        if state in OFF_STATES:
-            if eid in stored:
-                crud.delete_auto_off_state(eid)
-                changed = True
-            _last_sent.pop(eid, None)
-            continue
-        on_since = _parse(stored.get(eid))
-        if on_since is None:
-            # Lan dau thay dang bat: moc = last_changed cua HA, nhung khong som
-            # hon luc lich duoc tao/sua (vua dat lich cho thiet bi dang bat tu
-            # 2 tieng truoc thi dem tu bay gio, khong tat bat ngo).
-            on_since = min(now, _parse(st.get("last_changed")) or now)
-            armed = _parse(schedule.get("updated_at"))
-            if armed and armed > on_since:
-                on_since = min(now, armed)
-            crud.save_auto_off_state(eid, on_since.isoformat())
-            changed = True
-        if eid in manual:
-            continue
-        if now < on_since + timedelta(seconds=secs):
-            continue
-        sent = _last_sent.get(eid)
-        if sent and (now - sent).total_seconds() < RETRY_SECONDS:
-            continue
-        if sent and not await homeassistant.ensure_stable():
-            continue  # gui lai chi khi ket noi HA on dinh (v0.5.79)
-        _last_sent[eid] = now
-        dur = format_duration(secs)
-        try:
-            await homeassistant.call_service("homeassistant", "turn_off", [eid], {})
-            status, message = "success", tr(f"Tự tắt sau khi bật {dur}", f"Auto-off after being on for {dur}")
-            turned_off.append(eid)
+    for eid in [e for e in crud.list_auto_off_state() if e not in rule_map]:
+        changed |= _drop_mark(eid)  # lich bi xoa/tat -> bo moc
+    for eid in [e for e in _tasks if e not in rule_map]:
+        _cancel(eid)
+    for eid in [e for e in _states if e not in rule_map]:
+        _states.pop(eid, None)
+        _changed.pop(eid, None)
+    if not reconnect and any(eid not in _states for eid in rule_map):
+        try:  # co thiet bi moi duoc theo doi: doc trang thai hien tai 1 lan
+            snapshot = {s["entity_id"]: s for s in await homeassistant.get_states()}
+            for eid in rule_map:
+                if eid not in _states and eid in snapshot:
+                    _states[eid] = snapshot[eid].get("state")
+                    _changed[eid] = _parse(snapshot[eid].get("last_changed"))
         except Exception as exc:  # noqa: BLE001
-            status, message = "error", tr(f"Tự tắt sau {dur} thất bại: {exc}", f"Auto-off after {dur} failed: {exc}")
-            log.warning("Auto-off %s that bai: %s", eid, exc)
-        crud.add_history(schedule["id"], schedule["name"], None, status, message)
-        changed = True
+            log.debug("Chua doc duoc trang thai HA: %s", exc)
+    for eid in rule_map:
+        _states.setdefault(eid, None)  # van theo doi su kien du chua doc duoc state
+        _changed.setdefault(eid, None)
+    turned_off: list[str] = []
+    for eid, (_, schedule) in rule_map.items():
+        kind = _kind(_states.get(eid))
+        if kind == "off":
+            changed |= _drop_mark(eid)
+            continue
+        if kind == "on" and eid not in crud.list_auto_off_state():
+            crud.save_auto_off_state(eid, _first_mark(eid, schedule, now).isoformat())
+            changed = True
+        turned_off += await _settle(eid, now, rule_map)
     if changed:
         await manager.broadcast("auto_off_updated", {})
     return turned_off
 
 
-async def auto_off_loop() -> None:
-    log.info("Auto-off watcher started (poll=%ss)", POLL_SECONDS)
-    while True:
-        try:
-            await check_once()
-        except asyncio.CancelledError:
-            raise
-        except Exception:  # noqa: BLE001
-            log.exception("Loi khong mong doi trong auto_off_loop")
-        await asyncio.sleep(next_sleep())
-
-
-def next_sleep(now: datetime | None = None) -> float:
-    """Ngu toi da POLL_SECONDS, nhung thuc day DUNG luc thiet bi dang dem toi han
-    (test dau cuoi v0.5.53: tu tat 15s thuc te tat sau 20s vi cho het vong 5s)."""
+async def on_change(eid: str, old: dict | None, new: dict | None, now: datetime | None = None) -> list[str]:
+    """1 su kien state_changed tu HA. Bo qua nhanh entity khong co lich Tu tat."""
+    if eid not in _states:
+        return []
     now = now or _now()
+    old_kind = _kind(old.get("state") if old else None)
+    state = new.get("state") if new else None
+    _states[eid] = state
+    _changed[eid] = _parse(new.get("last_changed")) if new else None
+    kind = _kind(state)
     rule_map = rules()
-    wait = float(POLL_SECONDS)
-    for eid, on_since in crud.list_auto_off_state().items():
-        start = _parse(on_since)
-        if start is None or eid not in rule_map:
-            continue
-        left = (start + timedelta(seconds=rule_map[eid][0]) - now).total_seconds()
-        if left > 0:
-            wait = min(wait, left + 0.05)
-    return max(0.2, wait)
+    if eid not in rule_map or kind == "gone":
+        return []  # mat ket noi/khoi dong: giu nguyen moc va hen
+    if kind == "off":
+        if _drop_mark(eid):
+            await manager.broadcast("auto_off_updated", {})
+        return []
+    stored = crud.list_auto_off_state()
+    if old_kind == "off" or eid not in stored:
+        # Vua chuyen tu tat sang bat: moc MOI, bo moc cu con sot
+        _sent.discard(eid)
+        crud.save_auto_off_state(eid, now.isoformat() if old_kind == "off" else _first_mark(eid, rule_map[eid][1], now).isoformat())
+        await manager.broadcast("auto_off_updated", {})
+    elif eid in _tasks:
+        return []  # bat -> bat (doi thuoc tinh): hen dang chay, khong dung toi
+    return await _settle(eid, now, rule_map)
+
+
+async def on_schedule_event(event: str) -> None:
+    """Lich Tu tat vua duoc tao/sua/xoa/bat/tat -> dat lai hen (khong poll)."""
+    if event in ("schedule_updated", "schedule_deleted"):
+        await sync()
+
+
+async def _on_ready(states: list[dict]) -> None:
+    await sync(states=states)
+    if _ready_hook:
+        await _ready_hook(states)
+
+
+async def auto_off_loop() -> None:
+    log.info("Auto-off watcher started (event-driven)")
+    try:
+        await homeassistant.watch_states(_on_ready, on_change)
+    finally:
+        for eid in list(_tasks):
+            _cancel(eid)
