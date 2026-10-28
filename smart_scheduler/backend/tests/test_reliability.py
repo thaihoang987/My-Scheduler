@@ -24,6 +24,11 @@ def reset_ha_health(monkeypatch):
     scheduler_engine._slot_locks.clear()
 
 
+@pytest.fixture(autouse=True)
+def _device_on(fake_ha):
+    fake_ha.states = [{"entity_id": "switch.a", "state": "on"}]
+
+
 def make_pair(on_t, off_t, days=(0, 1, 2, 3, 4, 5, 6), gid="g1", **over):
     on = make_schedule(time=on_t, days=list(days), group_id=gid, action=ON, **over)
     off = make_schedule(time=off_t, days=list(days), group_id=gid, action=OFF, **over)
@@ -187,23 +192,46 @@ def test_connection_offline_flapping_then_stable(monkeypatch):
     assert run(homeassistant.ensure_stable()) is True and len(pings) == 2
 
 
-def test_manual_timer_retry_waits_for_stable(monkeypatch):
-    calls, stable = [], iter([False, False, True])
+def _timer(tid="t1"):
+    crud.save_manual_timer({"id": tid, "entity_ids": ["switch.a"], "started_at": "x", "off_at": datetime.now(TZ).isoformat()})
+
+
+def test_manual_timer_retries_twice_then_logs_error(monkeypatch):
+    calls = []
+
+    async def call_service(*args):
+        calls.append(args)
+        raise OSError("HA offline")
+
+    monkeypatch.setattr(homeassistant, "call_service", call_service)
+    monkeypatch.setattr(manual_timer, "RETRY_SECONDS", 0)
+    _timer()
+    run(manual_timer._auto_off("t1", ["switch.a"], 0))
+    assert len(calls) == 3  # 1 lan dau + 2 lan thu lai, khong lap nua
+    assert crud.list_history(5)[0]["status"] == "error" and crud.list_manual_timers() == []
+
+
+def test_manual_timer_retry_succeeds_second_time(monkeypatch):
+    calls = []
 
     async def call_service(*args):
         calls.append(args)
         if len(calls) == 1:
             raise OSError("HA offline")
 
-    async def ensure_stable():
-        return next(stable)
-
     monkeypatch.setattr(homeassistant, "call_service", call_service)
-    monkeypatch.setattr(homeassistant, "ensure_stable", ensure_stable)
     monkeypatch.setattr(manual_timer, "RETRY_SECONDS", 0)
-    crud.save_manual_timer({"id": "t1", "entity_ids": ["switch.a"], "started_at": "x", "off_at": datetime.now(TZ).isoformat()})
+    _timer()
     run(manual_timer._auto_off("t1", ["switch.a"], 0))
-    assert len(calls) == 2  # 1 lan loi + 1 lan sau khi on dinh, khong ban moi vong
+    assert len(calls) == 2 and crud.list_history(5)[0]["status"] == "success"
+
+
+def test_manual_timer_does_not_send_when_device_already_off(fake_ha, monkeypatch):
+    fake_ha.states = [{"entity_id": "switch.a", "state": "off"}]
+    monkeypatch.setattr(manual_timer, "RETRY_SECONDS", 0)
+    _timer()
+    run(manual_timer._auto_off("t1", ["switch.a"], 0))
+    assert fake_ha.calls == [] and crud.list_history(5)[0]["status"] == "success"
 
 
 def test_failed_script_is_not_replayed(fake_ha, monkeypatch):
@@ -326,6 +354,44 @@ def test_missed_off_is_caught_up_once(fake_ha):
     assert run(scheduler_engine.recover_ranges(now)) == [on["id"]]
     run(scheduler_engine._process_schedule(crud.get_schedule(off["id"]), "skip"))
     assert len(fake_ha.calls) == 1
+
+
+def test_catch_up_skips_device_already_off(fake_ha):
+    """Thiet bi da tat san (bat/tat tay) thi chi xoa co, khong gui lenh."""
+    on, _ = make_pair("20:00:00", "22:00:00")
+    ran_on(on, datetime(2026, 10, 1, 20, 0, tzinfo=TZ))
+    fake_ha.states = [{"entity_id": "switch.a", "state": "off"}]
+    assert run(scheduler_engine.recover_ranges(datetime(2026, 10, 2, 8, 0, tzinfo=TZ))) == []
+    assert fake_ha.calls == [] and crud.list_ranges() == []
+
+
+def test_catch_up_keeps_flag_while_device_unavailable(fake_ha):
+    on, _ = make_pair("20:00:00", "22:00:00")
+    ran_on(on, datetime(2026, 10, 1, 20, 0, tzinfo=TZ))
+    now = datetime(2026, 10, 2, 8, 0, tzinfo=TZ)
+    fake_ha.states = [{"entity_id": "switch.a", "state": "unavailable"}]
+    assert run(scheduler_engine.recover_ranges(now)) == [] and len(crud.list_ranges()) == 1
+    fake_ha.states = [{"entity_id": "switch.a", "state": "on"}]
+    assert run(scheduler_engine.recover_ranges(now)) == [on["id"]]
+
+
+def test_catch_up_on_reconnect_skips_stability_wait(fake_ha, monkeypatch):
+    on, _ = make_pair("20:00:00", "22:00:00")
+    ran_on(on, datetime(2026, 10, 1, 20, 0, tzinfo=TZ))
+
+    async def ensure_stable():
+        return False
+
+    monkeypatch.setattr(homeassistant, "ensure_stable", ensure_stable)
+    now = datetime(2026, 10, 2, 8, 0, tzinfo=TZ)
+    assert run(scheduler_engine.recover_ranges(now, states=fake_ha.states, trust_connection=True)) == [on["id"]]
+
+
+def test_maintenance_never_sends_commands(fake_ha):
+    on, _ = make_pair("20:00:00", "22:00:00")
+    ran_on(on, datetime(2026, 10, 1, 20, 0, tzinfo=TZ))
+    run(scheduler_engine._maintenance())
+    assert fake_ha.calls == [] and len(crud.list_ranges()) == 1
 
 
 def test_seed_from_existing_last_run(fake_ha):
@@ -471,3 +537,12 @@ def test_auto_off_ignores_scene_and_script():
     make_schedule(trigger_type="auto_off", time="00:10:00", target_entities=["script.a", "switch.b"],
                   action={"domain": "homeassistant", "service": "turn_off", "service_data": {}})
     assert set(auto_off.rules()) == {"switch.b"}
+
+
+def test_scheduled_off_skips_device_already_off(fake_ha):
+    now = datetime.now(TZ)
+    s = make_schedule(time=(now - timedelta(seconds=5)).strftime("%H:%M:%S"), action=OFF)
+    fake_ha.states = [{"entity_id": "switch.a", "state": "off"}]
+    run(scheduler_engine._process_schedule(s, "run_once"))
+    got = crud.get_schedule(s["id"])
+    assert fake_ha.calls == [] and got["last_status"] == "success"

@@ -392,6 +392,15 @@ async def _process_schedule(schedule: dict, missed_policy: str, expires_at: date
         await _run_slot(schedule, missed_policy, expires_at, pause_end, schedules, now, scheduled_dt, slot)
 
 
+async def _still_on(targets: list[str]) -> list[str]:
+    """Bo thiet bi HA bao la off/closed; doc state loi thi giu nguyen (van gui)."""
+    try:
+        states = {s["entity_id"]: s.get("state") for s in await homeassistant.get_states()}
+    except Exception:  # noqa: BLE001
+        return targets
+    return [e for e in targets if states.get(e) not in ("off", "closed")]
+
+
 async def _run_slot(schedule: dict, missed_policy: str, expires_at: datetime | None, pause_end: datetime | None,
                     schedules: list[dict] | None, now: datetime, scheduled_dt: datetime, slot: str) -> None:
 
@@ -474,6 +483,10 @@ async def _run_slot(schedule: dict, missed_policy: str, expires_at: datetime | N
     try:
         if not targets:
             raise ValueError("Schedule has no target entities")
+        if action["service"] == "turn_off":
+            targets = await _still_on(targets)  # thiet bi da tat san thi khong gui lenh (v0.5.96)
+            if not targets:
+                message = tr("Thiết bị đã tắt sẵn, không gửi lệnh", "Device was already off, no command sent")
         if targets:
             await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
     except Exception as exc:  # noqa: BLE001 - 1 schedule loi khong duoc lam chet vong lap (muc 54)
@@ -803,14 +816,26 @@ def seed_active_ranges() -> int:
     return added
 
 
-async def recover_ranges(now: datetime | None = None) -> list[str]:
+async def recover_ranges(now: datetime | None = None, states: list[dict] | None = None,
+                         trust_connection: bool = False) -> list[str]:
     """Tat bu (v0.5.79): khung gio da BAT thanh cong ma qua moc Tat chua tat (app
     tat/khoi dong lai, HA mat ket noi luc toi gio Tat), ke ca khung bat tu hom
     truoc. Chi tat bu khi: 2 moc con nguyen cau hinh (dau van tay), lich + card
     con bat, khong tam dung, khong qua RECOVERY_MAX_AGE, moc Tat chua chay khe
-    sau do, dieu kien Tat dung, skip_once chua dat va ket noi HA on dinh. Khung
-    chua tung bat thi khong bao gio tat bu, cung khong bat bu. Tra ve on_id da tat."""
+    sau do, dieu kien Tat dung, skip_once chua dat, ket noi HA on dinh VA thiet
+    bi THUC SU dang bat (thiet bi da tat san thi chi xoa co, khong gui lenh).
+    Khung chua tung bat thi khong bao gio tat bu, cung khong bat bu. Chi chay 1
+    lan moi khi HA ket noi lai (auto_off._on_ready), khong quet dinh ky;
+    `trust_connection` bo qua cho on dinh vi ket noi vua doc duoc states.
+    Tra ve on_id da tat."""
     now = now or datetime.now(_tz(DEFAULT_TIMEZONE))
+    if states is None:
+        try:
+            states = await homeassistant.get_states()
+        except Exception as exc:  # noqa: BLE001 - giu co, doi lan ket noi lai sau
+            log.debug("Tat bu: chua doc duoc trang thai HA: %s", exc)
+            return []
+    state_by = {s["entity_id"]: s.get("state") for s in states}
     schedules = crud.list_schedules()
     by_id = {s["id"]: s for s in schedules}
     pause_end = paused_until()
@@ -840,8 +865,15 @@ async def recover_ranges(now: datetime | None = None) -> list[str]:
             if fresh is None or (fresh.get("last_scheduled_for") == row["deadline"] and fresh.get("last_status") == "success"):
                 crud.close_range(row["on_id"])
                 continue
-            if not await homeassistant.ensure_stable():
+            if not trust_connection and not await homeassistant.ensure_stable():
                 continue  # giu lai, thu khi HA on dinh
+            live = [e for e in targets if state_by.get(e) not in ("off", "closed", "unavailable", "unknown", None)]
+            if not live:
+                # Khong con thiet bi nao dang bat: xoa co. Con thiet bi mat ket noi thi giu co.
+                if not any(state_by.get(e) in ("unavailable", "unknown") for e in targets):
+                    crud.close_range(row["on_id"])
+                continue
+            targets = live
             if fresh.get("skip_once"):
                 crud.mark_executed(off["id"], row["deadline"], "skipped_once")
                 crud.close_range(row["on_id"])
@@ -868,11 +900,11 @@ async def recover_ranges(now: datetime | None = None) -> list[str]:
 
 async def _maintenance() -> None:
     """Viec dinh ky, chay ngoai nhip dong ho: chuyen du lieu khung tron gio co
-    dinh/mat troi khi da co vi tri HA, roi tat bu khung lo moc Tat."""
+    dinh/mat troi khi da co vi tri HA. KHONG gui lenh nao toi thiet bi - tat bu
+    chi chay khi HA ket noi lai (recover_ranges, v0.5.93)."""
     try:
         if normalize_range_days():
             await manager.broadcast("schedule_updated", {"normalized": True})
-        await recover_ranges()
     except Exception:  # noqa: BLE001
         log.exception("Loi khi tat bu khung gio")
 

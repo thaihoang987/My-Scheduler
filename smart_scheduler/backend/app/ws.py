@@ -14,6 +14,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         self._connections: set[WebSocket] = set()
         self._lock = asyncio.Lock()
+        self._listeners: list = []
 
     async def connect(self, ws: WebSocket) -> None:
         await ws.accept()
@@ -24,7 +25,17 @@ class ConnectionManager:
         async with self._lock:
             self._connections.discard(ws)
 
+    def add_listener(self, listener) -> None:
+        """Ham async nhan ten event (vd auto_off dat lai hen khi lich doi)."""
+        if listener not in self._listeners:
+            self._listeners.append(listener)
+
     async def broadcast(self, event: str, payload: dict) -> None:
+        for listener in self._listeners:
+            try:
+                await listener(event)
+            except Exception:
+                log.exception("Listener loi khi xu ly event %s", event)
         message = json.dumps({"event": event, "data": payload})
         dead = []
         async with self._lock:

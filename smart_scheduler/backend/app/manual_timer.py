@@ -20,6 +20,7 @@ log = logging.getLogger("ha_smart_scheduler.manual_timer")
 
 _active: dict[str, dict] = {}  # id -> {entity_ids, off_at (iso|None), task}
 RETRY_SECONDS = 30
+MAX_RETRIES = 2
 
 
 def _now_iso() -> str:
@@ -71,28 +72,36 @@ async def start(entity_ids: list[str], auto_off_minutes: float | None) -> dict:
 
 
 async def _auto_off(tid: str, entity_ids: list[str], delay_seconds: float) -> None:
+    error: Exception | None = None
     try:
         await asyncio.sleep(delay_seconds)
-        attempt = 0
-        while True:
-            # Lan thu lai chi gui khi ket noi HA da on dinh (v0.5.79) - khong ban
-            # lenh moi 30s trong luc HA/mang chap chon.
-            if attempt and not await homeassistant.ensure_stable():
+        # "Loi" = lenh tat khong toi duoc HA (mat ket noi, HA tra loi loi), KHONG
+        # phai thiet bi dang tat. Moi lan gui deu doc lai trang thai: thiet bi da
+        # tat/bi nguoi dung bat lai thi khong gui gi. Toi da 1 + MAX_RETRIES lan,
+        # het thi ghi loi vao nhat ky roi bo hen (v0.5.94).
+        for attempt in range(1 + MAX_RETRIES):
+            if attempt:
                 await asyncio.sleep(RETRY_SECONDS)
-                continue
-            attempt += 1
             try:
-                await homeassistant.call_service("homeassistant", "turn_off", entity_ids, {})
+                states = {s["entity_id"]: s.get("state") for s in await homeassistant.get_states()}
+                live = [e for e in entity_ids if states.get(e) not in ("off", "closed")]
+                if live:
+                    await homeassistant.call_service("homeassistant", "turn_off", live, {})
+                error = None
                 break
-            except Exception as exc:  # noqa: BLE001 - HA co the chua san sang sau restart
-                log.warning("Manual timer %s tu tat that bai, thu lai khi HA on dinh: %s", tid, exc)
-                await asyncio.sleep(RETRY_SECONDS)
+            except Exception as exc:  # noqa: BLE001
+                error = exc
+                log.warning("Manual timer %s tu tat that bai (lan %d/%d): %s", tid, attempt + 1, 1 + MAX_RETRIES, exc)
     except asyncio.CancelledError:
         return  # shutdown giu DB; cancel() chu dong se xoa DB truoc khi huy task
     _active.pop(tid, None)
     crud.delete_manual_timer(tid)
-    crud.add_history(None, tr("Bật cưỡng chế", "Forced on"), None, "success", tr("Tự tắt theo hẹn giờ thủ công", "Automatically turned off by manual timer"), manual=True)
-    await manager.broadcast("manual_timer_finished", {"id": tid, "entity_ids": entity_ids, "status": "success"})
+    if error is None:
+        crud.add_history(None, tr("Bật cưỡng chế", "Forced on"), None, "success", tr("Tự tắt theo hẹn giờ thủ công", "Automatically turned off by manual timer"), manual=True)
+    else:
+        crud.add_history(None, tr("Bật cưỡng chế", "Forced on"), None, "error",
+                         tr(f"Hẹn tự tắt thất bại sau {1 + MAX_RETRIES} lần thử: {error}", f"Auto-off failed after {1 + MAX_RETRIES} attempts: {error}"), manual=True)
+    await manager.broadcast("manual_timer_finished", {"id": tid, "entity_ids": entity_ids, "status": "success" if error is None else "error"})
 
 
 def replace_entity(old_id: str, new_id: str) -> None:

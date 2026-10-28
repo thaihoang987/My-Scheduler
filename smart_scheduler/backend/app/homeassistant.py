@@ -236,6 +236,62 @@ async def call_service(domain: str, service: str, entity_ids: list[str], service
 
 _id_counter = itertools.count(1)
 
+WATCH_RETRY_MIN = 5
+WATCH_RETRY_MAX = 60
+
+
+async def watch_states(on_ready, on_change) -> None:
+    """Giu 1 WebSocket toi HA de NHAN su kien `state_changed` (v0.5.93) - thay
+    cho viec hoi lai trang thai moi 5 giay. Chi nghe, khong gui lenh nao len
+    HA. Moi lan (re)connect: dang ky su kien TRUOC, doc snapshot states, goi
+    `on_ready(states)` 1 lan, roi chuyen tung su kien cho `on_change(entity_id,
+    old_state, new_state)`. Mat ket noi thi noi lai voi backoff 5s -> 60s (day
+    la noi lai ket noi, khong phai poll trang thai)."""
+    delay = WATCH_RETRY_MIN
+    while True:
+        try:
+            token = _effective_token()
+            if not token:
+                raise HAError("Khong co SUPERVISOR_TOKEN hoac ha_token du phong")
+            async with websockets.connect(_effective_ws_url(), open_timeout=10, max_size=16 * 1024 * 1024) as ws:
+                hello = json.loads(await ws.recv())
+                if hello.get("type") != "auth_required":
+                    raise HAError("Unexpected HA WS handshake")
+                await ws.send(json.dumps({"type": "auth", "access_token": token}))
+                if json.loads(await ws.recv()).get("type") != "auth_ok":
+                    raise HAError("HA WS auth failed")
+                sub_id = next(_id_counter)
+                await ws.send(json.dumps({"id": sub_id, "type": "subscribe_events", "event_type": "state_changed"}))
+                states = await get_states()
+                log.info("Dang nghe su kien trang thai tu Home Assistant")
+                delay = WATCH_RETRY_MIN
+                try:
+                    await on_ready(states)
+                except Exception:  # noqa: BLE001
+                    log.exception("Loi khi dong bo sau khi ket noi HA")
+                async for raw in ws:
+                    msg = json.loads(raw)
+                    if msg.get("type") != "event":
+                        continue
+                    data = (msg.get("event") or {}).get("data") or {}
+                    entity_id = data.get("entity_id")
+                    if not entity_id:
+                        continue
+                    try:
+                        await on_change(entity_id, data.get("old_state"), data.get("new_state"))
+                    except Exception:  # noqa: BLE001
+                        log.exception("Loi khi xu ly su kien trang thai %s", entity_id)
+            log.warning("Mat ket noi su kien Home Assistant, noi lai sau %ss", delay)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            if _connection_error(exc) or isinstance(exc, (websockets.WebSocketException, HAError)):
+                _mark_failure()
+            log.warning("Ket noi su kien Home Assistant loi (%s), thu lai sau %ss", exc, delay)
+        await asyncio.sleep(delay)
+        delay = min(delay * 2, WATCH_RETRY_MAX)
+
+
 # Cache registry (v0.5.51): truoc day MOI lan GET /api/entities (tim kiem, xoa
 # thiet bi, poll 8s cua trang Nha) deu mo WS va tai lai toan bo area/device/
 # entity registry - nha nhieu entity mat ca giay, UI lag (phan hoi 2026-09-30).
