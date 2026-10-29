@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.99
+
+- Timeline: the cause colour now sits in its own thin lane under each on/off bar instead of being drawn over it, so the colours no longer overlap the bar or each other.
+
 ## 0.5.98
 
 - The on/off history timeline is simpler: the 8 cause colours are merged into 4 (app schedule/auto-off, forced on, manual from dashboard or switch, other automation). The legend lists only the colours present in the visible range, with a one-line explanation, and the coloured underline is thicker. Tapping a bar still shows the exact cause.
