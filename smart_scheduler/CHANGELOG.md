@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.98
+
+- The on/off history timeline is simpler: the 8 cause colours are merged into 4 (app schedule/auto-off, forced on, manual from dashboard or switch, other automation). The legend lists only the colours present in the visible range, with a one-line explanation, and the coloured underline is thicker. Tapping a bar still shows the exact cause.
+
 ## 0.5.97
 
 - The on/off history timeline on a device card is now colour-coded by what caused each change: app schedule, forced on, auto-off after being on, presence simulation, other app action (card deleted, schedules paused, turn off on startup), HA user (dashboard), automation / script / add-on, or the device itself (physical switch). A coloured strip along the bottom of each bar shows the cause, a legend sits under the chart, and tapping a bar adds a "By:" line (with the schedule name or HA user name).
