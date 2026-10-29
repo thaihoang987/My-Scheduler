@@ -855,20 +855,13 @@ body {
 .state-timeline__seg--off { background: color-mix(in srgb, var(--text-muted) 55%, var(--surface)); color: var(--text); }
 .state-timeline__seg--na { background: transparent; color: var(--text-muted); }
 /* Mau theo NGUON gay ra lan doi trang thai: day duoi doan + mep trai (v0.5.97). */
-.state-timeline__src--schedule { --src: #3b82f6; }
+.state-timeline__src--app { --src: #3b82f6; }
 .state-timeline__src--forced { --src: #f97316; }
-.state-timeline__src--auto_off { --src: #a855f7; }
-.state-timeline__src--presence { --src: #ec4899; }
-.state-timeline__src--app { --src: #a16207; }
 .state-timeline__src--user { --src: #22c55e; }
-.state-timeline__src--automation { --src: #14b8a6; }
-.state-timeline__src--device { --src: #ef4444; }
+.state-timeline__src--other { --src: #14b8a6; }
 .state-timeline__src--none { --src: transparent; }
 .state-timeline__stripe::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: var(--src, transparent);
-}
-.state-timeline__stripe::before {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--src, transparent);
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--src, transparent);
 }
 .state-timeline__swatch[class*="state-timeline__src--"] { background: var(--src); }
 .state-timeline__src--none.state-timeline__swatch { border: 1px dashed var(--text-muted); }

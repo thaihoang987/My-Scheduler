@@ -16,8 +16,24 @@ import { storedText, tr } from "../../i18n";
 type Point = { t: number; s: string; src?: string; by?: string };
 type Segment = { from: number; to: number; s: string; src?: string; by?: string };
 
-/** Nguon gay ra lan doi trang thai (backend sources.py): to mau day duoi moi
- * doan + dong "Do:" trong popup. Thu tu = thu tu hien o chu thich. */
+/** Nguon gay ra lan doi trang thai (backend sources.py). Chi gom 4 nhom de
+ * de doc: gach mau duoi moi doan + chu thich (chi hien nhom dang co tren
+ * khung dang xem). Popup van ghi ro nguon chi tiet. */
+const GROUPS: { key: string; label: () => string }[] = [
+  { key: "app", label: () => tr("App tự chạy (lịch, tự tắt…)", "App (schedule, auto-off…)") },
+  { key: "forced", label: () => tr("Bật cưỡng chế", "Forced on") },
+  { key: "user", label: () => tr("Bấm tay (dashboard, công tắc)", "Manual (dashboard, switch)") },
+  { key: "other", label: () => tr("Automation / add-on khác", "Other automation / add-on") },
+];
+
+function groupOf(src: string | undefined): string {
+  if (!src) return "none";
+  if (src === "forced") return "forced";
+  if (src === "user" || src === "device") return "user";
+  if (src === "automation") return "other";
+  return "app";
+}
+
 const SOURCES: { key: string; label: () => string }[] = [
   { key: "schedule", label: () => tr("Lịch của app", "App schedule") },
   { key: "forced", label: () => tr("Bật cưỡng chế", "Forced on") },
@@ -30,7 +46,7 @@ const SOURCES: { key: string; label: () => string }[] = [
 ];
 
 function sourceLabel(src: string | undefined): string {
-  return SOURCES.find((s) => s.key === src)?.label() ?? tr("Không rõ (trước khi app ghi nhận)", "Unknown (before the app recorded it)");
+  return SOURCES.find((s) => s.key === src)?.label() ?? tr("Chưa ghi nhận nguồn", "Source not recorded");
 }
 
 const HOUR = 3600_000;
@@ -315,6 +331,15 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
   for (let t = startMs - (msOfDay % step) + (msOfDay % step === 0 ? 0 : step); t <= endMs; t += step) ticks.push(t);
   const pct = (t: number) => ((t - startMs) / spanMs) * 100;
   const nowLine = serverNow();
+  const present = new Set<string>();
+  if (!sampleOnly) {
+    for (const id of entityIds) {
+      for (const seg of segmentsIn(data[id] || [], startMs, endMs, nowLine)) {
+        if (seg.s === "planned" || seg.s === "planned_off") continue;
+        present.add(groupOf(seg.src));
+      }
+    }
+  }
   const tipWidth = Math.min(280, width);
   const names = new Map(entities.map((e) => [e.entity_id, e.alias || e.ha_friendly_name || e.entity_id]));
   const spans = sampleOnly ? [{ ms: sampleSpan, label: () => tr("Khung giờ", "Window") },
@@ -400,7 +425,7 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
                     return (
                       <div
                         key={seg.from}
-                        className={`state-timeline__seg state-timeline__seg--${kind} ${!sampleOnly && seg.s !== "planned" ? `state-timeline__stripe state-timeline__src--${seg.src || "none"}` : ""} ${selected ? "state-timeline__seg--selected" : ""}`}
+                        className={`state-timeline__seg state-timeline__seg--${kind} ${!sampleOnly && seg.s !== "planned" ? `state-timeline__stripe state-timeline__src--${groupOf(seg.src)}` : ""} ${selected ? "state-timeline__seg--selected" : ""}`}
                         style={{ left: `${pct(seg.from)}%`, width: `${((seg.to - seg.from) / spanMs) * 100}%` }}
                       >
                         {w > 34 && <span>{stateLabel(seg.s)}</span>}
@@ -428,7 +453,7 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
                 <div>{tr("Thời lượng", "Duration")}: {formatDuration(tip.seg.to - tip.seg.from)}</div>
                 {!sampleOnly && tip.seg.s !== "planned" && tip.seg.s !== "planned_off" && (
                   <div className="state-timeline__tip-by">
-                    <span className={`state-timeline__swatch state-timeline__src--${tip.seg.src || "none"}`} />
+                    <span className={`state-timeline__swatch state-timeline__src--${groupOf(tip.seg.src)}`} />
                     {tr("Do", "By")}: {sourceLabel(tip.seg.src)}{tip.seg.by ? ` · ${storedText(tip.seg.by)}` : ""}
                   </div>
                 )}
@@ -450,11 +475,13 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
         </div>
 
         {error && <div className="state-timeline__error">{error}</div>}
-        {!sampleOnly && (
+        {!sampleOnly && present.size > 0 && (
           <div className="state-timeline__legend state-timeline__legend--sources">
-            {SOURCES.map((s) => (
-              <span key={s.key}><i className={`state-timeline__swatch state-timeline__src--${s.key}`} />{s.label()}</span>
+            <span>{tr("Gạch màu dưới thanh = ai bật/tắt:", "Colored underline = who switched it:")}</span>
+            {GROUPS.filter((g) => present.has(g.key)).map((g) => (
+              <span key={g.key}><i className={`state-timeline__swatch state-timeline__src--${g.key}`} />{g.label()}</span>
             ))}
+            {present.has("none") && <span><i className="state-timeline__swatch state-timeline__src--none" />{tr("Chưa ghi nhận", "Not recorded")}</span>}
           </div>
         )}
         {(!!lookAheadMs || sampleOnly) && <div className="state-timeline__legend">
