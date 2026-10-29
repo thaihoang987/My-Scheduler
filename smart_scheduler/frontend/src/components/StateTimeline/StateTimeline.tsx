@@ -1,5 +1,5 @@
 import { mdiChevronLeft, mdiChevronRight } from "@mdi/js";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "../Icon/Icon";
 import { api } from "../../services/api";
 import type { EntitySummary } from "../../types";
@@ -422,14 +422,18 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
                     const w = ((seg.to - seg.from) / spanMs) * width;
                     const kind = stateKind(seg.s);
                     const selected = tip?.entityId === id && tip.seg.from === seg.from;
+                    const showLane = !sampleOnly && seg.s !== "planned" && seg.s !== "planned_off";
+                    const box = { left: `${pct(seg.from)}%`, width: `${((seg.to - seg.from) / spanMs) * 100}%` };
                     return (
-                      <div
-                        key={seg.from}
-                        className={`state-timeline__seg state-timeline__seg--${kind} ${!sampleOnly && seg.s !== "planned" ? `state-timeline__stripe state-timeline__src--${groupOf(seg.src)}` : ""} ${selected ? "state-timeline__seg--selected" : ""}`}
-                        style={{ left: `${pct(seg.from)}%`, width: `${((seg.to - seg.from) / spanMs) * 100}%` }}
-                      >
-                        {w > 34 && <span>{stateLabel(seg.s)}</span>}
-                      </div>
+                      <Fragment key={seg.from}>
+                        <div
+                          className={`state-timeline__seg state-timeline__seg--${kind} ${showLane ? "state-timeline__seg--lifted" : ""} ${selected ? "state-timeline__seg--selected" : ""}`}
+                          style={box}
+                        >
+                          {w > 34 && <span>{stateLabel(seg.s)}</span>}
+                        </div>
+                        {showLane && <div className={`state-timeline__lane state-timeline__src--${groupOf(seg.src)}`} style={box} />}
+                      </Fragment>
                     );
                   })}
                 </div>

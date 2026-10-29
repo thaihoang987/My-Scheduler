@@ -860,8 +860,11 @@ body {
 .state-timeline__src--user { --src: #22c55e; }
 .state-timeline__src--other { --src: #14b8a6; }
 .state-timeline__src--none { --src: transparent; }
-.state-timeline__stripe::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--src, transparent);
+/* Mau nguon nam o 1 lan rieng duoi thanh, khong de len thanh bat/tat. */
+.state-timeline__seg--lifted { bottom: 7px; }
+.state-timeline__lane {
+  position: absolute; bottom: 0; height: 5px; background: var(--src, transparent);
+  box-shadow: inset -1px 0 0 var(--surface);
 }
 .state-timeline__swatch[class*="state-timeline__src--"] { background: var(--src); }
 .state-timeline__src--none.state-timeline__swatch { border: 1px dashed var(--text-muted); }
