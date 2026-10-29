@@ -66,7 +66,7 @@ export const api = {
 
   /** Lich su trang thai that tu recorder HA (card timeline o Device Detail). */
   stateHistory: (entityIds: string[], start: Date, end: Date) =>
-    request<Record<string, { s: string; t: string }[]>>(
+    request<Record<string, { s: string; t: string; src?: string; by?: string }[]>>(
       `/history/states?entity_ids=${encodeURIComponent(entityIds.join(","))}&start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`,
     ),
 

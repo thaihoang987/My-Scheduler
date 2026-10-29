@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app import crud
-from app import homeassistant
+from app import homeassistant, sources
 from app.models import ScheduleGroupToggle, ScheduleIds, ScheduleIn, ScheduleOut, ScheduleReorder
 from app.scheduler_engine import compute_next_run, normalize_range_days, one_shot_only, run_schedule_now, turn_off_running
 from app.ws import manager
@@ -91,7 +91,8 @@ async def delete_card(payload: ScheduleIds):
     if targets:
         name = schedules[0]["name"]
         try:
-            await homeassistant.call_service("homeassistant", "turn_off", targets, {})
+            with sources.acting_as("app", "card deleted"):
+                await homeassistant.call_service("homeassistant", "turn_off", targets, {})
             crud.add_history(None, name, None, "success", tr("Tắt thiết bị vì xoá card hẹn giờ", "Turned off device because its schedule card was deleted"), manual=True)
         except Exception as exc:  # noqa: BLE001
             crud.add_history(None, name, None, "error", tr(f"Không tắt được thiết bị khi xoá card: {exc}", f"Could not turn off device while deleting schedule card: {exc}"), manual=True)

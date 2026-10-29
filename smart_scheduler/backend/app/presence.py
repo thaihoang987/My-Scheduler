@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import date, datetime, time as time_cls, timedelta
 from zoneinfo import ZoneInfo
 
-from app import crud, homeassistant, scheduler_engine
+from app import crud, homeassistant, scheduler_engine, sources
 from app.config import DEFAULT_TIMEZONE
 from app.i18n import tr
 from app.ws import manager
@@ -189,7 +189,8 @@ async def _command(service: str, eid: str, now: datetime, cfg: dict, state: dict
         data, domain = {}, "homeassistant"
         if service == "turn_on" and eid.startswith("light.") and state and set((state.get("attributes") or {}).get("supported_color_modes") or []) - {"onoff"}:
             domain, data = "light", {"brightness_pct": cfg["brightness_pct"]}
-        result = await homeassistant.call_service(domain, service, [eid], data)
+        with sources.acting_as("presence", tr("Giả lập có người", "Presence simulation")):
+            result = await homeassistant.call_service(domain, service, [eid], data)
         _failures.pop(eid, None)
         _warnings.pop(eid, None)
         _retry[eid] = now + timedelta(seconds=30)

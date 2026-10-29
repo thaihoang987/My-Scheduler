@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.97
+
+- The on/off history timeline on a device card is now colour-coded by what caused each change: app schedule, forced on, auto-off after being on, presence simulation, other app action (card deleted, schedules paused, turn off on startup), HA user (dashboard), automation / script / add-on, or the device itself (physical switch). A coloured strip along the bottom of each bar shows the cause, a legend sits under the chart, and tapping a bar adds a "By:" line (with the schedule name or HA user name).
+- The app now records every state change of the devices it manages together with its cause (kept 35 days). Changes made outside the app (HA user, automation, physical switch) are also written to the History page, so an unexplained turn-off can be traced. Changes recorded before this version show as "Unknown".
+- Logs: every command sent to Home Assistant now states its source (for example `source=auto_off label=...`), and every state change of a managed device is logged with its cause. Forced-on start and cancel are now written to the History page too.
+
 ## 0.5.96
 
 - Auto-off after being on is now event-driven. The 5-second polling loop is gone: the app listens to Home Assistant `state_changed` events and sets a single timer per device. A device turning on (from the dashboard, a wall switch or an automation) starts a fresh count, so turning it off and on again quickly can no longer reuse an old start time.

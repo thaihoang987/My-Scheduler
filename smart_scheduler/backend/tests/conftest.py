@@ -27,6 +27,18 @@ def fresh_db(tmp_path, monkeypatch):
         db._local.conn = None
 
 
+@pytest.fixture(autouse=True)
+def fresh_sources(monkeypatch):
+    """Trang thai trong bo nho cua sources.py khong duoc ro ri giua cac test."""
+    import time
+    from app import sources
+
+    monkeypatch.setattr(sources, "_recent", [])
+    monkeypatch.setattr(sources, "_ctx_source", sources.OrderedDict())
+    monkeypatch.setattr(sources, "_extra_tracked", set())
+    monkeypatch.setattr(sources, "_tracked_cache", (0.0, frozenset()))
+
+
 class FakeHA:
     def __init__(self):
         self.calls: list[tuple] = []

@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app import crud, homeassistant
+from app import crud, homeassistant, sources
 from app.i18n import tr
 
 router = APIRouter(prefix="/api/history", tags=["history"])
@@ -31,7 +31,9 @@ async def state_history(entity_ids: str = Query(..., min_length=1), start: str =
         raise HTTPException(status_code=400, detail="start/end must be timezone-aware and start < end")
     if (end_dt - start_dt).days > MAX_RANGE_DAYS:
         raise HTTPException(status_code=400, detail=f"range must be <= {MAX_RANGE_DAYS} days")
+    sources.track(ids)  # tu nay ghi nguon cho cac thiet bi dang xem
     try:
-        return await homeassistant.get_state_history(ids, start_dt.isoformat(), end_dt.isoformat())
+        series = await homeassistant.get_state_history(ids, start_dt.isoformat(), end_dt.isoformat())
+        return sources.annotate(series)
     except Exception as exc:  # recorder tat / HA loi -> UI hien thong bao thay vi trang
         raise HTTPException(status_code=502, detail=tr(f"Không lấy được lịch sử từ Home Assistant: {exc}", f"Could not load history from Home Assistant: {exc}")) from exc

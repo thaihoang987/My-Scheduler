@@ -19,6 +19,7 @@ from urllib.parse import quote
 import httpx
 import websockets
 
+from app import sources
 from app.config import (
     CORE_API_BASE,
     CORE_WS_URL,
@@ -208,8 +209,10 @@ async def get_state_history(entity_ids: list[str], start: str, end: str) -> dict
 
 
 async def call_service(domain: str, service: str, entity_ids: list[str], service_data: dict) -> list[dict]:
-    log.info("HA command service=%s.%s targets=%s", domain, service, entity_ids)
+    source, label = sources.current()
+    log.info("HA command service=%s.%s targets=%s source=%s label=%s", domain, service, entity_ids, source, label)
     note_command(entity_ids)
+    sources.note_command(entity_ids, service)
     payload = dict(service_data or {})
     payload["entity_id"] = entity_ids
     try:
@@ -312,6 +315,43 @@ async def get_registries() -> dict:
         if data["entities"] or data["devices"] or data["areas"]:
             _registry_cache = (now, data)
         return data
+
+
+USERS_TTL_SECONDS = 300
+_users_cache: tuple[float, dict[str, str]] | None = None
+
+
+async def get_users() -> dict[str, str]:
+    """{user_id: ten} cua nguoi dung HA (de ghi "ai dieu khien" vao lich su).
+    Can quyen admin; loi thi tra ve rong va cache ngan, khong lam hong luong chinh."""
+    global _users_cache
+    now = time.monotonic()
+    if _users_cache and now - _users_cache[0] < USERS_TTL_SECONDS:
+        return _users_cache[1]
+    users: dict[str, str] = {}
+    try:
+        token = _effective_token()
+        if not token:
+            raise HAError("Khong co SUPERVISOR_TOKEN hoac ha_token du phong")
+        async with websockets.connect(_effective_ws_url(), open_timeout=10, max_size=16 * 1024 * 1024) as ws:
+            if json.loads(await ws.recv()).get("type") != "auth_required":
+                raise HAError("Unexpected HA WS handshake")
+            await ws.send(json.dumps({"type": "auth", "access_token": token}))
+            if json.loads(await ws.recv()).get("type") != "auth_ok":
+                raise HAError("HA WS auth failed")
+            cmd_id = next(_id_counter)
+            await ws.send(json.dumps({"id": cmd_id, "type": "config/auth/list"}))
+            while True:
+                raw = json.loads(await ws.recv())
+                if raw.get("id") == cmd_id:
+                    for user in raw.get("result") or []:
+                        if user.get("id") and user.get("name"):
+                            users[user["id"]] = user["name"]
+                    break
+    except (OSError, websockets.WebSocketException, HAError, ValueError) as exc:
+        log.debug("Khong lay duoc danh sach nguoi dung HA (%s)", exc)
+    _users_cache = (now, users)
+    return users
 
 
 async def _fetch_registries() -> dict:
