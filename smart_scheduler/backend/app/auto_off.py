@@ -27,7 +27,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from app import crud, homeassistant, manual_timer
+from app import crud, homeassistant, manual_timer, sources
 from app.ws import manager
 from app.i18n import tr
 
@@ -206,7 +206,8 @@ async def _expire(eid: str, now: datetime, rule_map: dict[str, tuple[int, dict]]
     _sent.add(eid)
     dur = format_duration(secs)
     try:
-        await homeassistant.call_service("homeassistant", "turn_off", [eid], {})
+        with sources.acting_as("auto_off", schedule["name"]):
+            await homeassistant.call_service("homeassistant", "turn_off", [eid], {})
         status, message = "success", tr(f"Tự tắt sau khi bật {dur}", f"Auto-off after being on for {dur}")
     except Exception as exc:  # noqa: BLE001
         status, message = "error", tr(f"Tự tắt sau {dur} thất bại: {exc}", f"Auto-off after {dur} failed: {exc}")
@@ -304,10 +305,20 @@ async def _on_ready(states: list[dict]) -> None:
         await _ready_hook(states)
 
 
+async def _on_event(eid: str, old: dict | None, new: dict | None) -> None:
+    """Moi su kien state_changed: ghi nguon bat/tat (sources) truoc, roi moi xu ly
+    tu tat. Ghi nguon loi thi van phai xu ly tu tat."""
+    try:
+        await sources.record(eid, old, new)
+    except Exception:  # noqa: BLE001
+        log.exception("Loi khi ghi nguon doi trang thai %s", eid)
+    await on_change(eid, old, new)
+
+
 async def auto_off_loop() -> None:
     log.info("Auto-off watcher started (event-driven)")
     try:
-        await homeassistant.watch_states(_on_ready, on_change)
+        await homeassistant.watch_states(_on_ready, _on_event)
     finally:
         for eid in list(_tasks):
             _cancel(eid)

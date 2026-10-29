@@ -117,6 +117,20 @@ CREATE TABLE IF NOT EXISTS auto_off_state (
     on_since TEXT NOT NULL
 );
 
+-- Moi lan thiet bi duoc theo doi DOI TRANG THAI + ai gay ra (v0.5.97): `ts` la
+-- last_changed cua HA de ghep voi diem trong lich su recorder, `source` la
+-- schedule/forced/auto_off/presence/app (lenh cua app) hoac user/automation/device.
+CREATE TABLE IF NOT EXISTS state_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    state TEXT,
+    prev TEXT,
+    source TEXT NOT NULL,
+    label TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_state_events_entity_ts ON state_events(entity_id, ts);
 CREATE INDEX IF NOT EXISTS idx_history_schedule ON execution_history(schedule_id);
 CREATE INDEX IF NOT EXISTS idx_history_executed_at ON execution_history(executed_at);
 CREATE INDEX IF NOT EXISTS idx_manual_timers_off_at ON manual_timers(off_at);

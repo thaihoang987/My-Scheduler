@@ -1,7 +1,7 @@
 """Truy van SQLite cho schedules/aliases/history/settings/groups. Tra ve
 dict thuan (khong ORM) de FastAPI/Pydantic serialize truc tiep."""
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from app import config
@@ -536,6 +536,34 @@ def add_history(schedule_id: Optional[str], schedule_name: Optional[str], schedu
                  SELECT id FROM execution_history ORDER BY executed_at DESC LIMIT ?)""",
             (keep_last,),
         )
+
+
+def add_state_event(entity_id: str, ts: str, state: Optional[str], prev: Optional[str],
+                    source: str, label: Optional[str]) -> None:
+    with tx() as c:
+        c.execute(
+            "INSERT INTO state_events (entity_id, ts, state, prev, source, label) VALUES (?,?,?,?,?,?)",
+            (entity_id, ts, state, prev, source, label),
+        )
+
+
+def list_state_events(entity_ids: list[str], since: str) -> list[dict]:
+    """Su kien doi trang thai cua cac entity tu moc `since` (so sanh chuoi ISO,
+    chi de loc tho - noi goi tu loc lai bang datetime)."""
+    if not entity_ids:
+        return []
+    marks = ",".join("?" for _ in entity_ids)
+    rows = get_conn().execute(
+        f"SELECT * FROM state_events WHERE entity_id IN ({marks}) AND ts >= ? ORDER BY ts",
+        (*entity_ids, since),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def prune_state_events(keep_days: int = 35) -> int:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=keep_days)).isoformat()
+    with tx() as c:
+        return c.execute("DELETE FROM state_events WHERE ts < ?", (cutoff,)).rowcount
 
 
 def list_history(limit: int = 200, schedule_id: Optional[str] = None) -> list[dict]:

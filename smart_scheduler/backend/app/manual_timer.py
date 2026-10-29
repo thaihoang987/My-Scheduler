@@ -12,7 +12,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from app import crud, homeassistant
+from app import crud, homeassistant, sources
 from app.ws import manager
 from app.i18n import tr
 
@@ -56,8 +56,11 @@ async def restore_active() -> None:
 
 
 async def start(entity_ids: list[str], auto_off_minutes: float | None) -> dict:
-    await homeassistant.call_service("homeassistant", "turn_on", entity_ids, {})
+    with sources.acting_as("forced", tr("Bật cưỡng chế", "Forced on")):
+        await homeassistant.call_service("homeassistant", "turn_on", entity_ids, {})
     started_at = _now_iso()
+    wait = tr(f", tự tắt sau {auto_off_minutes:g} phút", f", auto-off in {auto_off_minutes:g} min") if auto_off_minutes and auto_off_minutes > 0 else ""
+    crud.add_history(None, tr("Bật cưỡng chế", "Forced on"), None, "success", tr(f"Đã bật {', '.join(entity_ids)}{wait}", f"Turned on {', '.join(entity_ids)}{wait}"), manual=True)
     if not auto_off_minutes or auto_off_minutes <= 0:
         return {"id": None, "entity_ids": entity_ids, "started_at": started_at, "off_at": None}
 
@@ -86,7 +89,8 @@ async def _auto_off(tid: str, entity_ids: list[str], delay_seconds: float) -> No
                 states = {s["entity_id"]: s.get("state") for s in await homeassistant.get_states()}
                 live = [e for e in entity_ids if states.get(e) not in ("off", "closed")]
                 if live:
-                    await homeassistant.call_service("homeassistant", "turn_off", live, {})
+                    with sources.acting_as("forced", tr("Bật cưỡng chế", "Forced on")):
+                        await homeassistant.call_service("homeassistant", "turn_off", live, {})
                 error = None
                 break
             except Exception as exc:  # noqa: BLE001
@@ -136,8 +140,11 @@ async def cancel(tid: str) -> bool:
     crud.delete_manual_timer(tid)
     entry["task"].cancel()
     try:
-        await homeassistant.call_service("homeassistant", "turn_off", entry["entity_ids"], {})
+        with sources.acting_as("forced", tr("Bật cưỡng chế", "Forced on")):
+            await homeassistant.call_service("homeassistant", "turn_off", entry["entity_ids"], {})
+        crud.add_history(None, tr("Bật cưỡng chế", "Forced on"), None, "success", tr("Huỷ hẹn, đã tắt thiết bị", "Timer cancelled, device turned off"), manual=True)
     except Exception as exc:  # noqa: BLE001 - huy van coi la thanh cong, chi log loi tat
         log.warning("Huy hen bat cuong che %s nhung tat thiet bi that bai: %s", tid, exc)
+        crud.add_history(None, tr("Bật cưỡng chế", "Forced on"), None, "error", tr(f"Huỷ hẹn nhưng không tắt được thiết bị: {exc}", f"Timer cancelled but the device could not be turned off: {exc}"), manual=True)
     await manager.broadcast("manual_timer_finished", {"id": tid, "entity_ids": entry["entity_ids"], "status": "cancelled"})
     return True

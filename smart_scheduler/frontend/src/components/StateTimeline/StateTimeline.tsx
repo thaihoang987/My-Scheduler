@@ -5,7 +5,7 @@ import { api } from "../../services/api";
 import type { EntitySummary } from "../../types";
 import { fmtDateTime, fmtTime, secondsOfDayInZone } from "../../utils/appTime";
 import { serverNow } from "../../utils/serverTime";
-import { tr } from "../../i18n";
+import { storedText, tr } from "../../i18n";
 
 /** Card lich su bat/tat kieu "history graph" cua HA (phan hoi 2026-10-01 "kéo
  * qua kéo lại để coi lịch sử bật tắt"): moi thiet bi 1 thanh, keo ngang de lui
@@ -13,8 +13,25 @@ import { tr } from "../../i18n";
  * recorder cua HA qua GET /api/history/states, tai THEM tung doan khi keo ra
  * ngoai vung da tai (khong tai lai tu dau). */
 
-type Point = { t: number; s: string };
-type Segment = { from: number; to: number; s: string };
+type Point = { t: number; s: string; src?: string; by?: string };
+type Segment = { from: number; to: number; s: string; src?: string; by?: string };
+
+/** Nguon gay ra lan doi trang thai (backend sources.py): to mau day duoi moi
+ * doan + dong "Do:" trong popup. Thu tu = thu tu hien o chu thich. */
+const SOURCES: { key: string; label: () => string }[] = [
+  { key: "schedule", label: () => tr("Lịch của app", "App schedule") },
+  { key: "forced", label: () => tr("Bật cưỡng chế", "Forced on") },
+  { key: "auto_off", label: () => tr("Tự tắt sau khi bật", "Auto-off after on") },
+  { key: "presence", label: () => tr("Giả lập có người", "Presence simulation") },
+  { key: "app", label: () => tr("App (thao tác khác)", "App (other action)") },
+  { key: "user", label: () => tr("Người dùng (dashboard HA)", "User (HA dashboard)") },
+  { key: "automation", label: () => tr("Automation / script / add-on", "Automation / script / add-on") },
+  { key: "device", label: () => tr("Thiết bị / công tắc tay", "Device / physical switch") },
+];
+
+function sourceLabel(src: string | undefined): string {
+  return SOURCES.find((s) => s.key === src)?.label() ?? tr("Không rõ (trước khi app ghi nhận)", "Unknown (before the app recorded it)");
+}
 
 const HOUR = 3600_000;
 const SPANS = [
@@ -67,7 +84,10 @@ function mergePoints(a: Point[], b: Point[]): Point[] {
   const out: Point[] = [];
   for (const p of all) {
     const last = out[out.length - 1];
-    if (last && last.s === p.s) continue;
+    if (last && last.s === p.s) {
+      if (!last.src && p.src) out[out.length - 1] = { ...last, src: p.src, by: p.by };
+      continue;
+    }
     if (last && last.t === p.t) out[out.length - 1] = p;
     else out.push(p);
   }
@@ -80,7 +100,7 @@ function segmentsIn(points: Point[], from: number, to: number, now: number): Seg
     const start = points[i].t;
     const end = i + 1 < points.length ? points[i + 1].t : now;
     if (end <= from || start >= to) continue;
-    out.push({ from: Math.max(start, from), to: Math.min(end, to), s: points[i].s });
+    out.push({ from: Math.max(start, from), to: Math.min(end, to), s: points[i].s, src: points[i].src, by: points[i].by });
   }
   return out;
 }
@@ -160,7 +180,7 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
         setData((prev) => {
           const next: Record<string, Point[]> = { ...prev };
           for (const id of entityIds) {
-            const pts = (res[id] || []).map((p) => ({ t: Date.parse(p.t), s: p.s })).filter((p) => Number.isFinite(p.t));
+            const pts = (res[id] || []).map((p) => ({ t: Date.parse(p.t), s: p.s, src: p.src, by: p.by })).filter((p) => Number.isFinite(p.t));
             next[id] = mergePoints(prev[id] || [], pts);
           }
           return next;
@@ -380,7 +400,7 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
                     return (
                       <div
                         key={seg.from}
-                        className={`state-timeline__seg state-timeline__seg--${kind} ${selected ? "state-timeline__seg--selected" : ""}`}
+                        className={`state-timeline__seg state-timeline__seg--${kind} ${!sampleOnly && seg.s !== "planned" ? `state-timeline__stripe state-timeline__src--${seg.src || "none"}` : ""} ${selected ? "state-timeline__seg--selected" : ""}`}
                         style={{ left: `${pct(seg.from)}%`, width: `${((seg.to - seg.from) / spanMs) * 100}%` }}
                       >
                         {w > 34 && <span>{stateLabel(seg.s)}</span>}
@@ -406,6 +426,12 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
                   {!sampleOnly && tip.seg.s !== "planned" && tip.seg.to >= serverNow() - 1000 ? tr("đến bây giờ", "until now") : `${tr("lúc", "to")} ${fmtFull(tip.seg.to)}`}
                 </div>
                 <div>{tr("Thời lượng", "Duration")}: {formatDuration(tip.seg.to - tip.seg.from)}</div>
+                {!sampleOnly && tip.seg.s !== "planned" && tip.seg.s !== "planned_off" && (
+                  <div className="state-timeline__tip-by">
+                    <span className={`state-timeline__swatch state-timeline__src--${tip.seg.src || "none"}`} />
+                    {tr("Do", "By")}: {sourceLabel(tip.seg.src)}{tip.seg.by ? ` · ${storedText(tip.seg.by)}` : ""}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -424,6 +450,13 @@ export function StateTimeline({ entityIds, entities, liveKey, planned = [], look
         </div>
 
         {error && <div className="state-timeline__error">{error}</div>}
+        {!sampleOnly && (
+          <div className="state-timeline__legend state-timeline__legend--sources">
+            {SOURCES.map((s) => (
+              <span key={s.key}><i className={`state-timeline__swatch state-timeline__src--${s.key}`} />{s.label()}</span>
+            ))}
+          </div>
+        )}
         {(!!lookAheadMs || sampleOnly) && <div className="state-timeline__legend">
           <span><i className="state-timeline__swatch state-timeline__seg--planned" />{tr("Dự kiến · có thể bỏ qua", "Planned · may be skipped")}</span>
           {sampleOnly && <span><i className="state-timeline__swatch state-timeline__seg--off" />{tr("Nghỉ dự kiến", "Planned rest")}</span>}

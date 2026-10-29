@@ -9,7 +9,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app import auto_off, crud, homeassistant, manual_timer, presence
+from app import auto_off, crud, homeassistant, manual_timer, presence, sources
 from app.api import backup, entities, groups, history, manual, presence as presence_api, schedules, settings as settings_api, sun
 from app.db import init_db
 from app.homeassistant import connection_mode
@@ -62,7 +62,8 @@ async def _reset_devices_on_startup() -> None:
         log.info("Khong co thiet bi nao co lich dang bat luc app khoi dong - bo qua")
         return
     try:
-        await homeassistant.call_service("homeassistant", "turn_off", on_entities, {})
+        with sources.acting_as("app", "turn off on startup"):
+            await homeassistant.call_service("homeassistant", "turn_off", on_entities, {})
         log.info("Da gui lenh tat cho %d thiet bi co lich dang bat luc app khoi dong: %s", len(on_entities), on_entities)
     except Exception as exc:  # noqa: BLE001
         log.warning("Tat thiet bi luc khoi dong that bai (HA co the chua san sang): %s", exc)
@@ -122,6 +123,7 @@ async def lifespan(app: FastAPI):
     global _scheduler_task, _presence_task, _auto_off_task
     init_db()
     log.info("Database ready")
+    crud.prune_state_events(sources.KEEP_DAYS)
     timezone_loaded = await _load_ha_timezone()
     fixed = normalize_range_days()
     if fixed:

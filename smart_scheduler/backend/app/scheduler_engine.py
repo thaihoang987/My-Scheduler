@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 from astral import Observer
 from astral.sun import sun as astral_sun
 
-from app import crud, homeassistant
+from app import crud, homeassistant, sources
 from app.config import DEFAULT_TIMEZONE
 from app.db import now_iso
 from app.ws import manager
@@ -488,7 +488,8 @@ async def _run_slot(schedule: dict, missed_policy: str, expires_at: datetime | N
             if not targets:
                 message = tr("Thiết bị đã tắt sẵn, không gửi lệnh", "Device was already off, no command sent")
         if targets:
-            await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
+            with sources.acting_as("schedule", schedule["name"]):
+                await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
     except Exception as exc:  # noqa: BLE001 - 1 schedule loi khong duoc lam chet vong lap (muc 54)
         status, message = "error", str(exc)
         log.warning("Schedule %s (%s) loi khi thuc thi: %s", schedule["id"], schedule["name"], exc)
@@ -598,7 +599,8 @@ async def verify_state(schedule: dict, action: dict, targets: list[str], delay: 
                     log.info("Schedule %s: %s chua dung trang thai nhung khong gui lai (lich/thiet bi da doi hoac HA chua on dinh)", schedule["id"], wrong)
                     return []
                 log.warning("Schedule %s: %s chua dung trang thai sau %ss - gui lai lenh", schedule["id"], retry, delay)
-                await homeassistant.call_service(action["domain"], action["service"], retry, action.get("service_data") or {})
+                with sources.acting_as("schedule", schedule["name"]):
+                    await homeassistant.call_service(action["domain"], action["service"], retry, action.get("service_data") or {})
                 wrong = retry
         word = tr("tắt", "turn off") if action["service"] == "turn_off" else tr("bật", "turn on")
         crud.add_history(schedule["id"], schedule["name"], None, "verify_failed",
@@ -621,7 +623,8 @@ async def run_schedule_now(schedule: dict) -> tuple[str, str | None]:
         if not targets:
             raise ValueError("Schedule has no target entities")
         if targets:
-            await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
+            with sources.acting_as("schedule", schedule["name"]):
+                await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
     except Exception as exc:  # noqa: BLE001
         status, message = "error", str(exc)
     crud.add_history(schedule["id"], schedule["name"], None, status, message, manual=True)
@@ -770,7 +773,8 @@ async def turn_off_running(schedule_ids: list[str], reason: str) -> list[str]:
     }.get(reason, reason)
     status, message = "success", tr(f"Tắt ngay vì {reason} khi đang trong khung giờ bật", f"Turned off immediately due to {reason_en} during an active time range")
     try:
-        await homeassistant.call_service("homeassistant", "turn_off", targets, {})
+        with sources.acting_as("app", reason_en):
+            await homeassistant.call_service("homeassistant", "turn_off", targets, {})
     except Exception as exc:  # noqa: BLE001
         status, message = "error", tr(f"Không tắt được thiết bị khi {reason}: {exc}", f"Could not turn off devices due to {reason_en}: {exc}")
         log.warning("Tat thiet bi khi %s that bai: %s", reason, exc)
@@ -885,7 +889,8 @@ async def recover_ranges(now: datetime | None = None, states: list[dict] | None 
                 continue
             action = _execution_action(fresh)
             try:
-                await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
+                with sources.acting_as("schedule", off["name"]):
+                    await homeassistant.call_service(action["domain"], action["service"], targets, action.get("service_data") or {})
             except Exception as exc:  # noqa: BLE001 - giu lai, thu khi HA on dinh tro lai
                 log.warning("Tat bu khung %s that bai: %s", row["on_id"], exc)
                 continue
