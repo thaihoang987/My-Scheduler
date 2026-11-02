@@ -9,7 +9,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app import auto_off, crud, homeassistant, manual_timer, presence, sources
+from app import auto_off, companion, crud, homeassistant, manual_timer, presence, sources
 from app.api import backup, entities, groups, history, manual, presence as presence_api, schedules, settings as settings_api, sun
 from app.db import init_db
 from app.homeassistant import connection_mode
@@ -141,6 +141,7 @@ async def lifespan(app: FastAPI):
     _presence_task = asyncio.create_task(presence.presence_loop())
     auto_off.set_ready_hook(_on_ha_ready)
     manager.add_listener(auto_off.on_schedule_event)
+    manager.add_listener(companion.on_schedule_event)
     _auto_off_task = asyncio.create_task(auto_off.auto_off_loop())
     timezone_task = None if timezone_loaded else asyncio.create_task(_retry_ha_timezone())
     try:

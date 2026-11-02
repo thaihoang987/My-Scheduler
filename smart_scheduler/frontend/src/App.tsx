@@ -203,7 +203,7 @@ export function App() {
   // Lich "Tu tat sau khi bat" hien rieng thanh 1 danh sach tren Nha (AutoOffList), khong thanh card.
   // Dat mui gio hien thi NGAY trong render (khong doi useEffect) de lan ve dau da dung.
   setAppTimeZone(settings.timezone);
-  const groups = useMemo(() => groupSchedules(schedules.filter((s) => s.trigger_type !== "auto_off"), entities), [schedules, entities]);
+  const groups = useMemo(() => groupSchedules(schedules.filter((s) => s.trigger_type !== "auto_off" && s.trigger_type !== "companion"), entities), [schedules, entities]);
   const openDevice = useMemo(() => groups.find((g) => g.key === openDeviceKey) ?? null, [groups, openDeviceKey]);
   setAppLanguage(settings.language);
 

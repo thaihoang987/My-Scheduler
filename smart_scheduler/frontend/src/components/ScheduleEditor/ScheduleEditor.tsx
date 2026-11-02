@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { EntitySummary, Schedule } from "../../types";
 import {
+  DEFAULT_COMPANION_DELAY,
   draftFromSchedule,
   EMPTY_DRAFT,
   mergeClimateAttrs,
@@ -28,6 +29,16 @@ import { fmtTime, secondsOfDayInZone, todayInZone } from "../../utils/appTime";
 import { actionChipLabel, domainProfile, type ActionService } from "../../utils/domainProfile";
 
 const DOMAIN_ACTION_SERVICE = { climate: "climate_set", light: "light_set", cover: "cover_set", fan: "fan_set" } as const;
+
+function timeToSeconds(t: string): number {
+  const [h = 0, m = 0, s = 0] = t.split(":").map(Number);
+  return Math.round(h * 3600 + m * 60 + s);
+}
+
+function secondsToTime(total: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
+}
 
 /** " (05:43)" - gio moc troi hom nay de hien ngay tren chip, tra ve rong neu
  * chua co (dang tai hoac chua lay duoc vi tri HA). */
@@ -124,6 +135,7 @@ export function ScheduleEditor({
 }) {
   const [draft, setDraft] = useState<ScheduleDraft>(EMPTY_DRAFT);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [companionPickerOpen, setCompanionPickerOpen] = useState(false);
   const [saveAttempted, setSaveAttempted] = useState(false);
   const [sunTimes, setSunTimes] = useState<{ sunrise: string | null; sunset: string | null }>({ sunrise: null, sunset: null });
 
@@ -148,8 +160,11 @@ export function ScheduleEditor({
   // "Tu tat sau khi bat" (v0.5.44): `time` la do dai, backend dem tu luc
   // thiet bi thuc su bat (tu bat ky dau) - khong co ngay lap/dieu kien/hanh dong.
   const isAutoOff = draft.trigger_type === "auto_off";
+  // "Thiet bi mo cung" (v0.6.0): nhom = thiet bi da chon, them 1 thiet bi
+  // chay theo nhom (bom) + do tre tat. Khong co ngay lap/dieu kien/hanh dong.
+  const isCompanion = draft.trigger_type === "companion";
   const leaveAutoOff = (d: ScheduleDraft): Partial<ScheduleDraft> =>
-    d.trigger_type === "auto_off" ? { trigger_type: "time", time: EMPTY_DRAFT.time, action_service: "turn_on" } : {};
+    d.trigger_type === "auto_off" || d.trigger_type === "companion" ? { trigger_type: "time", time: EMPTY_DRAFT.time, action_service: "turn_on" } : {};
   const climateInfo = useMemo(() => mergeClimateAttrs(draft.target_entities, entities), [draft.target_entities, entities]);
   const lightInfo = useMemo(() => mergeLightAttrs(draft.target_entities, entities), [draft.target_entities, entities]);
   const coverInfo = useMemo(() => mergeCoverAttrs(draft.target_entities, entities), [draft.target_entities, entities]);
@@ -181,12 +196,13 @@ export function ScheduleEditor({
       let next = d;
       if (next.trigger_type === "auto_off" && !profile.autoOff) next = { ...next, ...leaveAutoOff(next) };
       if (next.end_time !== null && !profile.range) next = { ...next, end_time: null };
-      if (next.end_time === null && next.trigger_type !== "auto_off" && !profile.actions.includes(next.action_service)) {
+      if (next.trigger_type === "companion" && !profile.autoOff) next = { ...next, ...leaveAutoOff(next) };
+      if (next.end_time === null && next.trigger_type !== "auto_off" && next.trigger_type !== "companion" && !profile.actions.includes(next.action_service)) {
         next = withAction(next, profile.actions[0]);
       }
       return next === d ? d : next;
     });
-  }, [profile?.key, isRange, isAutoOff]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profile?.key, isRange, isAutoOff, isCompanion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Moi thiet bi chi 1 lich Tu tat: 2 lich thi backend chi lay thoi gian ngan
   // nhat, lich kia vo nghia (backend cung chan, xem _check_auto_off_unique).
@@ -276,12 +292,14 @@ export function ScheduleEditor({
           </div>
         ) : (
           <button className="input input--button" onClick={() => setPickerOpen(true)}>
-            {draft.target_entities.length === 0 ? `+ ${tr("Chọn thiết bị", "Select devices")}` : draft.target_entities.map(nameFor).join(", ")}
+            {draft.target_entities.length === 0
+              ? `+ ${isCompanion ? tr("Chọn các thiết bị trong nhóm (vd. các van)", "Select the devices in the group (e.g. valves)") : tr("Chọn thiết bị", "Select devices")}`
+              : draft.target_entities.map(nameFor).join(", ")}
           </button>
         )}
 
         {(!profile || profile.range || profile.autoOff) && <div className="chip-row">
-          <button className={!isRange && !isAutoOff ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, end_time: null, ...leaveAutoOff(d) }))}>
+          <button className={!isRange && !isAutoOff && !isCompanion ? "chip chip--active" : "chip"} onClick={() => setDraft((d) => ({ ...d, end_time: null, ...leaveAutoOff(d) }))}>
             {tr("Mốc thời gian", "Time point")}
           </button>
           {(!profile || profile.range) && <button
@@ -311,11 +329,27 @@ export function ScheduleEditor({
           >
             ⏱ {tr("Tự tắt sau khi bật", "Auto-off after on")}
           </button>}
+          {mode !== "schedule" && (!profile || profile.autoOff) && <button
+            className={isCompanion ? "chip chip--active" : "chip"}
+            onClick={() =>
+              setDraft((d) => ({
+                ...d,
+                trigger_type: "companion",
+                end_time: null,
+                action_service: "turn_on",
+                time: d.trigger_type === "companion" ? d.time : DEFAULT_COMPANION_DELAY,
+                conditions: [],
+                end_conditions: [],
+              }))
+            }
+          >
+            🔗 {tr("Thiết bị mở cùng", "Companion device")}
+          </button>}
         </div>}
 
         {/* Lich 1 moc: chon kieu gio o day. Khung gio: moi moc Bat/Tat co hang
             chip rieng ben duoi (v0.5.51). */}
-        {!isAutoOff && !isRange && <div className="chip-row">
+        {!isAutoOff && !isCompanion && !isRange && <div className="chip-row">
           <button
             className={draft.trigger_type === "time" ? "chip chip--active" : "chip"}
             onClick={() => setDraft((d) => ({ ...d, trigger_type: "time" }))}
@@ -338,7 +372,28 @@ export function ScheduleEditor({
 
         {showError && <div className="form-error" role="alert">{validationError}</div>}
 
-        {isAutoOff ? (
+        {isCompanion ? (
+          <>
+            <label className="field-label">{tr("Thiết bị mở cùng", "Companion device")}</label>
+            <button className="input input--button" onClick={() => setCompanionPickerOpen(true)}>
+              {draft.companion_entity ? nameFor(draft.companion_entity) : `+ ${tr("Chọn thiết bị mở cùng (vd. bơm tăng áp)", "Select the companion device (e.g. a booster pump)")}`}
+            </button>
+            <label className="field-label">{tr("Trễ trước khi tắt", "Turn-off delay")}</label>
+            <div className="companion-delay">
+              <button type="button" className="btn btn--ghost" aria-label={tr("Bớt 1 giây", "1 second less")}
+                onClick={() => setDraft((d) => ({ ...d, time: secondsToTime(Math.max(0, timeToSeconds(d.time) - 1)) }))}>−</button>
+              <span className="companion-delay__value">{timeToSeconds(draft.time)} {tr("giây", "s")}</span>
+              <button type="button" className="btn btn--ghost" aria-label={tr("Thêm 1 giây", "1 second more")}
+                onClick={() => setDraft((d) => ({ ...d, time: secondsToTime(Math.min(3600, timeToSeconds(d.time) + 1)) }))}>+</button>
+            </div>
+            <p className="settings-hint">
+              {tr(
+                "Chỉ cần một thiết bị trong nhóm bật là thiết bị mở cùng bật. Khi cả nhóm đã tắt, chờ thời gian trễ rồi kiểm tra lại: vẫn tắt hết mới tắt thiết bị mở cùng. Có thiết bị bật lại trong lúc chờ thì thiết bị mở cùng vẫn chạy.",
+                "When any device in the group turns on, the companion device turns on. When the whole group is off, it waits for the delay and checks again: only if all are still off is the companion turned off. A device turning on during the wait keeps it running.",
+              )}
+            </p>
+          </>
+        ) : isAutoOff ? (
           <>
             <div className="field-label field-label--inline">{tr("Tắt sau (giờ : phút : giây)", "Turn off after (h : m : s)")}</div>
             <TimeWheelPicker value={draft.time} onChange={(time) => setDraft((d) => ({ ...d, time }))} />
@@ -355,7 +410,7 @@ export function ScheduleEditor({
             <div className="range-wheel">
               <div className="field-label field-label--inline">{onWord} {tr("lúc", "at")}</div>
               <PointEditor
-                trigger={draft.trigger_type === "auto_off" ? "time" : draft.trigger_type}
+                trigger={draft.trigger_type === "auto_off" || draft.trigger_type === "companion" ? "time" : draft.trigger_type}
                 offset={draft.offset_minutes}
                 time={draft.time}
                 sunTimes={sunTimes}
@@ -372,7 +427,7 @@ export function ScheduleEditor({
                   trigger_type: d.end_trigger_type,
                   offset_minutes: d.end_offset_minutes,
                   time: d.end_time ?? d.time,
-                  end_trigger_type: d.trigger_type === "auto_off" ? "time" : d.trigger_type,
+                  end_trigger_type: d.trigger_type === "auto_off" || d.trigger_type === "companion" ? "time" : d.trigger_type,
                   end_offset_minutes: d.offset_minutes,
                   end_time: d.time,
                   conditions: d.end_conditions,
@@ -457,7 +512,7 @@ export function ScheduleEditor({
           />
         )}
 
-        {!isRange && !isAutoOff && (
+        {!isRange && !isAutoOff && !isCompanion && (
           <>
             <label className="field-label">{tr("Hành động", "Action")}</label>
             {profile ? (
@@ -508,7 +563,7 @@ export function ScheduleEditor({
           </>
         )}
 
-        {!isAutoOff && <>
+        {!isAutoOff && !isCompanion && <>
         <label className="field-label">{tr("Ngày lặp", "Repeat days")}</label>
         <DaySelector value={draft.days} onChange={(days) => setDraft((d) => ({ ...d, days }))} />
 
@@ -603,6 +658,19 @@ export function ScheduleEditor({
             return { ...d, target_entities: ids, action_service: stillMatches ? d.action_service : "turn_on" };
           });
           setPickerOpen(false);
+        }}
+      />
+
+      <EntityPicker
+        open={companionPickerOpen}
+        single
+        title={tr("Chọn thiết bị mở cùng", "Select the companion device")}
+        selected={draft.companion_entity ? [draft.companion_entity] : []}
+        exclude={draft.target_entities}
+        onClose={() => setCompanionPickerOpen(false)}
+        onConfirm={(ids) => {
+          setDraft((d) => ({ ...d, companion_entity: ids[0] ?? null }));
+          setCompanionPickerOpen(false);
         }}
       />
 

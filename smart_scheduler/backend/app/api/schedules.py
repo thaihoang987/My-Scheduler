@@ -36,6 +36,22 @@ def _check_auto_off_unique(data: dict, schedule_id: str | None = None) -> None:
                                         "This device already has an auto-off rule - edit it instead of adding another."))
 
 
+def _check_companion(data: dict) -> None:
+    """Thiet bi mo cung (v0.6.0): phai chon thiet bi mo cung, va no khong duoc
+    nam trong chinh nhom cua no (bat no se lai bat chinh no)."""
+    if data.get("trigger_type") != "companion":
+        return
+    companion = (data["action"].get("service_data") or {}).get("companion")
+    targets = data.get("target_entities") or []
+    if not companion:
+        raise HTTPException(400, tr("Chưa chọn thiết bị mở cùng.", "No companion device selected."))
+    if companion in targets:
+        raise HTTPException(400, tr("Thiết bị mở cùng không được nằm trong nhóm.",
+                                    "The companion device cannot also be in the group."))
+    if not targets:
+        raise HTTPException(400, tr("Chưa chọn thiết bị trong nhóm.", "No devices selected for the group."))
+
+
 @router.get("", response_model=list[ScheduleOut])
 async def list_schedules():
     schedules = crud.list_schedules()
@@ -48,6 +64,7 @@ async def create_schedule(payload: ScheduleIn):
     data["action"] = payload.action.model_dump()
     _check_one_shot(data)
     _check_auto_off_unique(data)
+    _check_companion(data)
     created = crud.create_schedule(data)
     if created.get("group_id") and normalize_range_days({created["group_id"]}):
         created = crud.get_schedule(created["id"])
@@ -69,6 +86,7 @@ async def update_schedule(schedule_id: str, payload: ScheduleIn):
     data["action"] = payload.action.model_dump()
     _check_one_shot(data)
     _check_auto_off_unique(data, schedule_id)
+    _check_companion(data)
     updated = crud.update_schedule(schedule_id, data)
     if not updated:
         raise HTTPException(404, "Schedule not found")

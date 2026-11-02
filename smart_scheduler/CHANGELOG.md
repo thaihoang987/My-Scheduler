@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+- New: **Companion device**. One shared device follows a whole group, for example a single booster pump shared by several irrigation valves. Tap + → "Companion device", pick the devices in the group (the valves), the companion device (the pump) and a turn-off delay (default 2 seconds).
+  - As soon as one device in the group turns on, the companion turns on (if it is off).
+  - When all devices in the group are off, the app waits for the delay and checks again: only if they are still all off is the companion turned off. A valve opening during the wait (two valves less than 2 seconds apart) keeps the pump running, so it no longer stops and restarts between valves.
+  - Works on the real device state, so valves switched from the dashboard, a wall switch or an automation count too. An unavailable device counts as off. Valve and cover companions are opened/closed, other devices are turned on/off.
+  - Rules sharing the same companion are combined, so one group going idle never stops a pump another group still needs. After Home Assistant reconnects every rule is checked once.
+- Companion rules are shown in their own section on the Home page (next to Auto-off after on): switch to enable/disable, tap to edit or delete, drag to reorder in arrange mode, and the section moves together with the Auto-off section. Every switch of the companion is written to the History page, and the on/off timeline shows "Companion device" as the cause.
+
 ## 0.5.99
 
 - Timeline: the cause colour now sits in its own thin lane under each on/off bar instead of being drawn over it, so the colours no longer overlap the bar or each other.

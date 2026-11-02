@@ -154,7 +154,7 @@ def _conflicts(now: datetime) -> set[str]:
     blocked = set()
     for s in crud.list_schedules():
         if s.get("enabled", True) and crud.card_on(s):
-            if s.get("trigger_type") == "auto_off" or not (paused and paused > now):
+            if s.get("trigger_type") in ("auto_off", "companion") or not (paused and paused > now):
                 blocked.update(s.get("target_entities") or [])
     for timer in crud.list_manual_timers():
         blocked.update(timer["entity_ids"])

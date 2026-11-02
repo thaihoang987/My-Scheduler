@@ -38,6 +38,7 @@ const SOURCES: { key: string; label: () => string }[] = [
   { key: "schedule", label: () => tr("Lịch của app", "App schedule") },
   { key: "forced", label: () => tr("Bật cưỡng chế", "Forced on") },
   { key: "auto_off", label: () => tr("Tự tắt sau khi bật", "Auto-off after on") },
+  { key: "companion", label: () => tr("Thiết bị mở cùng", "Companion device") },
   { key: "presence", label: () => tr("Giả lập có người", "Presence simulation") },
   { key: "app", label: () => tr("App (thao tác khác)", "App (other action)") },
   { key: "user", label: () => tr("Người dùng (dashboard HA)", "User (HA dashboard)") },
