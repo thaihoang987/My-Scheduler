@@ -41,7 +41,9 @@ export interface Schedule {
   // `offset_minutes` phut (giong Google Home/Tuya/SmartThings).
   // "auto_off" (v0.5.44) = tu tat sau khi thiet bi BAT duoc `time` (do dai
   // HH:MM:SS, khong phai gio dong ho) - backend theo doi trang thai that.
-  trigger_type: "time" | "sunrise" | "sunset" | "auto_off";
+  // "companion" (v0.6.0) = Thiet bi mo cung: target_entities la nhom,
+  // action.service_data.companion la thiet bi chay theo nhom, `time` = do tre tat.
+  trigger_type: "time" | "sunrise" | "sunset" | "auto_off" | "companion";
   offset_minutes: number;
   /** Khung gio: moc Tat cung ngay (0) / hom sau (1) cua moc Bat, null = theo kieu gio (v0.5.79). */
   range_day_offset?: 0 | 1 | null;

@@ -27,7 +27,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from app import crud, homeassistant, manual_timer, sources
+from app import companion, crud, homeassistant, manual_timer, sources
 from app.ws import manager
 from app.i18n import tr
 
@@ -301,17 +301,25 @@ async def on_schedule_event(event: str) -> None:
 
 async def _on_ready(states: list[dict]) -> None:
     await sync(states=states)
+    try:
+        await companion.sync(states=states)
+    except Exception:  # noqa: BLE001
+        log.exception("Loi khi dong bo Thiet bi mo cung")
     if _ready_hook:
         await _ready_hook(states)
 
 
 async def _on_event(eid: str, old: dict | None, new: dict | None) -> None:
     """Moi su kien state_changed: ghi nguon bat/tat (sources) truoc, roi moi xu ly
-    tu tat. Ghi nguon loi thi van phai xu ly tu tat."""
+    tu tat va Thiet bi mo cung. Ghi nguon loi thi van phai xu ly tiep."""
     try:
         await sources.record(eid, old, new)
     except Exception:  # noqa: BLE001
         log.exception("Loi khi ghi nguon doi trang thai %s", eid)
+    try:
+        await companion.on_change(eid, old, new)
+    except Exception:  # noqa: BLE001
+        log.exception("Loi khi xu ly Thiet bi mo cung %s", eid)
     await on_change(eid, old, new)
 
 
@@ -322,3 +330,4 @@ async def auto_off_loop() -> None:
     finally:
         for eid in list(_tasks):
             _cancel(eid)
+        companion.reset()

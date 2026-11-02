@@ -27,7 +27,7 @@ export interface ScheduleDraft {
   // binh minh/hoang hon +/- `offset_minutes`. Che do "Khung gio" chi ap dung
   // cho moc BAT (moc TAT luon la gio co dinh `end_time`). "auto_off" = tu
   // tat sau khi bat, `time` la DO DAI "HH:MM:SS" (xem backend auto_off.py).
-  trigger_type: "time" | "sunrise" | "sunset" | "auto_off";
+  trigger_type: "time" | "sunrise" | "sunset" | "auto_off" | "companion";
   offset_minutes: number;
   // Moc TAT cua "Khung gio" (v0.5.51): gio co dinh (`end_time`) hoac binh minh/
   // hoang hon +/- phut - vd bat luc hoang hon, tat luc binh minh.
@@ -59,6 +59,8 @@ export interface ScheduleDraft {
   // chung `conditions` voi moc Bat: dieu kien sai luc toi gio Tat thi thiet
   // bi bat mai. Rong = luon tat dung gio.
   end_conditions: ScheduleCondition[];
+  // Thiet bi mo cung (trigger_type "companion"), vd bom tang ap - `time` la do tre tat.
+  companion_entity: string | null;
 }
 
 export const EMPTY_DRAFT: ScheduleDraft = {
@@ -84,7 +86,16 @@ export const EMPTY_DRAFT: ScheduleDraft = {
   fan_preset_mode: null,
   conditions: [],
   end_conditions: [],
+  companion_entity: null,
 };
+
+/** Do tre mac dinh cua Thiet bi mo cung (2 giay). */
+export const DEFAULT_COMPANION_DELAY = "00:00:02";
+
+/** Thiet bi mo cung cua 1 lich "companion". */
+export function companionOf(schedule: Pick<Schedule, "action">): string | null {
+  return (schedule.action.service_data.companion as string | undefined) || null;
+}
 
 /** Nhan tieng Viet cho hvac_mode cua climate - dung chung ScheduleEditor
  * (chon mode) va draftName/describeAction (hien thi). Mode la khoa API
@@ -238,6 +249,7 @@ export function autoOffLabel(duration: string): string {
 export function triggerLabel(triggerType: Schedule["trigger_type"], offsetMinutes: number, time: string): string {
   if (triggerType === "time") return time;
   if (triggerType === "auto_off") return autoOffLabel(time);
+  if (triggerType === "companion") return `🔗 ${tr("Tắt sau", "Off after")} ${formatDuration(time)}`;
   const base = triggerType === "sunrise" ? tr("Bình minh", "Sunrise") : tr("Hoàng hôn", "Sunset");
   if (!offsetMinutes) return base;
   return `${base} ${offsetMinutes > 0 ? "+" : ""}${offsetMinutes}p`;
@@ -256,7 +268,7 @@ export function triggerLabelWithClock(
   nextRun: string | null,
 ): string {
   const label = triggerLabel(triggerType, offsetMinutes, time);
-  if (triggerType === "time" || triggerType === "auto_off" || !nextRun) return label;
+  if (triggerType === "time" || triggerType === "auto_off" || triggerType === "companion" || !nextRun) return label;
   const clock = fmtTime(nextRun);
   return `${label} (~${clock})`;
 }
@@ -273,6 +285,9 @@ export function draftName(draft: ScheduleDraft, entities: EntitySummary[]): stri
         ? nameOf(draft.target_entities[0])
         : `${draft.target_entities.length} ${tr("thiết bị", "devices")}`;
   if (draft.trigger_type === "auto_off") return `${deviceLabel} · ${autoOffLabel(draft.time)}`;
+  if (draft.trigger_type === "companion") {
+    return `${draft.companion_entity ? nameOf(draft.companion_entity) : tr("Thiết bị mở cùng", "Companion device")} · ${tr("theo", "follows")} ${deviceLabel}`;
+  }
   if (draft.end_time) {
     const on = triggerLabel(draft.trigger_type, draft.offset_minutes, draft.time);
     const off = triggerLabel(draft.end_trigger_type, draft.end_offset_minutes, draft.end_time);
@@ -388,6 +403,7 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
       fan_preset_mode: null,
       conditions: onS.conditions,
       end_conditions: offS.conditions,
+      companion_entity: null,
     };
   }
   const { domain, service, service_data } = schedule.action;
@@ -431,6 +447,7 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
     fan_preset_mode: isFanAction && service === "set_preset_mode" ? ((service_data.preset_mode as string) ?? null) : null,
     conditions: schedule.conditions,
     end_conditions: [],
+    companion_entity: schedule.trigger_type === "companion" ? companionOf(schedule) : null,
   };
 }
 
@@ -461,13 +478,16 @@ export async function saveScheduleDraft(
 
   if (!draft.end_time) {
     if (sibling) await api.deleteSchedule(sibling.id);
-    const autoOff = draft.trigger_type === "auto_off";
+    const companion = draft.trigger_type === "companion";
+    const autoOff = draft.trigger_type === "auto_off" || companion;
     const payload = {
       ...base,
       // Tu tat khong dung ngay lap/khoang ngay/dieu kien - luon ap dung.
       ...(autoOff ? { days: ALL_DAYS, start_date: null, end_date: null, group_id: null } : {}),
       name: draftName(draft, entities),
-      action: draftToAction(autoOff ? { ...draft, action_service: "turn_off" } : draft),
+      action: companion
+        ? { domain: "homeassistant", service: "turn_on", service_data: { companion: draft.companion_entity } }
+        : draftToAction(autoOff ? { ...draft, action_service: "turn_off" } : draft),
       conditions: autoOff ? [] : draft.conditions,
       time: draft.time,
       trigger_type: draft.trigger_type,
@@ -528,6 +548,13 @@ function toSeconds(t: string): number {
  * nhau; chi cam gio Bat va Tat trung chinh xac den giay trong cung 1 khung. */
 export function validateScheduleDraft(draft: ScheduleDraft): string | null {
   if (draft.target_entities.length === 0) return tr("Hãy chọn ít nhất một thiết bị", "Select at least one device");
+  if (draft.trigger_type === "companion") {
+    if (!draft.companion_entity) return tr("Hãy chọn thiết bị mở cùng (vd. bơm)", "Select the companion device (e.g. a pump)");
+    if (draft.target_entities.includes(draft.companion_entity)) {
+      return tr("Thiết bị mở cùng không được nằm trong nhóm", "The companion device cannot also be in the group");
+    }
+    return null;
+  }
   if (draft.trigger_type === "auto_off") {
     return toSeconds(draft.time) > 0 ? null : tr("Thời gian tự tắt phải lớn hơn 0", "Auto-off duration must be greater than 0");
   }

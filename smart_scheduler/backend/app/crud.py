@@ -78,7 +78,7 @@ def _row_to_schedule(row, tz: Optional[str] = None, cats: Optional[tuple] = None
     # Nhom cua card = nhom cua thiet bi DAU TIEN co nhom (giong categoryOf o
     # frontend). "Tu tat sau khi bat" khong thuoc nhom nao.
     d["group_paused"], d["group_skip_until"] = False, None
-    if d.get("trigger_type") != "auto_off":
+    if d.get("trigger_type") not in ("auto_off", "companion"):
         cat_of, groups = cats if cats is not None else _category_state()
         gid = next((cat_of[e] for e in d["target_entities"] if e in cat_of), None)
         g = groups.get(gid) if gid else None
@@ -441,7 +441,7 @@ def delete_group(group_id: str) -> bool:
 def group_schedule_ids(group_id: str) -> list[str]:
     """Lich (khong tinh Tu tat) dang thuoc nhom nay theo quy tac o _row_to_schedule."""
     cat_of, _ = _category_state()
-    return [s["id"] for s in list_schedules() if s.get("trigger_type") != "auto_off"
+    return [s["id"] for s in list_schedules() if s.get("trigger_type") not in ("auto_off", "companion")
             and next((cat_of[e] for e in s["target_entities"] if e in cat_of), None) == group_id]
 
 

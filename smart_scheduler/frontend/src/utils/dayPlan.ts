@@ -26,7 +26,7 @@ export function weekdayOf(date: string): number {
 }
 
 function runsOn(s: Schedule, date: string): boolean {
-  if (!s.enabled || s.card_enabled === false || s.group_paused || s.trigger_type === "auto_off") return false;
+  if (!s.enabled || s.card_enabled === false || s.group_paused || s.trigger_type === "auto_off" || s.trigger_type === "companion") return false;
   // Nhom dang "Bo qua": lenh Bat khong chay toi het ngay bo qua (lenh Tat van chay).
   if (s.group_skip_until && s.action.service !== "turn_off" && date <= dateInZone(new Date(Date.parse(s.group_skip_until) - 1))) return false;
   if (!s.days.includes(weekdayOf(date))) return false;

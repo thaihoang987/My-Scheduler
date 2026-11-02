@@ -1331,6 +1331,11 @@ body {
 }
 .auto-off__row.sortable-fallback { outline: 2px solid var(--accent); background: var(--surface); border-radius: var(--radius-lg); }
 
+/* ---- Thiet bi mo cung (v0.6.0): stepper do tre tat (giay) ---- */
+.companion-delay { display: flex; align-items: center; gap: 12px; }
+.companion-delay .btn { min-width: 44px; font-size: 20px; line-height: 1; }
+.companion-delay__value { min-width: 72px; text-align: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
 /* ---- Thu/phong + doi vi tri nhom tren Nha (v0.5.47) ---- */
 .section-header { align-items: center; justify-content: space-between; }
 .section-header__toggle {

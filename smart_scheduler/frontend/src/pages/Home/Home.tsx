@@ -1,6 +1,7 @@
 import { mdiPencilOutline, mdiPlus, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
 import { useEffect, useMemo, useState } from "react";
 import { AutoOffList } from "../../components/AutoOffList/AutoOffList";
+import { CompanionList } from "../../components/CompanionList/CompanionList";
 import { Clock } from "../../components/Clock/Clock";
 import { HomeBanners } from "../../components/HomeBanners/HomeBanners";
 import { DeviceGrid } from "../../components/DeviceGrid/DeviceGrid";
@@ -52,6 +53,7 @@ export function Home({
   /** Lich "Tu tat sau khi bat" dang sua (bam 1 dong trong AutoOffList). */
   const [editingRule, setEditingRule] = useState<Schedule | null>(null);
   const autoOffRules = useMemo(() => schedules.filter((s) => s.trigger_type === "auto_off"), [schedules]);
+  const companionRules = useMemo(() => schedules.filter((s) => s.trigger_type === "companion"), [schedules]);
   const [collapsed, toggleCollapsed] = useCollapsedSections(settings.collapsed_sections, reload);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
   const [savingTheme, setSavingTheme] = useState(false);
@@ -85,6 +87,7 @@ export function Home({
   // (luu Cai dat). Che do Sap xep: nut len/xuong doi nhom phan loai
   // (reorderGroups) hoac doi vi tri khoi Tu tat (updateSettings).
   const AUTO = "__auto_off__";
+  const COMPANION = "__companion__";
   const baseIds = categoryGroups.length > 0 ? [...categoryGroups.map((g) => g.id), UNGROUPED] : ["__all__"];
   const autoIndex = Math.max(0, Math.min(settings.auto_off_section_index ?? 0, baseIds.length));
   const order = [...baseIds.slice(0, autoIndex), AUTO, ...baseIds.slice(autoIndex)];
@@ -304,7 +307,7 @@ export function Home({
       </div>
 
       {(() => {
-        const autoNode = (
+        const autoOffNode = (
           <AutoOffList
             rules={autoOffRules}
             allSchedules={schedules}
@@ -320,6 +323,33 @@ export function Home({
             }}
             onToggle={toggleRule}
           />
+        );
+        // Thiet bi mo cung di chung vi tri voi khoi Tu tat (doi vi tri ca 2
+        // bang nut len/xuong cua khoi), thu gon rieng.
+        const autoControls = controls(AUTO);
+        const autoNode = (
+          <>
+            {autoOffNode}
+            <CompanionList
+              rules={companionRules}
+              allSchedules={schedules}
+              editMode={editMode}
+              reload={reload}
+              setDragging={setDragging}
+              entities={entities}
+              controls={{
+                ...autoControls,
+                ...(autoOffRules.length > 0 ? { onMoveUp: undefined, onMoveDown: undefined } : {}),
+                collapsed: collapsed.has(COMPANION),
+                onToggle: () => toggleCollapsed(COMPANION),
+              }}
+              onEdit={(rule) => {
+                setEditingRule(rule);
+                setEditorOpen(true);
+              }}
+              onToggle={toggleRule}
+            />
+          </>
         );
         // 2 kieu xem theo ngay: thay luoi card, khoi Tu tat van o duoi.
         if (view === "agenda") {
@@ -356,7 +386,7 @@ export function Home({
           );
         }
         const grid =
-          groups.length === 0 && autoOffRules.length > 0 ? null : (
+          groups.length === 0 && (autoOffRules.length > 0 || companionRules.length > 0) ? null : (
             <DeviceGrid
               groups={filtered}
               view={view}

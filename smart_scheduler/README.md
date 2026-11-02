@@ -13,6 +13,7 @@ created by hand for each device. Pick a device, pick a time, done.
 - Entity-state conditions, device groups, custom names/icons, favorites
 - Forced-on with auto-off, presence simulation while away, pause all schedules
 - Auto-off after on: a device that stays on longer than N (from any source) is turned off, survives restarts
+- Companion device: a shared device (e.g. a booster pump) runs while any device of a group (e.g. irrigation valves) is on, with a short turn-off delay so it does not cycle between valves
 - Missed-run catch-up, device state verification, history log, backup/restore
 - Schedules run in the app backend — they keep working with the browser closed
 - Interface language (English / Vietnamese): **Settings → Appearance → Language**

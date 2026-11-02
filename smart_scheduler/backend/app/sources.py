@@ -23,7 +23,7 @@ from app.i18n import tr
 
 log = logging.getLogger("ha_smart_scheduler.sources")
 
-APP_SOURCES = ("schedule", "forced", "auto_off", "presence", "app")
+APP_SOURCES = ("schedule", "forced", "auto_off", "companion", "presence", "app")
 EXTERNAL_SOURCES = ("user", "automation", "device")
 NO_STATE = ("unavailable", "unknown", None)
 MATCH_WINDOW_SECONDS = 30
