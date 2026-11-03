@@ -7,19 +7,20 @@ import type { EntitySummary, Schedule } from "../../types";
 import { visualFor } from "../../utils/deviceVisuals";
 import { useMdiIcons } from "../../utils/mdiIcons";
 import { entityNames } from "../../utils/groupSchedules";
-import { companionOf, formatDuration } from "../../utils/scheduleRange";
+import { companionOf, formatDuration, pausedOf } from "../../utils/scheduleRange";
 import { Icon } from "../Icon/Icon";
 import { MissingMark } from "../DeviceCard/DeviceCard";
 import type { SectionControls } from "../GroupedDeviceGrid/GroupedDeviceGrid";
 import { SectionHeader } from "../SectionHeader/SectionHeader";
 import { tr } from "../../i18n";
 
-const isOn = (state: string | undefined) =>
+export const isOn = (state: string | undefined) =>
   state !== undefined && !["off", "closed", "closing", "unavailable", "unknown"].includes(state);
 
 /** "Thiet bi mo cung" (v0.6.0) tren trang Nha - cung kieu AutoOffList: Icon |
- * ten thiet bi mo cung + nhom | do tre | toggle. Bam dong de sua/xoa, che do
- * "Sap xep" hien tay cam keo doi thu tu (sort_order chung voi moi lich). */
+ * ten thiet bi mo cung | do tre | toggle, ben duoi la tung thiet bi trong
+ * nhom (cham xanh = dang bat, mo = tam ngung, v0.6.1). Bam dong mo bang chi
+ * tiet (CompanionSheet), che do "Sap xep" hien tay cam keo doi thu tu. */
 export function CompanionList({
   rules,
   entities,
@@ -91,6 +92,7 @@ export function CompanionList({
           const enabled = rule.enabled && rule.card_enabled !== false;
           const ids = [companion, ...rule.target_entities];
           const missingIds = ids.filter((id) => entityMap.get(id)?.missing);
+          const paused = pausedOf(rule);
           return (
             <div
               key={rule.id}
@@ -114,11 +116,19 @@ export function CompanionList({
                 </div>
                 <div className="auto-off__state">
                   {running ? tr("● Đang chạy", "● Running") : tr("Đang tắt", "Off")}
-                  {" · "}
-                  {tr("theo", "follows")}{" "}
-                  {rule.target_entities.length <= 2
-                    ? entityNames(rule.target_entities, entities)
-                    : `${rule.target_entities.length} ${tr("thiết bị", "devices")}`}
+                  {paused.length > 0 && ` · ${rule.target_entities.length - paused.length}/${rule.target_entities.length} ${tr("đang kéo theo", "active")}`}
+                </div>
+                <div className="companion-chips">
+                  {rule.target_entities.map((id) => {
+                    const member = entityMap.get(id);
+                    const cls = paused.includes(id) ? "companion-chip--paused" : isOn(member?.state) ? "companion-chip--on" : "";
+                    return (
+                      <span key={id} className={`companion-chip ${cls}`}>
+                        <span className="companion-chip__dot" />
+                        {entityNames([id], entities)}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
               <div className="auto-off__duration" title={tr("Trễ trước khi tắt", "Turn-off delay")}>
