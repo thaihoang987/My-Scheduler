@@ -2,6 +2,7 @@ import { mdiPencilOutline, mdiPlus, mdiWeatherNight, mdiWhiteBalanceSunny } from
 import { useEffect, useMemo, useState } from "react";
 import { AutoOffList } from "../../components/AutoOffList/AutoOffList";
 import { CompanionList } from "../../components/CompanionList/CompanionList";
+import { CompanionSheet } from "../../components/CompanionList/CompanionSheet";
 import { Clock } from "../../components/Clock/Clock";
 import { HomeBanners } from "../../components/HomeBanners/HomeBanners";
 import { DeviceGrid } from "../../components/DeviceGrid/DeviceGrid";
@@ -54,6 +55,9 @@ export function Home({
   const [editingRule, setEditingRule] = useState<Schedule | null>(null);
   const autoOffRules = useMemo(() => schedules.filter((s) => s.trigger_type === "auto_off"), [schedules]);
   const companionRules = useMemo(() => schedules.filter((s) => s.trigger_type === "companion"), [schedules]);
+  /** Thiet bi mo cung dang mo bang chi tiet (v0.6.1) - giu id, lay lich moi nhat sau moi lan luu. */
+  const [companionSheetId, setCompanionSheetId] = useState<string | null>(null);
+  const companionSheetRule = companionRules.find((r) => r.id === companionSheetId) ?? null;
   const [collapsed, toggleCollapsed] = useCollapsedSections(settings.collapsed_sections, reload);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
   const [savingTheme, setSavingTheme] = useState(false);
@@ -343,10 +347,7 @@ export function Home({
                 collapsed: collapsed.has(COMPANION),
                 onToggle: () => toggleCollapsed(COMPANION),
               }}
-              onEdit={(rule) => {
-                setEditingRule(rule);
-                setEditorOpen(true);
-              }}
+              onEdit={(rule) => setCompanionSheetId(rule.id)}
               onToggle={toggleRule}
             />
           </>
@@ -407,6 +408,24 @@ export function Home({
       <button className="fab" onClick={() => setEditorOpen(true)} aria-label={tr("Thêm lịch", "Add schedule")}>
         <Icon path={mdiPlus} size={26} />
       </button>
+
+      <CompanionSheet
+        open={Boolean(companionSheetRule)}
+        rule={companionSheetRule}
+        entities={entities}
+        allSchedules={schedules}
+        reload={reload}
+        onClose={() => setCompanionSheetId(null)}
+        onEdit={(rule) => {
+          setCompanionSheetId(null);
+          setEditingRule(rule);
+          setEditorOpen(true);
+        }}
+        onDelete={async (id) => {
+          setCompanionSheetId(null);
+          await deleteRule(id);
+        }}
+      />
 
       <ScheduleEditor
         open={editorOpen}

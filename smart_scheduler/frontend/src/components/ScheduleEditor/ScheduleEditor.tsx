@@ -9,6 +9,8 @@ import {
   mergeFanAttrs,
   mergeLightAttrs,
   rangeDayOffset,
+  secondsToTime,
+  timeToSeconds,
   validateScheduleDraft,
   type ScheduleDraft,
 } from "../../utils/scheduleRange";
@@ -29,16 +31,6 @@ import { fmtTime, secondsOfDayInZone, todayInZone } from "../../utils/appTime";
 import { actionChipLabel, domainProfile, type ActionService } from "../../utils/domainProfile";
 
 const DOMAIN_ACTION_SERVICE = { climate: "climate_set", light: "light_set", cover: "cover_set", fan: "fan_set" } as const;
-
-function timeToSeconds(t: string): number {
-  const [h = 0, m = 0, s = 0] = t.split(":").map(Number);
-  return Math.round(h * 3600 + m * 60 + s);
-}
-
-function secondsToTime(total: number): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
-}
 
 /** " (05:43)" - gio moc troi hom nay de hien ngay tren chip, tra ve rong neu
  * chua co (dang tai hoac chua lay duoc vi tri HA). */

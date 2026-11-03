@@ -31,7 +31,7 @@ The app talks to Home Assistant through the Supervisor, so no token or URL is ne
 
 - **Forced on**: turn a device on now with an automatic off timer; survives app restarts.
 - **Auto-off after on**: + → "Auto-off after on", pick a device and a duration. Whenever it turns on (dashboard, wall switch, automation, another schedule) it is turned off after that duration. The on-time is stored, so a Home Assistant restart or backup does not reset the countdown; if it expired while offline, it turns off as soon as the app is back.
-- **Companion device**: + → "Companion device", pick the devices in the group (e.g. irrigation valves), the companion device (e.g. the booster pump) and a turn-off delay (default 2 seconds). The companion turns on as soon as one device in the group is on. When the whole group is off, the app waits for the delay and checks again before turning it off, so a valve opening within the delay keeps the pump running.
+- **Companion device**: + → "Companion device", pick the devices in the group (e.g. irrigation valves), the companion device (e.g. the booster pump) and a turn-off delay (default 2 seconds). The companion turns on as soon as one device in the group is on. When the whole group is off, the app waits for the delay and checks again before turning it off, so a valve opening within the delay keeps the pump running. Tap the card on the Home page to see each device in the group, pause one with its switch, add or remove devices, or change the delay.
 - **Presence simulation**: randomly switch selected devices while you are away.
 - **Groups, custom names, icons, favorites** to organize the Home page.
 - **Missed runs**: skip, or run once after the app restarts.

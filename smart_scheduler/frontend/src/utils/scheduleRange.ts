@@ -61,6 +61,8 @@ export interface ScheduleDraft {
   end_conditions: ScheduleCondition[];
   // Thiet bi mo cung (trigger_type "companion"), vd bom tang ap - `time` la do tre tat.
   companion_entity: string | null;
+  // Thiet bi trong nhom dang tam ngung (v0.6.1) - khong keo theo thiet bi mo cung.
+  companion_paused: string[];
 }
 
 export const EMPTY_DRAFT: ScheduleDraft = {
@@ -87,14 +89,58 @@ export const EMPTY_DRAFT: ScheduleDraft = {
   conditions: [],
   end_conditions: [],
   companion_entity: null,
+  companion_paused: [],
 };
 
 /** Do tre mac dinh cua Thiet bi mo cung (2 giay). */
 export const DEFAULT_COMPANION_DELAY = "00:00:02";
 
+/** "HH:MM:SS" <-> so giay (do tre tat cua Thiet bi mo cung). */
+export function timeToSeconds(t: string): number {
+  const [h = 0, m = 0, s = 0] = t.split(":").map(Number);
+  return Math.round(h * 3600 + m * 60 + s);
+}
+
+export function secondsToTime(total: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
+}
+
 /** Thiet bi mo cung cua 1 lich "companion". */
 export function companionOf(schedule: Pick<Schedule, "action">): string | null {
   return (schedule.action.service_data.companion as string | undefined) || null;
+}
+
+/** Thiet bi trong nhom dang tam ngung cua 1 lich "companion" (v0.6.1). */
+export function pausedOf(schedule: Pick<Schedule, "action">): string[] {
+  return (schedule.action.service_data.paused as string[] | undefined) ?? [];
+}
+
+/** Sua nhanh 1 lich "companion" tu bang chi tiet (nhom, tam ngung, do tre) -
+ * gui lai du cac truong con lai cua lich, giu vi tri/yeu thich. */
+export async function updateCompanion(
+  rule: Schedule,
+  patch: { target_entities?: string[]; paused?: string[]; time?: string },
+): Promise<void> {
+  const targets = patch.target_entities ?? rule.target_entities;
+  const paused = (patch.paused ?? pausedOf(rule)).filter((id) => targets.includes(id));
+  await api.updateSchedule(rule.id, {
+    name: rule.name,
+    enabled: rule.enabled,
+    target_entities: targets,
+    action: { ...rule.action, service_data: { ...rule.action.service_data, paused } },
+    days: rule.days,
+    time: patch.time ?? rule.time,
+    trigger_type: "companion",
+    offset_minutes: 0,
+    sort_order: rule.sort_order,
+    favorite: rule.favorite,
+    start_date: null,
+    end_date: null,
+    group_id: null,
+    range_day_offset: null,
+    conditions: [],
+  });
 }
 
 /** Nhan tieng Viet cho hvac_mode cua climate - dung chung ScheduleEditor
@@ -404,6 +450,7 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
       conditions: onS.conditions,
       end_conditions: offS.conditions,
       companion_entity: null,
+      companion_paused: [],
     };
   }
   const { domain, service, service_data } = schedule.action;
@@ -448,6 +495,7 @@ export function draftFromSchedule(schedule: Schedule, allSchedules: Schedule[]):
     conditions: schedule.conditions,
     end_conditions: [],
     companion_entity: schedule.trigger_type === "companion" ? companionOf(schedule) : null,
+    companion_paused: schedule.trigger_type === "companion" ? pausedOf(schedule) : [],
   };
 }
 
@@ -486,7 +534,10 @@ export async function saveScheduleDraft(
       ...(autoOff ? { days: ALL_DAYS, start_date: null, end_date: null, group_id: null } : {}),
       name: draftName(draft, entities),
       action: companion
-        ? { domain: "homeassistant", service: "turn_on", service_data: { companion: draft.companion_entity } }
+        ? { domain: "homeassistant", service: "turn_on", service_data: {
+            companion: draft.companion_entity,
+            paused: draft.companion_paused.filter((id) => draft.target_entities.includes(id)),
+          } }
         : draftToAction(autoOff ? { ...draft, action_service: "turn_off" } : draft),
       conditions: autoOff ? [] : draft.conditions,
       time: draft.time,

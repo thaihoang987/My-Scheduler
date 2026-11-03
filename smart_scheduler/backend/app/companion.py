@@ -61,6 +61,12 @@ def companion_of(schedule: dict) -> str | None:
     return ((schedule.get("action") or {}).get("service_data") or {}).get("companion") or None
 
 
+def paused_of(schedule: dict) -> set[str]:
+    """Thiet bi trong nhom dang tam ngung (v0.6.1): van nam trong nhom nhung
+    bat/tat no khong keo theo thiet bi mo cung."""
+    return set(((schedule.get("action") or {}).get("service_data") or {}).get("paused") or [])
+
+
 def service_for(entity_id: str, turn_on: bool) -> tuple[str, str]:
     domain = entity_id.split(".", 1)[0]
     if domain in SERVICES:
@@ -77,6 +83,9 @@ def build_rules(schedules: list[dict] | None = None) -> dict[str, Rule]:
         members = set(s.get("target_entities") or []) - {companion}
         if not companion or not members:
             continue
+        # Tam ngung het van giu quy tac (nhom rong) de bom dang chay vi nhom
+        # van duoc tat sau do tre, giong tam ngung tung thiet bi.
+        members -= paused_of(s)
         rule = out.setdefault(companion, Rule(companion=companion, schedule=s))
         rule.members |= members
         rule.delay = max(rule.delay, delay_seconds(s.get("time")))

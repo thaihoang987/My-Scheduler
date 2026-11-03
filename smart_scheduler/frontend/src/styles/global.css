@@ -1336,6 +1336,35 @@ body {
 .companion-delay .btn { min-width: 44px; font-size: 20px; line-height: 1; }
 .companion-delay__value { min-width: 72px; text-align: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* Tung thiet bi trong nhom tren card + bang chi tiet (v0.6.1) */
+.companion-chips { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 6px; }
+.companion-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.14));
+  font-size: 12px; line-height: 1.4; color: var(--text-muted);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.companion-chip__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); opacity: 0.5; flex-shrink: 0; }
+.companion-chip--on { color: var(--text); }
+.companion-chip--on .companion-chip__dot { background: #34c759; opacity: 1; box-shadow: 0 0 0 2px rgba(52, 199, 89, 0.25); }
+.companion-chip--paused { opacity: 0.55; text-decoration: line-through; }
+.companion-sheet__pump { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.companion-sheet__list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.companion-sheet__row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.companion-sheet__row--paused .auto-off__icon, .companion-sheet__row--paused .auto-off__name { opacity: 0.5; }
+.companion-sheet__remove {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: none; border-radius: 50%;
+  background: none; color: var(--text-muted); cursor: pointer; flex-shrink: 0;
+}
+.companion-sheet__remove:disabled { opacity: 0.3; cursor: default; }
+.companion-sheet__add {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px; border: none; background: none; color: var(--accent, #0a84ff);
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+
 /* ---- Thu/phong + doi vi tri nhom tren Nha (v0.5.47) ---- */
 .section-header { align-items: center; justify-content: space-between; }
 .section-header__toggle {

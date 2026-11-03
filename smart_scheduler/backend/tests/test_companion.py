@@ -297,6 +297,65 @@ def test_card_switch_off_does_nothing(ha):
     assert ha.calls == []
 
 
+def _paused_action(*paused):
+    return {"domain": "homeassistant", "service": "turn_on",
+            "service_data": {"companion": PUMP, "paused": list(paused)}}
+
+
+def test_paused_valve_does_not_start_pump(ha):
+    make_rule(action=_paused_action("switch.van_1"))
+
+    async def scenario():
+        await connect(ha)
+        await ha.set("switch.van_1", "on")
+        await settle(DELAY * 3)
+        assert ha.calls == []
+        await ha.set("switch.van_2", "on")
+        await settle()
+
+    run(scenario())
+    assert ha.calls == [("homeassistant", "turn_on", [PUMP])]
+
+
+def test_pausing_the_only_open_valve_stops_pump(ha):
+    """Tam ngung van dang mo, cac van khac dong -> bom tat sau do tre."""
+    s = make_rule()
+
+    async def scenario():
+        await connect(ha, pump="on", valves=("on", "off", "closed"))
+        crud.update_schedule(s["id"], {**s, "action": _paused_action("switch.van_1")})
+        await companion.sync()
+        await settle(DELAY * 3)
+
+    run(scenario())
+    assert ha.calls == [("homeassistant", "turn_off", [PUMP])]
+
+
+def test_pausing_every_valve_stops_pump(ha):
+    s = make_rule()
+
+    async def scenario():
+        await connect(ha, pump="on", valves=("on", "on", "closed"))
+        crud.update_schedule(s["id"], {**s, "action": _paused_action(*VALVES)})
+        await companion.sync()
+        await settle(DELAY * 3)
+
+    run(scenario())
+    assert ha.calls == [("homeassistant", "turn_off", [PUMP])]
+
+
+def test_all_paused_rule_does_nothing(ha):
+    make_rule(action=_paused_action(*VALVES))
+
+    async def scenario():
+        await connect(ha)
+        await ha.set("switch.van_1", "on")
+        await settle()
+
+    run(scenario())
+    assert ha.calls == []
+
+
 def test_reconnect_turns_pump_on_for_open_valve(ha):
     make_rule()
     run(connect(ha, pump="off", valves=("off", "on", "closed")))

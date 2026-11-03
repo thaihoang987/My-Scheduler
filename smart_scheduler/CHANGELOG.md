@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- Companion device: tapping a companion card on the Home page now opens a detail sheet instead of the full editor. It lists every device in the group with its live state (on/off), and each one has its own switch to pause it, like the switch on a single schedule. A paused device stays in the group, but turning it on or off no longer drives the companion. Devices can be added (+ Add device) or removed (×), and the turn-off delay changed, right there; every change is saved immediately. "Edit" still opens the full editor, for example to pick a different companion device.
+- The companion card shows each device in the group as a small chip: green dot = on, struck through = paused, plus "1/2 active" when some are paused.
+- Pausing the last active device (or all of them) while the companion is running now turns the companion off after the delay, the same as pausing them one by one.
+
 ## 0.6.0
 
 - New: **Companion device**. One shared device follows a whole group, for example a single booster pump shared by several irrigation valves. Tap + → "Companion device", pick the devices in the group (the valves), the companion device (the pump) and a turn-off delay (default 2 seconds).
